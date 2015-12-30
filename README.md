@@ -1,5 +1,5 @@
-# Tormenta
-Measurement control and analysis for optical microscopy
+# Tempesta
+Measurement control and analysis for optical microscopy. Adaption of Fede Barabas' Tormenta software https://github.com/fedebarabas/Tormenta
 
 ### Dependencies
  - numpy
