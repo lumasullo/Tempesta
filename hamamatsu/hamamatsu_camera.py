@@ -19,7 +19,7 @@
 
 import ctypes
 import ctypes.util
-import numpy
+import numpy as np
 
 # Hamamatsu constants.
 DCAMCAP_EVENT_FRAMEREADY = int("0x0002", 0)
@@ -141,7 +141,7 @@ class HCamData():
     # @param size The size of the data object in bytes.
     #
     def __init__(self, size):
-        self.np_array = numpy.ascontiguousarray(numpy.empty(size/2, dtype=numpy.uint16))
+        self.np_array = np.ascontiguousarray(np.empty(np.int(size/2), dtype=np.uint16))
         self.size = size
 
     ## __getitem__
@@ -547,7 +547,7 @@ class HamamatsuCamera():
     #
     # Return a list of the ids of all the new frames since the last check.
     #
-    # This will block waiting for at least one new frame.
+    # This will block waiting for at least one new frame. 
     #
     # @return [id of the first frame, .. , id of the last frame]
     #
@@ -663,7 +663,7 @@ class HamamatsuCamera():
     #
     def startAcquisition(self):
         self.captureSetup()
-
+        print(self.frame_bytes)
         #
         # Allocate Hamamatsu image buffers.
         # We allocate enough to buffer 2 seconds of data.
@@ -766,7 +766,7 @@ class HamamatsuCameraMR(HamamatsuCamera):
     #
     def startAcquisition(self):
         self.captureSetup()
-
+        print(self.frame_bytes)
         #
         # Allocate new image buffers if necessary.
         # Allocate as many frames as can fit in 2GB of memory.
@@ -823,6 +823,7 @@ class HamamatsuCameraMR(HamamatsuCamera):
 #
 # Testing.
 #
+
 if __name__ == "__main__":
 
     import time
@@ -898,6 +899,8 @@ if __name__ == "__main__":
                     cnt += 1
                     
             hcam.stopAcquisition()
+            
+
 
 #
 # The MIT License

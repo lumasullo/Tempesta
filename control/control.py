@@ -543,6 +543,11 @@ class CamParamTree(ParameterTree):
 
     @writable.setter
     def writable(self, value):
+        """
+        property to set basically the whole parameters tree as writable
+        (value=True) or not writable (value=False)
+        useful to set it as not writable during recording
+        """
         self._writable = value
         self.p.param('Image frame').param('Shape').setWritable(value)
         self.timeParams.param('Frame Transfer Mode').setWritable(value)
@@ -581,11 +586,14 @@ class TormentaGUI(QtGui.QMainWindow):
     liveviewStarts = QtCore.pyqtSignal()
     liveviewEnds = QtCore.pyqtSignal()
 
-    def __init__(self, andor, bluelaser, violetlaser, uvlaser, scanZ, daq, hamamatsu,
+    def __init__(self, andor, bluelaser, violetlaser, uvlaser, scanZ, daq, orcaflash,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.orcaflash = orcaflash
+        self.orcaflash.setPropertyValue("exposure_time", 0.01)
+        print(self.orcaflash)
+        print(self.orcaflash.getPropertyValue("exposure_time"))
         self.andor = andor
         self.shape = self.andor.detector_shape
         self.frameStart = (1, 1)
@@ -870,7 +878,7 @@ class TormentaGUI(QtGui.QMainWindow):
         laserDock.addWidget(self.laserWidgets)
         dockArea.addDock(laserDock, 'above', moleculesDock)
 
-        self.setWindowTitle('Tormenta')
+        self.setWindowTitle('Tempesta')
         self.cwidget = QtGui.QWidget()
         self.setCentralWidget(self.cwidget)
 
@@ -1092,13 +1100,17 @@ class TormentaGUI(QtGui.QMainWindow):
         """
         if self.liveviewButton.isChecked():
             self.liveviewStart(update)
-            print(self.orcaflash.camera_model)
 
         else:
             self.liveviewStop()
 
-#    def liveviewStart(self, update):
-#
+    def liveviewStart(self, update):
+
+        print(self.orcaflash.camera_model)
+        self.orcaflash.startAcquisition()
+        time.sleep(1)
+#        time.sleep(np.max((5 * self.t_exp_real.magnitude, 1)))
+              
 #        self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
 #        self.liveviewStarts.emit()
 #
@@ -1115,19 +1127,27 @@ class TormentaGUI(QtGui.QMainWindow):
 #        self.recWidget.recButton.setEnabled(True)
 #
 #        # Initial image
+        self.rawframe = self.orcaflash.getFrames()
+        self.frame = self.rawframe[0][1].getData()
+        self.frame = np.reshape(self.frame, (2048, 2048))
+#        print(self.frame)
+#        print(type(self.frame))
+        self.img.setImage(self.frame, autoLevels=False, lut=self.lut)
+        
 #        image = np.transpose(self.andor.most_recent_image16(self.shape))
 #        self.img.setImage(image, autoLevels=False, lut=self.lut)
 #        if update:
 #            self.updateLevels(image)
-#        self.viewtimer.start(0)
+        self.viewtimer.start(35)
 #        self.moleculeWidget.enableBox.setEnabled(True)
 #        self.gridButton.setEnabled(True)
 #        self.grid2Button.setEnabled(True)
 #        self.crosshairButton.setEnabled(True)
+        pass
 
     def liveviewStop(self):
         self.viewtimer.stop()
-        self.recWidget.readyToRecord = False
+#        self.recWidget.readyToRecord = False
         self.moleculeWidget.enableBox.setEnabled(False)
         self.gridButton.setChecked(False)
         self.gridButton.setEnabled(False)
@@ -1140,18 +1160,40 @@ class TormentaGUI(QtGui.QMainWindow):
         self.crosshair.hide()
 
         # Turn off camera, close shutter
-        idleMsg = 'Camera is idle, waiting for instructions.'
-        if self.andor.status != idleMsg:
-            self.andor.abort_acquisition()
-
-        self.andor.shutter(0, 2, 0, 0, 0)
+#        idleMsg = 'Camera is idle, waiting for instructions.'
+#        if self.andor.status != idleMsg:
+#            self.andor.abort_acquisition()
+#
+#        self.andor.shutter(0, 2, 0, 0, 0)
+        self.orcaflash.stopAcquisition()
         self.img.setImage(np.zeros(self.shape), autoLevels=False)
 
         self.liveviewEnds.emit()
 
     def updateView(self):
-#        """ Image update while in Liveview mode
-#        """
+        """ Image update while in Liveview mode
+        """
+        try:
+            image = self.orcaflash.getFrames()
+            self.image = image[0][-1].getData()
+            self.image1 = np.reshape(self.image, (2048, 2048))
+
+#            if self.moleculeWidget.enabled:
+#                self.moleculeWidget.graph.update(image)
+            self.img.setImage(self.image1, autoLevels=False)
+
+            if self.crosshair.showed:
+                ycoord = int(np.round(self.crosshair.hLine.pos()[1]))
+                xcoord = int(np.round(self.crosshair.vLine.pos()[0]))
+                self.xProfile.setData(image[:, ycoord])
+                self.yProfile.setData(image[xcoord])
+
+#            self.fpsMath()
+            self.image = image
+        except:
+            pass        
+        
+        
 #        try:
 #            image = np.transpose(self.andor.most_recent_image16(self.shape))
 #            if self.moleculeWidget.enabled:
@@ -1168,7 +1210,7 @@ class TormentaGUI(QtGui.QMainWindow):
 #            self.image = image
 #
 #        except:
-            pass
+#            pass
 
     def fpsMath(self):
         now = ptime.time()
