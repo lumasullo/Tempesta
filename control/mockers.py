@@ -270,12 +270,7 @@ class MockCamera(Driver):
     def cooler_on(self, value):
         self.cooler_on_state = value
 
-    @property
-    def temperature_status(self):
-        if self.cooler_on_state:
-            return 'Temperature stabilized'
-        else:
-            return 'Temperature not stabilized'
+ 
 
     @property
     def acquisition_mode(self):

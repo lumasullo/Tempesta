@@ -17,6 +17,7 @@ import pygame
 import pygame.camera
 
 import control.mockers as mockers
+import control.MockHamamatsu as MockHamamatsu
 
 
 class Webcam(object):
@@ -125,9 +126,12 @@ class Camera(object):
             camera.lib.Initialize()
 
         except:
-            print('hello')
-            return mockers.MockCamera()
-
+            if(driverName == 'HamamatsuCameraMR'):            
+                print('Mock Hamamatsu Camera initiated')
+                return MockHamamatsu.MockHamamatsu()
+            else:
+                print('MockCamera (Andor) initiated')
+                return mockers.MockCamera()
 
         else:
             return OrcaflashCamera(0)
