@@ -17,7 +17,8 @@ import pygame
 
 from lantz import Q_
 
-import control.instruments as instruments  # , DAQ
+import control.instruments as instruments 
+ # , DAQ
 import control.pi as pi
 
 

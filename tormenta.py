@@ -17,14 +17,16 @@ def main():
 
 #TO DO: create an instruments.Camera(hamamatsu) or something similar
 
-    with instruments.Camera('andor.ccd.CCD') as andor, \
-         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM12') as bluelaser, \
+    with instruments.Camera('hamamatsu.hamamatsu_camera.HamamatsuCameraMR') as orcaflash, \
+         instruments.Camera('andor.ccd.CCD') as andor, \
+         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM7') as bluelaser, \
          instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM11') as violetlaser, \
          instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM5') as uvlaser, \
          instruments.DAQ() as daq, instruments.ScanZ(12) as scanZ:
 
-        orcaflash = hm.HamamatsuCameraMR(0)
-        print(orcaflash.camera_model)
+         
+#for now, bluelaser is the 488nm laser, greenlaser is the 405nm laser and redlaser is the 355nm laser
+    #    orcaflash = hm.HamamatsuCameraMR(0)
         print(andor.idn)
         print(bluelaser.idn)
         print(violetlaser.idn)
