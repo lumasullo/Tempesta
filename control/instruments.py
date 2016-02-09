@@ -9,8 +9,9 @@ import numpy as np
 import importlib
 
 from lantz.drivers.andor.ccd import CCD
-from lantz.drivers.labjack.t7 import T7
+#   from lantz.drivers.labjack.t7 import T7
 from lantz import Q_
+import lantz.drivers.hamamatsu.hamamatsu_camera as hm
 
 import pygame
 import pygame.camera
@@ -34,16 +35,17 @@ class Webcam(object):
 class Laser(object):
 
     def __new__(cls, iName, *args):
-#        try:
-        pName, driverName = iName.rsplit('.', 1)
-        package = importlib.import_module('lantz.drivers.' + pName)
-        driver = getattr(package, driverName)
-        laser = driver(*args)
-        laser.initialize()
-        return driver(*args)
+        try:
+            pName, driverName = iName.rsplit('.', 1)
+            package = importlib.import_module('lantz.drivers.' + pName)
+            driver = getattr(package, driverName)
+            laser = driver(*args)
+            laser.initialize()
+        
+            return driver(*args)
 
-#        except:
-#            return mockers.MockLaser()
+        except:
+            return mockers.MockLaser()
 
 
 class DAQ(object):
@@ -59,41 +61,41 @@ class DAQ(object):
             return mockers.MockDAQ()
 
 
-class STORMDAQ(T7):
-    """ Subclass of the Labjack lantz driver. """
-    def __init__(self, *args):
-
-        super().__init__(*args)
-        super().initialize(*args)
-
-        # Clock configuration for the flipper
-        self.writeName("DIO_EF_CLOCK0_ENABLE", 0)
-        self.writeName("DIO_EF_CLOCK0_DIVISOR", 1)
-        self.writeName("DIO_EF_CLOCK0_ROLL_VALUE", 1600000)
-        self.writeName("DIO_EF_CLOCK0_ENABLE", 1)
-        self.writeName("DIO2_EF_ENABLE", 0)
-        self.writeName("DIO2_EF_INDEX", 0)
-        self.writeName("DIO2_EF_OPTIONS", 0)
-        self.flipperState = True
-        self.flipper = self.flipperState
-        self.writeName("DIO2_EF_ENABLE", 1)
-
-    @property
-    def flipper(self):
-        """ Flipper True means the ND filter is in the light path."""
-        return self.flipperState
-
-    @flipper.setter
-    def flipper(self, value):
-        if value:
-            self.writeName("DIO2_EF_CONFIG_A", 150000)
-        else:
-            self.writeName("DIO2_EF_CONFIG_A", 72000)
-
-        self.flipperState = value
-
-    def toggleFlipper(self):
-        self.flipper = not(self.flipper)
+#class STORMDAQ(T7):
+#    """ Subclass of the Labjack lantz driver. """
+#    def __init__(self, *args):
+#
+#        super().__init__(*args)
+#        super().initialize(*args)
+#
+#        # Clock configuration for the flipper
+#        self.writeName("DIO_EF_CLOCK0_ENABLE", 0)
+#        self.writeName("DIO_EF_CLOCK0_DIVISOR", 1)
+#        self.writeName("DIO_EF_CLOCK0_ROLL_VALUE", 1600000)
+#        self.writeName("DIO_EF_CLOCK0_ENABLE", 1)
+#        self.writeName("DIO2_EF_ENABLE", 0)
+#        self.writeName("DIO2_EF_INDEX", 0)
+#        self.writeName("DIO2_EF_OPTIONS", 0)
+#        self.flipperState = True
+#        self.flipper = self.flipperState
+#        self.writeName("DIO2_EF_ENABLE", 1)
+#
+#    @property
+#    def flipper(self):
+#        """ Flipper True means the ND filter is in the light path."""
+#        return self.flipperState
+#
+#    @flipper.setter
+#    def flipper(self, value):
+#        if value:
+#            self.writeName("DIO2_EF_CONFIG_A", 150000)
+#        else:
+#            self.writeName("DIO2_EF_CONFIG_A", 72000)
+#
+#        self.flipperState = value
+#
+#    def toggleFlipper(self):
+#        self.flipper = not(self.flipper)
 
 
 class ScanZ(object):
@@ -123,10 +125,24 @@ class Camera(object):
             camera.lib.Initialize()
 
         except:
+            print('hello')
             return mockers.MockCamera()
 
+
         else:
-            return STORMCamera(*args)
+            return OrcaflashCamera(0)
+            
+class OrcaflashCamera(hm.HamamatsuCameraMR):
+
+
+    def __init__(self, camera_id):
+        hm.HamamatsuCameraMR.__init__(self, camera_id)
+
+#            pName, driverName = iName.rsplit('.', 1)
+#            package = importlib.import_module('lantz.drivers.' + pName)
+#            driver = getattr(package, driverName)
+#            camera = driver(*args)
+#            camera.lib.Initialize()
 
 
 class STORMCamera(CCD):
