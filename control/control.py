@@ -84,7 +84,7 @@ class RecordingWidget(QtGui.QFrame):
         self.tRemaining.setAlignment((QtCore.Qt.AlignCenter |
                                       QtCore.Qt.AlignVCenter))
         self.numExpositionsEdit.textChanged.connect(self.nChanged)
-        self.updateRemaining()
+#        self.updateRemaining()
 
         self.progressBar = QtGui.QProgressBar()
         self.progressBar.setTextVisible(False)
@@ -156,10 +156,10 @@ class RecordingWidget(QtGui.QFrame):
         self.updateRemaining()
         self.limitExpositions(9)
 
-    def updateRemaining(self):
-        rSecs = self.main.t_acc_real.magnitude * self.n()
-        rTime = datetime.timedelta(seconds=np.round(rSecs))
-        self.tRemaining.setText('{}'.format(rTime))
+#    def updateRemaining(self):
+#        rSecs = self.main.t_acc_real.magnitude * self.n()
+#        rTime = datetime.timedelta(seconds=np.round(rSecs))
+#        self.tRemaining.setText('{}'.format(rTime))
 
     def nPixels(self):
         return self.main.shape[0] * self.main.shape[1]
@@ -404,46 +404,46 @@ class RecWorker(QtCore.QObject):
 
 
 class TemperatureStabilizer(QtCore.QObject):
-
-    def __init__(self, main, *args, **kwargs):
-
-        super().__init__(*args, **kwargs)
-        self.main = main
-        self.setPoint = main.tempSetPoint
-        self.main.andor.temperature_setpoint = self.setPoint
-        self.stableText = 'Temperature has stabilized at set point.'
-
-    def start(self):
-        self.main.andor.cooler_on = True
-        self.timer = QtCore.QTimer()
-        self.timer.timeout.connect(self.update)
-        self.timer.start(10000)
-        self.update()
-
-    def stop(self):
-        self.timer.stop()
-
-    def update(self):
-        tempStatus = self.main.andor.temperature_status
-        self.main.tempStatus.setText(tempStatus)
-        temperature = np.round(self.main.andor.temperature, 1)
-        self.main.temp.setText('{} ºC'.format(temperature.magnitude))
-
-        if tempStatus != self.stableText:
-            threshold = Q_(0.8 * self.setPoint.magnitude, 'degC')
-            if temperature <= threshold or self.main.andor.mock:
-                self.main.liveviewButton.setEnabled(True)
-                self.main.liveviewAction.setEnabled(True)
-
-        else:
-            self.timer.stop()
+    pass
+#    def __init__(self, main, *args, **kwargs):
+#
+#        super().__init__(*args, **kwargs)
+#        self.main = main
+#        self.setPoint = main.tempSetPoint
+#        self.main.andor.temperature_setpoint = self.setPoint
+#        self.stableText = 'Temperature has stabilized at set point.'
+#
+#    def start(self):
+#        self.main.andor.cooler_on = True
+#        self.timer = QtCore.QTimer()
+#        self.timer.timeout.connect(self.update)
+#        self.timer.start(10000)
+#        self.update()
+#
+#    def stop(self):
+#        self.timer.stop()
+#
+#    def update(self):
+#        tempStatus = self.main.andor.temperature_status
+#        self.main.tempStatus.setText(tempStatus)
+#        temperature = np.round(self.main.andor.temperature, 1)
+#        self.main.temp.setText('{} ºC'.format(temperature.magnitude))
+#
+#        if tempStatus != self.stableText:
+#            threshold = Q_(0.8 * self.setPoint.magnitude, 'degC')
+#            if temperature <= threshold or self.main.andor.mock:
+#                self.main.liveviewButton.setEnabled(True)
+#                self.main.liveviewAction.setEnabled(True)
+#
+#        else:
+#            self.timer.stop()
 
 
 class CamParamTree(ParameterTree):
     """ Making the ParameterTree for configuration of the camera during imaging
     """
 
-    def __init__(self, andor, *args, **kwargs):
+    def __init__(self, orcaflash, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         vpssTip = ("Faster vertical shift speeds allow for higher maximum \n"
@@ -474,7 +474,7 @@ class CamParamTree(ParameterTree):
 
         # Parameter tree for the camera configuration
         params = [{'name': 'Camera', 'type': 'str',
-                   'value': andor.idn.split(',')[0]},
+                   'value': orcaflash.camera_id},
                   {'name': 'Image frame', 'type': 'group', 'children': [
                       {'name': 'Shape', 'type': 'list',
                        'values': ['Full chip', '256x256', '128x128', '64x64',
@@ -482,14 +482,14 @@ class CamParamTree(ParameterTree):
                       {'name': 'Apply', 'type': 'action'}]},
                   {'name': 'Timings', 'type': 'group', 'children': [
                       {'name': 'Horizontal readout rate', 'type': 'list',
-                       'values': andor.HRRates, 'tip': hrrTip},
+                       'values': [9999, 9999, 9999], 'tip': hrrTip},
                       {'name': 'Vertical pixel shift', 'type': 'group',
                        'children': [
                            {'name': 'Speed', 'type': 'list',
-                            'values': andor.vertSpeeds[::-1],
+                            'values': [9999, 9999, 9999],
                             'tip': vpssTip},
                            {'name': 'Clock voltage amplitude', 'tip': vpssTip,
-                            'type': 'list', 'values': andor.vertAmps}]},
+                            'type': 'list', 'values': [9999, 9999, 9999]}]},
                       {'name': 'Frame Transfer Mode', 'type': 'bool',
                        'value': False},
                       {'name': 'Cropped sensor mode', 'type': 'group',
@@ -499,7 +499,7 @@ class CamParamTree(ParameterTree):
                            {'name': 'Apply', 'type': 'action'}]},
                       {'name': 'Set exposure time', 'type': 'float',
                        'value': 0.1, 'limits': (0,
-                                                andor.max_exposure.magnitude),
+                                                9999),
                        'siPrefix': True, 'suffix': 's'},
                       {'name': 'Real exposure time', 'type': 'float',
                        'value': 0, 'readonly': True, 'siPrefix': True,
@@ -512,10 +512,10 @@ class CamParamTree(ParameterTree):
                        'suffix': 'Hz'}]},
                   {'name': 'Gain', 'type': 'group', 'children': [
                       {'name': 'Pre-amp gain', 'type': 'list',
-                       'values': list(andor.PreAmps),
+                       'values': list([9999, 9999, 9999]),
                        'tip': preampTip},
                       {'name': 'EM gain', 'type': 'int', 'value': 1,
-                       'limits': (0, andor.EM_gain_range[1]),
+                       'limits': (0, 9999),
                        'tip': EMGainTip}]}]
 
         self.p = Parameter.create(name='params', type='group', children=params)
@@ -594,8 +594,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.orcaflash.setPropertyValue("exposure_time", 0.01)
         print(self.orcaflash)
         print(self.orcaflash.getPropertyValue("exposure_time"))
-        self.andor = andor
-        self.shape = self.andor.detector_shape
+        self.shape = [self.orcaflash.getPropertyValue('image_height')[0], self.orcaflash.getPropertyValue('image_width')[0]]
         self.frameStart = (1, 1)
         self.bluelaser = bluelaser
         self.violetlaser = violetlaser
@@ -662,7 +661,7 @@ class TormentaGUI(QtGui.QMainWindow):
         exitAction.triggered.connect(QtGui.QApplication.closeAllWindows)
         fileMenu.addAction(exitAction)
 
-        self.tree = CamParamTree(self.andor)
+        self.tree = CamParamTree(self.orcaflash)
 
         # Frame signals
         frameParam = self.tree.p.param('Image frame')
@@ -672,7 +671,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.cropLoaded = False
 
         # Exposition signals
-        changeExposure = lambda: self.changeParameter(self.setExposure)
+        changeExposure = lambda: self.setExposure
         timingsPar = self.tree.p.param('Timings')
         self.expPar = timingsPar.param('Set exposure time')
         self.expPar.sigValueChanged.connect(changeExposure)
@@ -691,7 +690,7 @@ class TormentaGUI(QtGui.QMainWindow):
 
         # Gain signals
         self.PreGainPar = self.tree.p.param('Gain').param('Pre-amp gain')
-        updateGain = lambda: self.changeParameter(self.setGain)
+        updateGain = lambda: self.setGain
         self.PreGainPar.sigValueChanged.connect(updateGain)
         self.GainPar = self.tree.p.param('Gain').param('EM gain')
         self.GainPar.sigValueChanged.connect(updateGain)
@@ -765,14 +764,14 @@ class TormentaGUI(QtGui.QMainWindow):
         self.statusBar().addPermanentWidget(self.cursorPos)
 
         # Temperature stabilization functionality
-        self.tempSetPoint = Q_(-50, 'degC')
-        self.stabilizer = TemperatureStabilizer(self)
-        self.stabilizerThread = QtCore.QThread()
-        self.stabilizer.moveToThread(self.stabilizerThread)
-        self.stabilizerThread.started.connect(self.stabilizer.start)
-        self.stabilizerThread.start()
-        self.liveviewStarts.connect(self.stabilizer.stop)
-        self.liveviewEnds.connect(self.stabilizer.start)
+#        self.tempSetPoint = Q_(-50, 'degC')
+#        self.stabilizer = TemperatureStabilizer(self)
+#        self.stabilizerThread = QtCore.QThread()
+#        self.stabilizer.moveToThread(self.stabilizerThread)
+#        self.stabilizerThread.started.connect(self.stabilizer.start)
+#        self.stabilizerThread.start()
+#        self.liveviewStarts.connect(self.stabilizer.stop)
+#        self.liveviewEnds.connect(self.stabilizer.start)
 
         # Recording settings widget
         self.recWidget = RecordingWidget(self)
@@ -814,7 +813,7 @@ class TormentaGUI(QtGui.QMainWindow):
         yPlot.setYLink(self.vb)
 
         # Initial camera configuration taken from the parameter tree
-        self.andor.set_exposure_time(self.expPar.value() * self.s)
+        self.orcaflash.setPropertyValue('exposure_time', self.expPar.value() * self.s)
         self.adjustFrame()
 
         # Dock widget
@@ -964,21 +963,21 @@ class TormentaGUI(QtGui.QMainWindow):
             self.shape = self.andor.detector_shape
             self.adjustFrame()
 
-    def changeParameter(self, function):
-        """ This method is used to change those camera properties that need
-        the camera to be idle to be able to be adjusted.
-        """
-        status = self.andor.status
-        if status != ('Camera is idle, waiting for instructions.'):
-            self.viewtimer.stop()
-            self.andor.abort_acquisition()
-
-        function()
-
-        if status != ('Camera is idle, waiting for instructions.'):
-            self.andor.start_acquisition()
-            time.sleep(np.min((5 * self.t_exp_real.magnitude, 1)))
-            self.viewtimer.start(0)
+#    def changeParameter(self, function):
+#        """ This method is used to change those camera properties that need
+#        the camera to be idle to be able to be adjusted.
+#        """
+#        status = self.andor.status
+#        if status != ('Camera is idle, waiting for instructions.'):
+#            self.viewtimer.stop()
+#            self.andor.abort_acquisition()
+#
+#        function()
+#
+#        if status != ('Camera is idle, waiting for instructions.'):
+#            self.andor.start_acquisition()
+#            time.sleep(np.min((5 * self.t_exp_real.magnitude, 1)))
+#            self.viewtimer.start(0)
 
     def updateLevels(self, image):
         std = np.std(image)
@@ -987,48 +986,51 @@ class TormentaGUI(QtGui.QMainWindow):
     def setGain(self):
         """ Method to change the pre-amp gain and main gain of the EMCCD
         """
-        PreAmpGain = self.PreGainPar.value()
-        n = np.where(self.andor.PreAmps == PreAmpGain)[0][0]
-        # The (2 - n) accounts for the difference in order between the options
-        # in the GUI and the camera settings
-        self.andor.preamp = 2 - n
-        self.andor.EM_gain = self.GainPar.value()
+        pass
+#        PreAmpGain = self.PreGainPar.value()
+#        n = np.where(self.andor.PreAmps == PreAmpGain)[0][0]
+#        # The (2 - n) accounts for the difference in order between the options
+#        # in the GUI and the camera settings
+#        self.andor.preamp = 2 - n
+#        self.andor.EM_gain = self.GainPar.value()
 
     def setExposure(self):
         """ Method to change the exposure time setting
         """
-        self.andor.set_exposure_time(self.expPar.value() * self.s)
-        self.andor.frame_transfer_mode = self.FTMPar.value()
-        hhRatesArr = np.array([item.magnitude for item in self.andor.HRRates])
-        n_hrr = np.where(hhRatesArr == self.HRRatePar.value().magnitude)[0][0]
-        # The (3 - n) accounts for the difference in order between the options
-        # in the GUI and the camera settings
-        self.andor.horiz_shift_speed = 3 - n_hrr
-
-        n_vss = np.where(np.array([item.magnitude
-                                  for item in self.andor.vertSpeeds])
-                         == self.vertShiftSpeedPar.value().magnitude)[0][0]
-        self.andor.vert_shift_speed = n_vss
-
-        n_vsa = np.where(np.array(self.andor.vertAmps) ==
-                         self.vertShiftAmpPar.value())[0][0]
-        self.andor.set_vert_clock(n_vsa)
-
-        self.updateTimings()
+        pass
+#        self.andor.set_exposure_time(self.expPar.value() * self.s)
+#        self.andor.frame_transfer_mode = self.FTMPar.value()
+#        hhRatesArr = np.array([item.magnitude for item in self.andor.HRRates])
+#        n_hrr = np.where(hhRatesArr == self.HRRatePar.value().magnitude)[0][0]
+#        # The (3 - n) accounts for the difference in order between the options
+#        # in the GUI and the camera settings
+#        self.andor.horiz_shift_speed = 3 - n_hrr
+#
+#        n_vss = np.where(np.array([item.magnitude
+#                                  for item in self.andor.vertSpeeds])
+#                         == self.vertShiftSpeedPar.value().magnitude)[0][0]
+#        self.andor.vert_shift_speed = n_vss
+#
+#        n_vsa = np.where(np.array(self.andor.vertAmps) ==
+#                         self.vertShiftAmpPar.value())[0][0]
+#        self.andor.set_vert_clock(n_vsa)
+#
+#        self.updateTimings()
 
     def adjustFrame(self):
         """ Method to change the area of the CCD to be used and adjust the
         image widget accordingly. It needs a previous change in self.shape
         and self.frameStart)
         """
-        self.andor.set_image(shape=self.shape, p_0=self.frameStart)
-        self.vb.setLimits(xMin=-0.5, xMax=self.shape[0] - 0.5, minXRange=4,
-                          yMin=-0.5, yMax=self.shape[1] - 0.5, minYRange=4)
-
-        self.updateTimings()
-
-        self.grid.update(self.shape)
-        self.recWidget.shape = self.shape
+        pass
+#        self.andor.set_image(shape=self.shape, p_0=self.frameStart)
+#        self.vb.setLimits(xMin=-0.5, xMax=self.shape[0] - 0.5, minXRange=4,
+#                          yMin=-0.5, yMax=self.shape[1] - 0.5, minYRange=4)
+#
+#        self.updateTimings()
+#
+#        self.grid.update(self.shape)
+#        self.recWidget.shape = self.shape
 
     def updateFrame(self):
         """ Method to change the image frame size and position in the sensor
