@@ -74,6 +74,8 @@ class MockHamamatsu(Driver):
         self.properties = {}
         self.max_backlog = 0
         self.number_image_buffers = 0
+        
+        self.s = Q_(1, 's')
 
         # Open the camera.
 #        self.camera_handle = ctypes.c_void_p(0)
@@ -83,7 +85,8 @@ class MockHamamatsu(Driver):
 #                         "dcam_open")
         # Get camera properties.
         self.properties = {'Name': 'MOCK Hamamatsu',
-        'exposure_time': 9999,
+        'exposure_time': 9999 * self.s,
+        'accumulation_time': 99999 * self.s,
         'image_width': 2048, 
         'image_height': 2048, 
         'image_framebytes': 8, 

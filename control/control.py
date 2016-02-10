@@ -446,12 +446,8 @@ class CamParamTree(ParameterTree):
     def __init__(self, orcaflash, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        vpssTip = ("Faster vertical shift speeds allow for higher maximum \n"
-                   "frame rates but reduce the pixel well depth, causing \n"
-                   "degraded spatial resolution (smearing) for bright \n"
-                   "signals. To improve the charge transfer efficiency the \n"
-                   "vertical clock voltage amplitude can be increased at \n"
-                   "the expense of a higher clock-induced charge.")
+        BinTip = ("Sets binning mode. Binning mode specifies if and how many \n"
+                    "pixels are to be read out and interpreted as a single pixel value.")
 
         preampTip = ("Andor recommend using the highest value setting for \n"
                      "most low-light applications")
@@ -476,27 +472,12 @@ class CamParamTree(ParameterTree):
         params = [{'name': 'Camera', 'type': 'str',
                    'value': orcaflash.camera_id},
                   {'name': 'Image frame', 'type': 'group', 'children': [
-                      {'name': 'Shape', 'type': 'list',
-                       'values': ['Full chip', '256x256', '128x128', '64x64',
-                                  'Custom']},
-                      {'name': 'Apply', 'type': 'action'}]},
+                      {'name': 'Nr of rows', 'type': 'list',
+                       'values': ['2048', '1024', '515', '256', '128', '64', '8']}, 
+{'name': 'Binning', 'type': 'list', 
+                                  'values': ['1x1', '2x2', '4x4'], 'tip': BinTip},
+                                  {'name': 'Apply', 'type': 'action'}]},
                   {'name': 'Timings', 'type': 'group', 'children': [
-                      {'name': 'Horizontal readout rate', 'type': 'list',
-                       'values': [9999, 9999, 9999], 'tip': hrrTip},
-                      {'name': 'Vertical pixel shift', 'type': 'group',
-                       'children': [
-                           {'name': 'Speed', 'type': 'list',
-                            'values': [9999, 9999, 9999],
-                            'tip': vpssTip},
-                           {'name': 'Clock voltage amplitude', 'tip': vpssTip,
-                            'type': 'list', 'values': [9999, 9999, 9999]}]},
-                      {'name': 'Frame Transfer Mode', 'type': 'bool',
-                       'value': False},
-                      {'name': 'Cropped sensor mode', 'type': 'group',
-                       'children': [
-                           {'name': 'Enable', 'type': 'bool', 'value': False,
-                            'tip': croppedTip},
-                           {'name': 'Apply', 'type': 'action'}]},
                       {'name': 'Set exposure time', 'type': 'float',
                        'value': 0.1, 'limits': (0,
                                                 9999),
@@ -523,11 +504,6 @@ class CamParamTree(ParameterTree):
         self._writable = True
 
         self.timeParams = self.p.param('Timings')
-        self.cropModeParam = self.timeParams.param('Cropped sensor mode')
-        self.cropModeEnableParam = self.cropModeParam.param('Enable')
-        self.cropModeEnableParam.setWritable(False)
-        self.frameTransferParam = self.timeParams.param('Frame Transfer Mode')
-        self.frameTransferParam.sigValueChanged.connect(self.enableCropMode)
 
     def enableCropMode(self):
         value = self.frameTransferParam.value()
@@ -662,29 +638,17 @@ class TormentaGUI(QtGui.QMainWindow):
         self.tree = CamParamTree(self.orcaflash)
 
         # Frame signals
-        frameParam = self.tree.p.param('Image frame')
-        frameParam.param('Shape').sigValueChanged.connect(self.updateFrame)
+
         # Indicator for loading frame shape from a preset setting
         self.customFrameLoaded = False
         self.cropLoaded = False
 
         # Exposition signals
-        changeExposure = lambda: self.setExposure
+        changeExposure = lambda: self.setExposure()
         timingsPar = self.tree.p.param('Timings')
         self.expPar = timingsPar.param('Set exposure time')
         self.expPar.sigValueChanged.connect(changeExposure)
-        self.FTMPar = timingsPar.param('Frame Transfer Mode')
-        self.FTMPar.sigValueChanged.connect(changeExposure)
-        self.HRRatePar = timingsPar.param('Horizontal readout rate')
-        self.HRRatePar.sigValueChanged.connect(changeExposure)
-        vertShiftPar = timingsPar.param('Vertical pixel shift')
-        self.vertShiftSpeedPar = vertShiftPar.param('Speed')
-        self.vertShiftSpeedPar.sigValueChanged.connect(changeExposure)
-        self.vertShiftAmpPar = vertShiftPar.param('Clock voltage amplitude')
-        self.vertShiftAmpPar.sigValueChanged.connect(changeExposure)
         changeExposure()    # Set default values
-        self.cropParam = timingsPar.param('Cropped sensor mode')
-        self.cropParam.param('Enable').sigValueChanged.connect(self.cropCCD)
 
         # Gain signals
         self.PreGainPar = self.tree.p.param('Gain').param('Pre-amp gain')
@@ -720,35 +684,35 @@ class TormentaGUI(QtGui.QMainWindow):
         self.liveviewButton.setCheckable(True)
         self.liveviewButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
                                           QtGui.QSizePolicy.Expanding)
-        self.liveviewButton.clicked.connect(self.liveview)
+        self.liveviewButton.clicked.connect(self.liveview)      #Link button click to funciton liveview
         self.liveviewButton.setEnabled(True)
         self.viewtimer = QtCore.QTimer()
         self.viewtimer.timeout.connect(self.updateView)
 
         # viewBox custom Tools
-        self.gridButton = QtGui.QPushButton('Grid')
-        self.gridButton.setCheckable(True)
-        self.gridButton.setEnabled(False)
-        self.grid2Button = QtGui.QPushButton('Two-color grid')
-        self.grid2Button.setCheckable(True)
-        self.grid2Button.setEnabled(False)
-        self.crosshairButton = QtGui.QPushButton('Crosshair')
-        self.crosshairButton.setCheckable(True)
-        self.crosshairButton.setEnabled(False)
+#        self.gridButton = QtGui.QPushButton('Grid')
+#        self.gridButton.setCheckable(True)
+#        self.gridButton.setEnabled(False)
+#        self.grid2Button = QtGui.QPushButton('Two-color grid')
+#        self.grid2Button.setCheckable(True)
+#        self.grid2Button.setEnabled(False)
+#        self.crosshairButton = QtGui.QPushButton('Crosshair')
+#        self.crosshairButton.setCheckable(True)
+#        self.crosshairButton.setEnabled(False)
 
-        self.flipperButton = QtGui.QPushButton('x1000')
-        self.flipperButton.setStyleSheet("font-size:16px")
-        self.flipperButton.setCheckable(True)
-        self.flipperButton.clicked.connect(self.daq.toggleFlipper)
+#        self.flipperButton = QtGui.QPushButton('x1000')
+#        self.flipperButton.setStyleSheet("font-size:16px")
+#        self.flipperButton.setCheckable(True)
+#        self.flipperButton.clicked.connect(self.daq.toggleFlipper)
 
         self.viewCtrl = QtGui.QWidget()
         self.viewCtrlLayout = QtGui.QGridLayout()
         self.viewCtrl.setLayout(self.viewCtrlLayout)
         self.viewCtrlLayout.addWidget(self.liveviewButton, 0, 0, 1, 3)
-        self.viewCtrlLayout.addWidget(self.gridButton, 1, 0)
-        self.viewCtrlLayout.addWidget(self.grid2Button, 1, 1)
-        self.viewCtrlLayout.addWidget(self.crosshairButton, 1, 2)
-        self.viewCtrlLayout.addWidget(self.flipperButton, 2, 0, 1, 3)
+#        self.viewCtrlLayout.addWidget(self.gridButton, 1, 0)
+#        self.viewCtrlLayout.addWidget(self.grid2Button, 1, 1)
+#        self.viewCtrlLayout.addWidget(self.crosshairButton, 1, 2)
+#        self.viewCtrlLayout.addWidget(self.flipperButton, 2, 0, 1, 3)
 
         self.fpsBox = QtGui.QLabel()
         self.fpsBox.setText('0 fps')
@@ -788,12 +752,12 @@ class TormentaGUI(QtGui.QMainWindow):
         self.hist.vb.setLimits(yMin=0, yMax=20000)
         imageWidget.addItem(self.hist, row=1, col=2)
 
-        self.grid = guitools.Grid(self.vb, self.shape)
-        self.gridButton.clicked.connect(self.grid.toggle)
-        self.grid2 = guitools.TwoColorGrid(self.vb)
-        self.grid2Button.clicked.connect(self.grid2.toggle)
-        self.crosshair = guitools.Crosshair(self.vb)
-        self.crosshairButton.clicked.connect(self.crosshair.toggle)
+#        self.grid = guitools.Grid(self.vb, self.shape)
+#        self.gridButton.clicked.connect(self.grid.toggle)
+#        self.grid2 = guitools.TwoColorGrid(self.vb)
+#        self.grid2Button.clicked.connect(self.grid2.toggle)
+#        self.crosshair = guitools.Crosshair(self.vb)
+#        self.crosshairButton.clicked.connect(self.crosshair.toggle)
 
         # x and y profiles
         xPlot = imageWidget.addPlot(row=0, col=1)
@@ -1013,7 +977,7 @@ class TormentaGUI(QtGui.QMainWindow):
 #                         self.vertShiftAmpPar.value())[0][0]
 #        self.andor.set_vert_clock(n_vsa)
 #
-#        self.updateTimings()
+        self.updateTimings()
 
     def adjustFrame(self):
         """ Method to change the area of the CCD to be used and adjust the
@@ -1073,15 +1037,19 @@ class TormentaGUI(QtGui.QMainWindow):
         """ Update the real exposition and accumulation times in the parameter
         tree.
         """
-        timings = self.andor.acquisition_timings
-        self.t_exp_real, self.t_acc_real, self.t_kin_real = timings
+#        timings = self.orcaflash.getPropertyValue('exposure_time') 
+#        self.t_exp_real, self.t_acc_real, self.t_kin_real = timings
         timingsPar = self.tree.p.param('Timings')
         RealExpPar = timingsPar.param('Real exposure time')
         RealAccPar = timingsPar.param('Real accumulation time')
         EffFRPar = timingsPar.param('Effective frame rate')
-        RealExpPar.setValue(self.t_exp_real.magnitude)
-        RealAccPar.setValue(self.t_acc_real.magnitude)
-        EffFRPar.setValue(1 / self.t_acc_real.magnitude)
+        print(self.orcaflash.getPropertyValue('exposure_time')[0])
+        RealExpPar.setValue(self.orcaflash.getPropertyValue('exposure_time')[0].magnitude)
+        RealAccPar.setValue(self.orcaflash.getPropertyValue('accumulation_time')[0].magnitude)
+        EffFRPar.setValue(1 / self.orcaflash.getPropertyValue('accumulation_time')[0].magnitude)
+#        RealExpPar.setValue(self.orcaflash.getPropertyValue('exposure_time')[0])
+#        RealAccPar.setValue(self.orcaflash.getPropertyValue('accumulation_time')[0])
+#        EffFRPar.setValue(1 / self.orcaflash.getPropertyValue('accumulation_time')[0])
 
     # This is the function triggered by the liveview shortcut
     def liveviewKey(self):
