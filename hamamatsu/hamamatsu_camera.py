@@ -117,8 +117,8 @@ class DCAMException(Exception):
 #
 dcam = ctypes.windll.dcamapi
 temp = ctypes.c_int32(0)
-#if (dcam.dcam_init(None, ctypes.byref(temp), None) != DCAMERR_NOERROR):
-#    raise DCAMException("DCAM initialization failed.")
+if (dcam.dcam_init(None, ctypes.byref(temp), None) != DCAMERR_NOERROR):
+    raise DCAMException("DCAM initialization failed.")
 n_cameras = temp.value
 
 

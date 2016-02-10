@@ -1,0 +1,10 @@
+1) "control not a module" Error --> solved with os.chdir(C:\Users\Luciano\Documents\GitHub\Tormenta)
+
+2) "Presets" Error --> solved creating "Presets" folder
+
+3) Labjack Error --> solved commenting ljm related code (we don't have a Labjack device here)
+
+4) Cannot find module pygame. Install from same as tifffile site. http://www.lfd.uci.edu/~gohlke/pythonlibs/
+
+5) [WinError] - download installation file for hamamatsu drivers from http://dcam-api.com/ and run setup -> install
+USB drivers.

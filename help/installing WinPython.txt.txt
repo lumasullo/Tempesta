@@ -1,0 +1,7 @@
+1) Always use the WinPython Control Panel to install packages, is the easiest way
+
+2) tifffile module is not available for Python 3.4, be careful with that
+
+3) lantz package must be downloaded from fedebarabas github, that version contains drivers used in Tormenta
+
+4) "no module named pint/stringparser": fix - "pip install pint/stringparser" in python console
