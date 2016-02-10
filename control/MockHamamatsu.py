@@ -4,13 +4,59 @@ Created on Tue Feb  9 12:56:16 2016
 
 @author: andreas.boden
 """
-
+import ctypes
+import ctypes.util
 import logging
 import numpy as np
 import pygame
 
 from lantz import Driver
 from lantz import Q_
+
+class HMockCamData():
+
+    ## __init__
+    #
+    # Create a data object of the appropriate size.
+    #
+    # @param size The size of the data object in bytes.
+    #
+    def __init__(self, size):
+        self.np_array = np.random.randint(1, 256, size)
+        self.size = size
+
+    ## __getitem__
+    #
+    # @param slice The slice of the item to get.
+    #
+    def __getitem__(self, slice):
+        return self.np_array[slice]
+
+    ## copyData
+    #
+    # Uses the C memmove function to copy data from an address in memory
+    # into memory allocated for the numpy array of this object.
+    #
+    # @param address The memory address of the data to copy.
+    #
+    def copyData(self, address):
+        ctypes.memmove(self.np_array.ctypes.data, address, self.size)
+
+    ## getData
+    #
+    # @return A numpy array that contains the camera data.
+    #
+    def getData(self):
+        return self.np_array
+
+    ## getDataPtr
+    #
+    # @return The physical address in memory of the data.
+    #
+    def getDataPtr(self):
+        return self.np_array.ctypes.data
+
+
 
 class MockHamamatsu(Driver):
 
@@ -64,6 +110,7 @@ class MockHamamatsu(Driver):
 
         # Get frame properties.
         self.frame_x = self.getPropertyValue("image_width")[0]
+        print('frame_x set to ', self.getPropertyValue('image_width')[0])
         self.frame_y = self.getPropertyValue("image_height")[0]
         self.frame_bytes = self.getPropertyValue("image_framebytes")[0]
 
@@ -90,7 +137,14 @@ class MockHamamatsu(Driver):
     #
     def getFrames(self):
         
-        frames = np.random.rand(1, self.frame_x*self.frame_y)
+        frames = []
+
+        for i in range(2):
+        # Create storage
+            hc_data = HMockCamData(self.frame_x*self.frame_y)
+    
+    
+            frames.append(hc_data)
 
         return [frames, [self.frame_x, self.frame_y]]
         
@@ -220,13 +274,14 @@ class MockHamamatsu(Driver):
 
         # If the value is text, figure out what the 
         # corresponding numerical property value is.
-        if (type(property_value) == type("")):
-            text_values = self.getPropertyText(property_name)
-            if (property_value in text_values):
-                property_value = float(text_values[property_value])
-            else:
-                print(" unknown property text value:", property_value, "for", property_name)
-                return False
+
+        self.properties[property_name] = property_value
+        print(property_name, 'set to:', self.properties[property_name])
+#            if (property_value in text_values):
+#                property_value = float(text_values[property_value])
+#            else:
+#                print(" unknown property text value:", property_value, "for", property_name)
+#                return False
             
         return property_value
 
@@ -251,6 +306,7 @@ class MockHamamatsu(Driver):
     # Start data acquisition.
     #
     def startAcquisition(self):
+        self.captureSetup()
         pass
 
     ## stopAcquisition

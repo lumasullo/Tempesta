@@ -591,9 +591,7 @@ class TormentaGUI(QtGui.QMainWindow):
         super().__init__(*args, **kwargs)
 
         self.orcaflash = orcaflash
-        self.orcaflash.setPropertyValue("exposure_time", 0.01)
-        print(self.orcaflash)
-        print(self.orcaflash.getPropertyValue("exposure_time"))
+        self.orcaflash.setPropertyValue("exposure_time", 0.001)
         self.shape = [self.orcaflash.getPropertyValue('image_height')[0], self.orcaflash.getPropertyValue('image_width')[0]]
         self.frameStart = (1, 1)
         self.bluelaser = bluelaser
@@ -723,7 +721,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.liveviewButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
                                           QtGui.QSizePolicy.Expanding)
         self.liveviewButton.clicked.connect(self.liveview)
-        self.liveviewButton.setEnabled(False)
+        self.liveviewButton.setEnabled(True)
         self.viewtimer = QtCore.QTimer()
         self.viewtimer.timeout.connect(self.updateView)
 
@@ -997,8 +995,8 @@ class TormentaGUI(QtGui.QMainWindow):
     def setExposure(self):
         """ Method to change the exposure time setting
         """
-        pass
-#        self.andor.set_exposure_time(self.expPar.value() * self.s)
+        self.orcaflash.setPropertyValue('exposure_time', self.expPar.value() * self.s)
+        print('In setExposure')
 #        self.andor.frame_transfer_mode = self.FTMPar.value()
 #        hhRatesArr = np.array([item.magnitude for item in self.andor.HRRates])
 #        n_hrr = np.where(hhRatesArr == self.HRRatePar.value().magnitude)[0][0]
@@ -1102,6 +1100,7 @@ class TormentaGUI(QtGui.QMainWindow):
         """
         if self.liveviewButton.isChecked():
             self.liveviewStart(update)
+            print('Liveview pressed')
 
         else:
             self.liveviewStop()
@@ -1130,7 +1129,7 @@ class TormentaGUI(QtGui.QMainWindow):
 #
 #        # Initial image
         self.rawframe = self.orcaflash.getFrames()
-        self.frame = self.rawframe[0][1].getData()
+        self.frame = self.rawframe[0][1].getData() #return A numpy array that contains the camera data.
         self.frame = np.reshape(self.frame, (2048, 2048))
 #        print(self.frame)
 #        print(type(self.frame))
