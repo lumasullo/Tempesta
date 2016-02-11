@@ -1044,10 +1044,9 @@ class TormentaGUI(QtGui.QMainWindow):
         RealAccPar = timingsPar.param('Real accumulation time')
         EffFRPar = timingsPar.param('Effective frame rate')
         print(self.orcaflash.getPropertyValue('exposure_time')[0])
-        RealExpPar.setValue(self.orcaflash.getPropertyValue('timing_exposure')[0])
-        RAT = self.orcaflash.getPropertyValue('timing_exposure')[0] + self.orcaflash.getPropertyValue('timing_readout_time')[0]
-        RealAccPar.setValue(RAT)
-        EffFRPar.setValue(1 / RAT)
+        RealExpPar.setValue(self.orcaflash.getPropertyValue('exposure_time')[0])
+        RealAccPar.setValue(self.orcaflash.getPropertyValue('exposure_time')[0] + self.orcaflash.getPropertyValue('timing_readout_time')[0])
+        EffFRPar.setValue(self.orcaflash.getPropertyValue('internal_frame_rate')[0])
 #        RealExpPar.setValue(self.orcaflash.getPropertyValue('exposure_time')[0])
 #        RealAccPar.setValue(self.orcaflash.getPropertyValue('accumulation_time')[0])
 #        EffFRPar.setValue(1 / self.orcaflash.getPropertyValue('accumulation_time')[0])
@@ -1118,27 +1117,12 @@ class TormentaGUI(QtGui.QMainWindow):
     def liveviewStop(self):
         self.viewtimer.stop()
 #        self.recWidget.readyToRecord = False
-        self.moleculeWidget.enableBox.setEnabled(False)
-        self.gridButton.setChecked(False)
-        self.gridButton.setEnabled(False)
-        self.grid.hide()
-        self.grid2Button.setChecked(False)
-        self.grid2Button.setEnabled(False)
-        self.grid2.hide()
-        self.crosshairButton.setChecked(False)
-        self.crosshairButton.setEnabled(False)
-        self.crosshair.hide()
 
         # Turn off camera, close shutter
-#        idleMsg = 'Camera is idle, waiting for instructions.'
-#        if self.andor.status != idleMsg:
-#            self.andor.abort_acquisition()
-#
-#        self.andor.shutter(0, 2, 0, 0, 0)
         self.orcaflash.stopAcquisition()
         self.img.setImage(np.zeros(self.shape), autoLevels=False)
 
-        self.liveviewEnds.emit()
+#        self.liveviewEnds.emit()
 
     def updateView(self):
         """ Image update while in Liveview mode
