@@ -4,4 +4,4 @@
 
 3) lantz package must be downloaded from fedebarabas github, that version contains drivers used in Tormenta
 
-4) "no module named pint/stringparser": fix - "pip install pint/stringparser" in python console
+4) "no module named pint or stringparser": fix - "pip install pint" and "pip install stringparser" in python console

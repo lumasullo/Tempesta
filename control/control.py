@@ -775,7 +775,7 @@ class TormentaGUI(QtGui.QMainWindow):
         yPlot.setYLink(self.vb)
 
         # Initial camera configuration taken from the parameter tree
-        self.orcaflash.setPropertyValue('exposure_time', self.expPar.value() * self.s)
+        self.orcaflash.setPropertyValue('exposure_time', self.expPar.value())
         self.adjustFrame()
 
         # Dock widget
@@ -959,7 +959,7 @@ class TormentaGUI(QtGui.QMainWindow):
     def setExposure(self):
         """ Method to change the exposure time setting
         """
-        self.orcaflash.setPropertyValue('exposure_time', self.expPar.value() * self.s)
+        self.orcaflash.setPropertyValue('exposure_time', self.expPar.value())
         print('In setExposure')
 #        self.andor.frame_transfer_mode = self.FTMPar.value()
 #        hhRatesArr = np.array([item.magnitude for item in self.andor.HRRates])
@@ -1044,9 +1044,10 @@ class TormentaGUI(QtGui.QMainWindow):
         RealAccPar = timingsPar.param('Real accumulation time')
         EffFRPar = timingsPar.param('Effective frame rate')
         print(self.orcaflash.getPropertyValue('exposure_time')[0])
-        RealExpPar.setValue(self.orcaflash.getPropertyValue('exposure_time')[0].magnitude)
-        RealAccPar.setValue(self.orcaflash.getPropertyValue('accumulation_time')[0].magnitude)
-        EffFRPar.setValue(1 / self.orcaflash.getPropertyValue('accumulation_time')[0].magnitude)
+        RealExpPar.setValue(self.orcaflash.getPropertyValue('timing_exposure')[0])
+        RAT = self.orcaflash.getPropertyValue('timing_exposure')[0] + self.orcaflash.getPropertyValue('timing_readout_time')[0]
+        RealAccPar.setValue(RAT)
+        EffFRPar.setValue(1 / RAT)
 #        RealExpPar.setValue(self.orcaflash.getPropertyValue('exposure_time')[0])
 #        RealAccPar.setValue(self.orcaflash.getPropertyValue('accumulation_time')[0])
 #        EffFRPar.setValue(1 / self.orcaflash.getPropertyValue('accumulation_time')[0])

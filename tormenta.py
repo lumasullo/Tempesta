@@ -6,7 +6,6 @@ Created on Thu May 21 13:19:31 2015
 """
 from pyqtgraph.Qt import QtGui
 
-
 def main():
 
     from control import control
@@ -16,8 +15,8 @@ def main():
 
 #TO DO: create an instruments.Camera(hamamatsu) or something similar
 
-    with instruments.Camera('hamamatsu.hamamatsu_camera.HamamatsuCameraMR') as orcaflash, \
-         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM7') as bluelaser, \
+#    with instruments.Camera('hamamatsu.hamamatsu_camera.HamamatsuCameraMR') as orcaflash, \
+    with instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM7') as bluelaser, \
          instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM11') as violetlaser, \
          instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM5') as uvlaser, \
          instruments.DAQ() as daq, instruments.ScanZ(12) as scanZ:
@@ -25,8 +24,7 @@ def main():
 
          
 #for now, bluelaser is the 488nm laser, greenlaser is the 405nm laser and redlaser is the 355nm laser
-    #    orcaflash = hm.HamamatsuCameraMR(0)
-        print(orcaflash.getModelInfo)
+        orcaflash = instruments.Camera()
         print(bluelaser.idn)
         print(violetlaser.idn)
         print(uvlaser.idn)

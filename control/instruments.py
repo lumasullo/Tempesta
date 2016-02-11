@@ -11,13 +11,12 @@ import importlib
 from lantz.drivers.andor.ccd import CCD
 #   from lantz.drivers.labjack.t7 import T7
 from lantz import Q_
-import lantz.drivers.hamamatsu.hamamatsu_camera as hm
+
 
 import pygame
 import pygame.camera
 
 import control.mockers as mockers
-import control.MockHamamatsu as MockHamamatsu
 
 
 class Webcam(object):
@@ -115,38 +114,41 @@ class ScanZ(object):
 class Camera(object):
     """ Buffer class for testing whether the camera is connected. If it's not,
     it returns a dummy class for program testing. """
+#TODO:
+    """This was originally (by federica) called from tormenta.py using a "with" call, as with the Lasers. But
+    accoring to litterature, "with" should be used with classes having __enter__ and __exit functions defined. 
+    For some reason this particular class gives "Error: class is missing __exit__ fcn" (or similar)
+    Maybe it could be rewritten using __enter__  __exit__. 
+    http://effbot.org/zone/python-with-statement.htm
+    Although I believe that design is more suitable for funcions that a 
+    called alot or environments that are used alot."""
 
-    def __new__(cls, iName, *args):
 
-        try:
-            pName, driverName = iName.rsplit('.', 1)
-            package = importlib.import_module('lantz.drivers.' + pName)
-            driver = getattr(package, driverName)
-            camera = driver(*args)
-            camera.lib.Initialize()
+    def __new__(cls, *args):
+
+        try:     
+            import lantz.drivers.hamamatsu.hamamatsu_camera as hm
+            orcaflash = hm.HamamatsuCamera(0)
+            print('Initializing Hamamatsu Camera Object, model: ', orcaflash.camera_model)
+            return orcaflash
 
         except:
-            if(driverName == 'HamamatsuCameraMR'):            
-                print('Mock Hamamatsu Camera initiated')
-                return MockHamamatsu.MockHamamatsu()
-            else:
-                print('MockCamera (Andor) initiated')
-                return mockers.MockCamera()
-
-        else:
-            return OrcaflashCamera(0)
-            
-class OrcaflashCamera(hm.HamamatsuCameraMR):
+            import control.MockHamamatsu as MockHamamatsu
+            print('Initializing Mock Hamamatsu')
+            return MockHamamatsu.MockHamamatsu()
 
 
-    def __init__(self, camera_id):
-        hm.HamamatsuCameraMR.__init__(self, camera_id)
-
-#            pName, driverName = iName.rsplit('.', 1)
-#            package = importlib.import_module('lantz.drivers.' + pName)
-#            driver = getattr(package, driverName)
-#            camera = driver(*args)
-#            camera.lib.Initialize()
+#class OrcaflashCamera(hm.HamamatsuCameraMR):
+#
+#
+#    def __init__(self, camera_id):
+#        hm.HamamatsuCameraMR.__init__(self, camera_id)
+#
+##            pName, driverName = iName.rsplit('.', 1)
+##            package = importlib.import_module('lantz.drivers.' + pName)
+##            driver = getattr(package, driverName)
+##            camera = driver(*args)
+##            camera.lib.Initialize()
 
 
 class STORMCamera(CCD):
