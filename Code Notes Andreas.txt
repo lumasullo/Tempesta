@@ -1,0 +1,4 @@
+150216
+
+setImage function in liveview functions seems to start some seperate thread process. viewtimer waits for this process to finish before calling timeout again. Clue to this was
+was that the line setImage did not take any time but time until next update call was long.
