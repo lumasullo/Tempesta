@@ -94,7 +94,8 @@ class MockHamamatsu(Driver):
         'subarray_vsize': 2048,
         'subarray_mode': 'OFF',
         'timing_readout_time': 9999,
-        'internal_frame_rate': 9999};
+        'internal_frame_rate': 9999,
+        'internal_frame_interval': 9999};
 
         # Get camera max width, height.
         self.max_width = self.getPropertyValue("image_width")[0]
@@ -286,8 +287,7 @@ class MockHamamatsu(Driver):
 #                property_value = float(text_values[property_value])
 #            else:
 #                print(" unknown property text value:", property_value, "for", property_name)
-#                return False
-            
+#                return False  
         return property_value
 
     ## setSubArrayMode
@@ -299,12 +299,15 @@ class MockHamamatsu(Driver):
         # Check ROI properties.
         roi_w = self.getPropertyValue("subarray_hsize")[0]
         roi_h = self.getPropertyValue("subarray_vsize")[0]
+        self.properties['image_height'] = roi_h
+        self.properties['image_width'] = roi_w
 
         # If the ROI is smaller than the entire frame turn on subarray mode
         if ((roi_w == self.max_width) and (roi_h == self.max_height)):
             self.setPropertyValue("subarray_mode", "OFF")
         else:
             self.setPropertyValue("subarray_mode", "ON")
+
 
     ## startAcquisition
     #

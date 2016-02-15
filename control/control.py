@@ -459,21 +459,13 @@ class CamParamTree(ParameterTree):
                      "300 would give little or no extra SNR benefit and \n"
                      "would only reduce dynamic range.")
 
-        hrrTip = ("Slower readout typically allows lower read noise and \n"
-                  "higher available dynamic range, but at the expense of \n"
-                  "slower frame rates")
-
-        croppedTip = ("Ensure that no light is falling on the light \n"
-                      "sensitive area outside of the defined region. Any \n"
-                      "light collected outside the cropped area could \n"
-                      "corrupt the images which were acquired in this mode.")
 
         # Parameter tree for the camera configuration
         params = [{'name': 'Camera', 'type': 'str',
                    'value': orcaflash.camera_id},
                   {'name': 'Image frame', 'type': 'group', 'children': [
                       {'name': 'Nr of rows', 'type': 'list',
-                       'values': [2048, 1024, 515, 256, 128, 64, 8]}, 
+                       'values': [2048, 1024, 512, 256, 128, 64, 8]}, 
 {'name': 'binning', 'type': 'list', 
                                   'values': [b'1x1', b'2x2', b'4x4'], 'tip': BinTip},
                                   {'name': 'Apply', 'type': 'action'}]},
@@ -577,7 +569,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.daq = daq
 
         self.s = Q_(1, 's')
-        self.lastTime = ptime.time()
+        self.lastTime = time.clock()
         self.fps = None
 
         # Actions and menubar
@@ -958,13 +950,27 @@ class TormentaGUI(QtGui.QMainWindow):
         
         """Method to change the binning of the captured frame"""
         print('In setBinning')
-        self.orcaflash.setPropertyValue('binning', self.binPar.value())
+        
+        try:
+            self.orcaflash.setPropertyValue('binning', self.binPar.value())
+        
+        except:
+            self.liveviewStop()
+            self.orcaflash.setPropertyValue('binning', self.binPar.value())
+            self.liveviewStart()
+            
         
     def setNrrows(self):
         
         """Method to change the number of rows of the captured frame"""
-        print('In setNrrrows')
-        self.orcaflash.setPropertyValue('subarray_hsize', self.nrrowPar.value())
+
+        try:
+            self.orcaflash.setPropertyValue('subarray_vsize', self.nrrowPar.value())
+        
+        except:
+            self.liveviewStop()
+            self.orcaflash.setPropertyValue('subarray_vsize', self.nrrowPar.value())
+            self.liveviewStart()
 
     def setGain(self):
         """ Method to change the pre-amp gain and main gain of the EMCCD
@@ -1063,8 +1069,7 @@ class TormentaGUI(QtGui.QMainWindow):
         RealExpPar = timingsPar.param('Real exposure time')
         RealAccPar = timingsPar.param('Real accumulation time')
         EffFRPar = timingsPar.param('Effective frame rate')
-        print(self.orcaflash.getPropertyValue('exposure_time')[0])
-        RealExpPar.setValue(1000 * self.orcaflash.getPropertyValue('exposure_time')[0])
+        RealExpPar.setValue(1000 * self.orcaflash.getPropertyValue('internal_frame_interval')[0])
         RealAccPar.setValue(self.orcaflash.getPropertyValue('timing_readout_time')[0])
         EffFRPar.setValue(self.orcaflash.getPropertyValue('internal_frame_rate')[0])
 #        RealExpPar.setValue(self.orcaflash.getPropertyValue('exposure_time')[0])
@@ -1083,19 +1088,21 @@ class TormentaGUI(QtGui.QMainWindow):
             self.liveviewButton.setChecked(True)
 
     # This is the function triggered by pressing the liveview button
-    def liveview(self, update=True):
+    def liveview(self):
         """ Image live view when not recording
         """
         if self.liveviewButton.isChecked():
-            self.liveviewStart(update)
+            print("Liveview button checked")
+            self.liveviewStart()
 
         else:
+            print("Liveview button not checked")
             self.liveviewStop()
 
-    def liveviewStart(self, update):
+    def liveviewStart(self):
 
         self.orcaflash.startAcquisition()
-        time.sleep(1)
+        time.sleep(0.1)
 #        time.sleep(np.max((5 * self.t_exp_real.magnitude, 1)))
               
 #        self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
@@ -1115,8 +1122,8 @@ class TormentaGUI(QtGui.QMainWindow):
 #
 #        # Initial image
         self.rawframe = self.orcaflash.getFrames()
-        self.frame = self.rawframe[0][1].getData() #return A numpy array that contains the camera data.
-        self.frame = np.reshape(self.frame, (self.orcaflash.frame_y, self.orcaflash.frame_x))
+        self.frame = self.rawframe[0][0].getData() #return A numpy array that contains the camera data.
+        self.frame = np.reshape(self.frame, (self.orcaflash.frame_x, self.orcaflash.frame_y))
 #        print(self.frame)
 #        print(type(self.frame))
         self.img.setImage(self.frame, autoLevels=False, lut=self.lut)
@@ -1125,7 +1132,10 @@ class TormentaGUI(QtGui.QMainWindow):
 #        self.img.setImage(image, autoLevels=False, lut=self.lut)
 #        if update:
 #            self.updateLevels(image)
-        self.viewtimer.start(35)
+        self.viewtimer.start(0)
+#        while self.liveviewButton.isChecked():
+#            self.updateView()
+
 #        self.moleculeWidget.enableBox.setEnabled(True)
 #        self.gridButton.setEnabled(True)
 #        self.grid2Button.setEnabled(True)
@@ -1146,14 +1156,18 @@ class TormentaGUI(QtGui.QMainWindow):
         """ Image update while in Liveview mode
         """
 #        try:
+        print("\nTime taken from end of last updateView to beginning of this one: ", time.clock() - self.lastTime)
+        now = time.clock()
         image = self.orcaflash.getFrames()
+#        print("Time taken to retrieve image: ", time.clock() - now)
         self.image = image[0][-1].getData()
-        self.image1 = np.reshape(self.image, (self.orcaflash.frame_y, self.orcaflash.frame_x))
-
+        self.image1 = np.reshape(self.image, (self.orcaflash.frame_x, self.orcaflash.frame_y))
+#        print("Time taken to retrieve image + getData and reshape: ", time.clock() - now)
 #            if self.moleculeWidget.enabled:
 #                self.moleculeWidget.graph.update(image)
+        now = time.clock()
         self.img.setImage(self.image1, autoLevels=False)
-#
+        print("Time taken by setImage function: ", time.clock() - now)
 #        if self.crosshair.showed:
 #            ycoord = int(np.round(self.crosshair.hLine.pos()[1]))
 #            xcoord = int(np.round(self.crosshair.vLine.pos()[0]))
@@ -1161,7 +1175,15 @@ class TormentaGUI(QtGui.QMainWindow):
 #            self.yProfile.setData(image[xcoord])
 
 #            self.fpsMath()
+        now = time.clock()
         self.image = image
+#        print("Time taken to copy image: ", time.clock() - now)
+        now = time.clock()
+        self.updateTimings()
+#        print("Time taken to update timings: ", time.clock() - now)
+        since_last = time.clock() - self.lastTime
+        self.lastTime = time.clock()
+#        print("Liveview frame rate = ", 1/since_last, " fps")
 #        except:
 #            pass        
         
