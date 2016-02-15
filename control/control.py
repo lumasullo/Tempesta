@@ -473,9 +473,9 @@ class CamParamTree(ParameterTree):
                    'value': orcaflash.camera_id},
                   {'name': 'Image frame', 'type': 'group', 'children': [
                       {'name': 'Nr of rows', 'type': 'list',
-                       'values': ['2048', '1024', '515', '256', '128', '64', '8']}, 
-{'name': 'Binning', 'type': 'list', 
-                                  'values': ['1x1', '2x2', '4x4'], 'tip': BinTip},
+                       'values': [2048, 1024, 515, 256, 128, 64, 8]}, 
+{'name': 'binning', 'type': 'list', 
+                                  'values': [b'1x1', b'2x2', b'4x4'], 'tip': BinTip},
                                   {'name': 'Apply', 'type': 'action'}]},
                   {'name': 'Timings', 'type': 'group', 'children': [
                       {'name': 'Set exposure time', 'type': 'float',
@@ -483,14 +483,14 @@ class CamParamTree(ParameterTree):
                                                 9999),
                        'siPrefix': True, 'suffix': 's'},
                       {'name': 'Real exposure time', 'type': 'float',
-                       'value': 0, 'readonly': True, 'siPrefix': True,
-                       'suffix': 's'},
+                       'value': 0, 'readonly': True, 'siPrefix': False,
+                       'suffix': ' ms'},
                       {'name': 'Real accumulation time', 'type': 'float',
                        'value': 0, 'readonly': True, 'siPrefix': True,
                        'suffix': 's'},
                       {'name': 'Effective frame rate', 'type': 'float',
-                       'value': 0, 'readonly': True, 'siPrefix': True,
-                       'suffix': 'Hz'}]},
+                       'value': 0, 'readonly': True, 'siPrefix': False,
+                       'suffix': ' fps'}]},
                   {'name': 'Gain', 'type': 'group', 'children': [
                       {'name': 'Pre-amp gain', 'type': 'list',
                        'values': list([9999, 9999, 9999]),
@@ -643,11 +643,20 @@ class TormentaGUI(QtGui.QMainWindow):
         self.customFrameLoaded = False
         self.cropLoaded = False
 
+        # Camera binning signals
+        changeExposure = lambda: self.setBinning()
+        framePar = self.tree.p.param('Image frame')
+        self.binPar = framePar.param('binning')
+        self.binPar.sigValueChanged.connect(self.setBinning)
+        self.nrrowPar = framePar.param('Nr of rows')
+        self.nrrowPar.sigValueChanged.connect(self.setNrrows)
         # Exposition signals
         changeExposure = lambda: self.setExposure()
         timingsPar = self.tree.p.param('Timings')
         self.expPar = timingsPar.param('Set exposure time')
         self.expPar.sigValueChanged.connect(changeExposure)
+        self.RealExpPar = timingsPar.param('Real exposure time')
+        self.RealExpPar.setOpts(decimals = 10)
         changeExposure()    # Set default values
 
         # Gain signals
@@ -945,6 +954,18 @@ class TormentaGUI(QtGui.QMainWindow):
         std = np.std(image)
         self.hist.setLevels(np.min(image) - std, np.max(image) + std)
 
+    def setBinning(self):
+        
+        """Method to change the binning of the captured frame"""
+        print('In setBinning')
+        self.orcaflash.setPropertyValue('binning', self.binPar.value())
+        
+    def setNrrows(self):
+        
+        """Method to change the number of rows of the captured frame"""
+        print('In setNrrrows')
+        self.orcaflash.setPropertyValue('subarray_hsize', self.nrrowPar.value())
+
     def setGain(self):
         """ Method to change the pre-amp gain and main gain of the EMCCD
         """
@@ -960,7 +981,6 @@ class TormentaGUI(QtGui.QMainWindow):
         """ Method to change the exposure time setting
         """
         self.orcaflash.setPropertyValue('exposure_time', self.expPar.value())
-        print('In setExposure')
 #        self.andor.frame_transfer_mode = self.FTMPar.value()
 #        hhRatesArr = np.array([item.magnitude for item in self.andor.HRRates])
 #        n_hrr = np.where(hhRatesArr == self.HRRatePar.value().magnitude)[0][0]
@@ -1044,8 +1064,8 @@ class TormentaGUI(QtGui.QMainWindow):
         RealAccPar = timingsPar.param('Real accumulation time')
         EffFRPar = timingsPar.param('Effective frame rate')
         print(self.orcaflash.getPropertyValue('exposure_time')[0])
-        RealExpPar.setValue(self.orcaflash.getPropertyValue('exposure_time')[0])
-        RealAccPar.setValue(self.orcaflash.getPropertyValue('exposure_time')[0] + self.orcaflash.getPropertyValue('timing_readout_time')[0])
+        RealExpPar.setValue(1000 * self.orcaflash.getPropertyValue('exposure_time')[0])
+        RealAccPar.setValue(self.orcaflash.getPropertyValue('timing_readout_time')[0])
         EffFRPar.setValue(self.orcaflash.getPropertyValue('internal_frame_rate')[0])
 #        RealExpPar.setValue(self.orcaflash.getPropertyValue('exposure_time')[0])
 #        RealAccPar.setValue(self.orcaflash.getPropertyValue('accumulation_time')[0])
@@ -1068,14 +1088,12 @@ class TormentaGUI(QtGui.QMainWindow):
         """
         if self.liveviewButton.isChecked():
             self.liveviewStart(update)
-            print('Liveview pressed')
 
         else:
             self.liveviewStop()
 
     def liveviewStart(self, update):
 
-        print(self.orcaflash.camera_model)
         self.orcaflash.startAcquisition()
         time.sleep(1)
 #        time.sleep(np.max((5 * self.t_exp_real.magnitude, 1)))
@@ -1098,7 +1116,7 @@ class TormentaGUI(QtGui.QMainWindow):
 #        # Initial image
         self.rawframe = self.orcaflash.getFrames()
         self.frame = self.rawframe[0][1].getData() #return A numpy array that contains the camera data.
-        self.frame = np.reshape(self.frame, (2048, 2048))
+        self.frame = np.reshape(self.frame, (self.orcaflash.frame_y, self.orcaflash.frame_x))
 #        print(self.frame)
 #        print(type(self.frame))
         self.img.setImage(self.frame, autoLevels=False, lut=self.lut)
@@ -1127,25 +1145,25 @@ class TormentaGUI(QtGui.QMainWindow):
     def updateView(self):
         """ Image update while in Liveview mode
         """
-        try:
-            image = self.orcaflash.getFrames()
-            self.image = image[0][-1].getData()
-            self.image1 = np.reshape(self.image, (2048, 2048))
+#        try:
+        image = self.orcaflash.getFrames()
+        self.image = image[0][-1].getData()
+        self.image1 = np.reshape(self.image, (self.orcaflash.frame_y, self.orcaflash.frame_x))
 
 #            if self.moleculeWidget.enabled:
 #                self.moleculeWidget.graph.update(image)
-            self.img.setImage(self.image1, autoLevels=False)
-
-            if self.crosshair.showed:
-                ycoord = int(np.round(self.crosshair.hLine.pos()[1]))
-                xcoord = int(np.round(self.crosshair.vLine.pos()[0]))
-                self.xProfile.setData(image[:, ycoord])
-                self.yProfile.setData(image[xcoord])
+        self.img.setImage(self.image1, autoLevels=False)
+#
+#        if self.crosshair.showed:
+#            ycoord = int(np.round(self.crosshair.hLine.pos()[1]))
+#            xcoord = int(np.round(self.crosshair.vLine.pos()[0]))
+#            self.xProfile.setData(image[:, ycoord])
+#            self.yProfile.setData(image[xcoord])
 
 #            self.fpsMath()
-            self.image = image
-        except:
-            pass        
+        self.image = image
+#        except:
+#            pass        
         
         
 #        try:

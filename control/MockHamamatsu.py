@@ -92,7 +92,9 @@ class MockHamamatsu(Driver):
         'image_framebytes': 8, 
         'subarray_hsize': 2048, 
         'subarray_vsize': 2048,
-        'subarray_mode': 'OFF'};
+        'subarray_mode': 'OFF',
+        'timing_readout_time': 9999,
+        'internal_frame_rate': 9999};
 
         # Get camera max width, height.
         self.max_width = self.getPropertyValue("image_width")[0]
