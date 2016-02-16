@@ -22,7 +22,7 @@ class HMockCamData():
     # @param size The size of the data object in bytes.
     #
     def __init__(self, size):
-        self.np_array = np.random.randint(1, 256, size)
+        self.np_array = np.random.randint(1, 256, int(size))
         self.size = size
 
     ## __getitem__
@@ -115,9 +115,8 @@ class MockHamamatsu(Driver):
         self.setSubArrayMode()
 
         # Get frame properties.
-        self.frame_x = self.getPropertyValue("image_width")[0]
-        print('frame_x set to ', self.getPropertyValue('image_width')[0])
-        self.frame_y = self.getPropertyValue("image_height")[0]
+        self.frame_x = int(self.getPropertyValue("image_width")[0])
+        self.frame_y = int(self.getPropertyValue("image_height")[0])
         self.frame_bytes = self.getPropertyValue("image_framebytes")[0]
 
 

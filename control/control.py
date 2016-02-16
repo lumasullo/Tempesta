@@ -33,6 +33,7 @@ import control.ontime as ontime
 import control.guitools as guitools
 
 
+
 class RecordingWidget(QtGui.QFrame):
 
     def __init__(self, main, *args, **kwargs):
@@ -464,10 +465,17 @@ class CamParamTree(ParameterTree):
         params = [{'name': 'Camera', 'type': 'str',
                    'value': orcaflash.camera_id},
                   {'name': 'Image frame', 'type': 'group', 'children': [
-                      {'name': 'Nr of rows', 'type': 'list',
-                       'values': [2048, 1024, 512, 256, 128, 64, 8]}, 
-{'name': 'binning', 'type': 'list', 
+                      {'name': 'Binning', 'type': 'list', 
                                   'values': [b'1x1', b'2x2', b'4x4'], 'tip': BinTip},
+{'name': 'Nr of rows', 'type': 'list',
+                       'values': [2048, 1024, 512, 256, 128, 64, 8]}, 
+{'name': 'Nr of columns', 'type': 'list',
+                       'values': [2048, 1024, 512, 256, 128, 64, 8]},
+{'name': 'Mode', 'type': 'list', 'values': ['Full chip', 'Standard', 'Custom']},
+{'name': 'X0', 'type': 'int', 'value': 1, 'limits': (1, 2048)},
+{'name': 'X1', 'type': 'int', 'value': 2018, 'limits': (1, 2048)},
+{'name': 'Y0', 'type': 'int', 'value': 1, 'limits': (1, 2048)},
+{'name': 'Y1', 'type': 'int', 'value': 2048, 'limits': (1, 2048)}, 
                                   {'name': 'Apply', 'type': 'action'}]},
                   {'name': 'Timings', 'type': 'group', 'children': [
                       {'name': 'Set exposure time', 'type': 'float',
@@ -638,10 +646,15 @@ class TormentaGUI(QtGui.QMainWindow):
         # Camera binning signals
         changeExposure = lambda: self.setBinning()
         framePar = self.tree.p.param('Image frame')
-        self.binPar = framePar.param('binning')
+        self.binPar = framePar.param('Binning')
         self.binPar.sigValueChanged.connect(self.setBinning)
         self.nrrowPar = framePar.param('Nr of rows')
         self.nrrowPar.sigValueChanged.connect(self.setNrrows)
+        self.nrcolPar = framePar.param('Nr of columns')
+        self.nrcolPar.sigValueChanged.connect(self.setNrcols)
+        self.applyParam = framePar.param('Apply')
+        self.applyParam.sigStateChanged.connect(self.OptForROI)
+        
         # Exposition signals
         changeExposure = lambda: self.setExposure()
         timingsPar = self.tree.p.param('Timings')
@@ -752,6 +765,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.hist = pg.HistogramLUTItem(image=self.img)
         self.hist.vb.setLimits(yMin=0, yMax=20000)
         imageWidget.addItem(self.hist, row=1, col=2)
+
 
 #        self.grid = guitools.Grid(self.vb, self.shape)
 #        self.gridButton.clicked.connect(self.grid.toggle)
@@ -874,6 +888,43 @@ class TormentaGUI(QtGui.QMainWindow):
         self.flipperButton.setChecked(not(value))
         self.daq.flipper = value
 
+
+
+    def OptForROI(self):
+#        targetRect = self.vb.targetRect()
+#        viewRect = self.vb.viewRect()
+        viewRange = self.vb.viewRange()
+        print(viewRange)
+#        print('targetRect: ', targetRect)
+#        print('viewRect: ', viewRect)
+#        print('viewRange', self.vb.viewRange())
+        framemidW = self.nrcolPar.value() /2
+        framemidH = self.nrrowPar.value() /2
+        print('framemidW: ', framemidW)
+        print('framemidH: ', framemidH)
+#        print(self.xRange[1])
+        width = 2 * max(framemidW - viewRange[0][0], viewRange[0][1] - framemidW)
+        height = 2 * max(framemidH - viewRange[1][0], viewRange[1][1] - framemidH)
+        width = min(2*framemidW, np.power(2, np.ceil(np.log2(width))))
+        height = min(2*framemidH, np.power(2, np.ceil(np.log2(height))))
+        print('width: ', width,'height: ', height)
+        try:
+            self.orcaflash.setPropertyValue('subarray_hsize', width)
+            self.orcaflash.setPropertyValue('subarray_vsize', height)
+        except:
+            self.liveviewStop()
+            self.orcaflash.setPropertyValue('subarray_hsize', width)
+            self.orcaflash.setPropertyValue('subarray_vsize', height)
+            self.liveviewStart()
+            
+        self.nrrowPar.setValue(height)
+        self.nrcolPar.setValue(width)
+#        print('\nOld state: ', self.vb.getState(copy = True))    
+        self.vb.setRange(xRange = (framemidW - (framemidW - viewRange[0][0]), width/2 - (framemidW - viewRange[0][1])), 
+                         yRange = (framemidH - (framemidH - viewRange[1][0]), height/2 - (framemidH - viewRange[1][1])),
+padding = 0.0)
+#        print('\nNew state: ',self.vb.getState(copy = True))
+
     def cropCCD(self):
 
         if self.cropParam.param('Enable').value():
@@ -926,10 +977,20 @@ class TormentaGUI(QtGui.QMainWindow):
             self.shape = self.andor.detector_shape
             self.adjustFrame()
 
-#    def changeParameter(self, function):
-#        """ This method is used to change those camera properties that need
-#        the camera to be idle to be able to be adjusted.
-#        """
+    def changeParameter(self, function):
+        """ This method is used to change those camera properties that need
+        the camera to be idle to be able to be adjusted.
+        """
+        try:
+            function()
+        except:
+
+            self.viewtimer.stop()
+            self.orcaflash.stopAcquisition()
+            function()
+            self.orcaflash.startAcquisition()
+            self.viewtimer.start(0)
+
 #        status = self.andor.status
 #        if status != ('Camera is idle, waiting for instructions.'):
 #            self.viewtimer.stop()
@@ -958,19 +1019,18 @@ class TormentaGUI(QtGui.QMainWindow):
             self.liveviewStop()
             self.orcaflash.setPropertyValue('binning', self.binPar.value())
             self.liveviewStart()
+
             
         
     def setNrrows(self):
         
         """Method to change the number of rows of the captured frame"""
+        self.changeParameter(lambda: self.orcaflash.setPropertyValue('subarray_vsize', self.nrrowPar.value()))
 
-        try:
-            self.orcaflash.setPropertyValue('subarray_vsize', self.nrrowPar.value())
+    def setNrcols(self):
         
-        except:
-            self.liveviewStop()
-            self.orcaflash.setPropertyValue('subarray_vsize', self.nrrowPar.value())
-            self.liveviewStart()
+        """Method to change the number of rows of the captured frame"""
+        self.changeParameter(lambda: self.orcaflash.setPropertyValue('subarray_hsize', self.nrcolPar.value()))
 
     def setGain(self):
         """ Method to change the pre-amp gain and main gain of the EMCCD
@@ -1092,11 +1152,9 @@ class TormentaGUI(QtGui.QMainWindow):
         """ Image live view when not recording
         """
         if self.liveviewButton.isChecked():
-            print("Liveview button checked")
             self.liveviewStart()
 
         else:
-            print("Liveview button not checked")
             self.liveviewStop()
 
     def liveviewStart(self):
@@ -1105,7 +1163,7 @@ class TormentaGUI(QtGui.QMainWindow):
         time.sleep(0.1)
 #        time.sleep(np.max((5 * self.t_exp_real.magnitude, 1)))
               
-#        self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
+        self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
 #        self.liveviewStarts.emit()
 #
 #        idle = 'Camera is idle, waiting for instructions.'
@@ -1127,11 +1185,12 @@ class TormentaGUI(QtGui.QMainWindow):
 #        print(self.frame)
 #        print(type(self.frame))
         self.img.setImage(self.frame, autoLevels=False, lut=self.lut)
-        
 #        image = np.transpose(self.andor.most_recent_image16(self.shape))
 #        self.img.setImage(image, autoLevels=False, lut=self.lut)
 #        if update:
 #            self.updateLevels(image)
+        self.xRange = (0, 2048)
+        self.yRange = (0, 2048)
         self.viewtimer.start(0)
 #        while self.liveviewButton.isChecked():
 #            self.updateView()
@@ -1156,7 +1215,7 @@ class TormentaGUI(QtGui.QMainWindow):
         """ Image update while in Liveview mode
         """
 #        try:
-        print("\nTime taken from end of last updateView to beginning of this one: ", time.clock() - self.lastTime)
+#        print("\nTime taken from end of last updateView to beginning of this one: ", time.clock() - self.lastTime)
         now = time.clock()
         image = self.orcaflash.getFrames()
 #        print("Time taken to retrieve image: ", time.clock() - now)
@@ -1167,7 +1226,7 @@ class TormentaGUI(QtGui.QMainWindow):
 #                self.moleculeWidget.graph.update(image)
         now = time.clock()
         self.img.setImage(self.image1, autoLevels=False)
-        print("Time taken by setImage function: ", time.clock() - now)
+#        print("Time taken by setImage function: ", time.clock() - now)
 #        if self.crosshair.showed:
 #            ycoord = int(np.round(self.crosshair.hLine.pos()[1]))
 #            xcoord = int(np.round(self.crosshair.vLine.pos()[0]))
