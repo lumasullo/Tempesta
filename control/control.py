@@ -645,15 +645,17 @@ class TormentaGUI(QtGui.QMainWindow):
 
         # Camera binning signals
         changeExposure = lambda: self.setBinning()
-        framePar = self.tree.p.param('Image frame')
-        self.binPar = framePar.param('Binning')
+        self.framePar = self.tree.p.param('Image frame')
+        self.binPar = self.framePar.param('Binning')
         self.binPar.sigValueChanged.connect(self.setBinning)
-        self.nrrowPar = framePar.param('Nr of rows')
+        self.nrrowPar = self.framePar.param('Nr of rows')
         self.nrrowPar.sigValueChanged.connect(self.setNrrows)
-        self.nrcolPar = framePar.param('Nr of columns')
+        self.nrcolPar = self.framePar.param('Nr of columns')
         self.nrcolPar.sigValueChanged.connect(self.setNrcols)
-        self.applyParam = framePar.param('Apply')
-        self.applyParam.sigStateChanged.connect(self.OptForROI)
+#        self.applyParam = framePar.param('Apply')
+#        self.applyParam.sigStateChanged.connect(self.OptForROI)
+        self.updFrame = self.framePar.param('Mode')
+        self.updFrame.sigValueChanged.connect(self.updateFrame)
         
         # Exposition signals
         changeExposure = lambda: self.setExposure()
@@ -1064,19 +1066,34 @@ padding = 0.0)
 #        self.andor.set_vert_clock(n_vsa)
 #
         self.updateTimings()
+        
+    def cropOrca(self, hpos, vpos, hsize, vsize):
+        """Method to crop the fram read out by Orcaflash """
+#       Round to closest "divisable by 8" value.
+        vpos = 8*np.ceil(vpos/8)
+        hpos = 8*np.ceil(hpos/8)
+        vsize = 8*np.ceil(vsize/8)
+        hsize = 8*np.ceil(hsize/8)
+        
+        print(vpos, hpos, vsize, hsize)
+        
+        self.orcaflash.setPropertyValue('subarray_vpos', vpos)
+        self.orcaflash.setPropertyValue('subarray_hpos', hpos)
+        self.orcaflash.setPropertyValue('subarray_vsize', vsize)
+        self.orcaflash.setPropertyValue('subarray_hsize', hsize)
 
     def adjustFrame(self):
         """ Method to change the area of the CCD to be used and adjust the
         image widget accordingly. It needs a previous change in self.shape
         and self.frameStart)
         """
-        pass
 #        self.andor.set_image(shape=self.shape, p_0=self.frameStart)
-#        self.vb.setLimits(xMin=-0.5, xMax=self.shape[0] - 0.5, minXRange=4,
-#                          yMin=-0.5, yMax=self.shape[1] - 0.5, minYRange=4)
-#
-#        self.updateTimings()
-#
+        self.changeParameter(lambda: self.cropOrca(self.frameStart[0] - self.shape[0] / 2, self.frameStart[1] - self.shape[1] / 2, self.shape[0], self.shape[1]))
+        self.vb.setLimits(xMin=-0.5, xMax=self.shape[0] - 0.5, minXRange=4,
+                          yMin=-0.5, yMax=self.shape[1] - 0.5, minYRange=4)
+
+        self.updateTimings()
+
 #        self.grid.update(self.shape)
 #        self.recWidget.shape = self.shape
 
@@ -1084,29 +1101,34 @@ padding = 0.0)
         """ Method to change the image frame size and position in the sensor
         """
         frameParam = self.tree.p.param('Image frame')
-        if frameParam.param('Shape').value() == 'Custom':
+        if frameParam.param('Mode').value() == 'Custom':
 
-            if not(self.customFrameLoaded):
-                ROIpos = (0.5 * self.shape[0] - 64, 0.5 * self.shape[1] - 64)
-                self.ROI = guitools.ROI(self.shape, self.vb, ROIpos,
-                                        handlePos=(1, 0), handleCenter=(0, 1),
-                                        scaleSnap=True, translateSnap=True)
+#            if not(self.customFrameLoaded):
+            ROIpos = (0.5 * self.shape[0] - 64, 0.5 * self.shape[1] - 64)
+            self.ROI = guitools.ROI(self.shape, self.vb, ROIpos,
+                                    handlePos=(1, 0), handleCenter=(0, 1),
+scaleSnap=True, translateSnap=True)
                 # Signals
-                applyParam = frameParam.param('Apply')
-                applyParam.sigStateChanged.connect(self.customFrame)
+            self.applyParam = self.framePar.param('Apply')
+            self.applyParam.sigStateChanged.connect(self.customFrame)
 
-        elif frameParam.param('Shape').value() == 'Full chip':
-            self.shape = self.andor.detector_shape
+        elif frameParam.param('Mode').value() == 'Full chip':
+            print('Full chip')
+            self.shape = [2048, 2048]
             self.frameStart = (1, 1)
             self.changeParameter(self.adjustFrame)
 
+            self.applyParam.sigStateChanged.disconnect()
+
+
         else:
-            side = int(frameParam.param('Shape').value().split('x')[0])
+            side = int(frameParam.param('Mode').value().split('x')[0])
             self.shape = (side, side)
             start = int(0.5*(self.andor.detector_shape[0] - side) + 1)
             self.frameStart = (start, start)
 
             self.changeParameter(self.adjustFrame)
+#            self.applyParam.disable()
 
     def customFrame(self):
 
@@ -1114,10 +1136,10 @@ padding = 0.0)
         self.shape = (int(ROISize[0]), int(ROISize[1]))
         self.frameStart = (int(self.ROI.pos()[0]), int(self.ROI.pos()[1]))
 
-        self.changeParameter(self.adjustFrame)
+        self.adjustFrame()
         self.ROI.hide()
-        self.grid.update(self.shape)
-        self.recWidget.shape = self.shape
+#        self.grid.update(self.shape)
+#        self.recWidget.shape = self.shape
 
     def updateTimings(self):
         """ Update the real exposition and accumulation times in the parameter
