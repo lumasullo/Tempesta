@@ -768,7 +768,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.img.setLookupTable(self.lut)
 #        self.img.translate(-0.5, -0.5)
         self.img.translate(-0.5, -0.5)
-        self.img.setPxMode(True)
+#        self.img.setPxMode(True)
         self.vb.addItem(self.img)
         self.vb.setAspectLocked(True)
         self.hist = pg.HistogramLUTItem(image=self.img)
