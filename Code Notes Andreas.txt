@@ -1,3 +1,4 @@
+General notes:
 150216
 
 setImage function in liveview functions seems to start some seperate thread process. viewtimer waits for this process to finish before calling timeout again. Clue to this was
@@ -12,3 +13,8 @@ hamamatsu_coltrol.py cannot be imported as module if Orcaflash is not connected 
 Raises DCAMException. This exception cannot be caught outside this module since the exceptionclass cannot be initialized if the module cannot be 
 initialized... DCAMException is not caught anywhere in hamamatsu_control -> unnecessary? "Try : import" is used now but requires a default Except:
 which is not really good to have.  
+
+Bugs or TODOs:
+
+170216
+Even though parameters like Y0 and X0 show zero they can still apparently take negative values with can give error when trying to pass to camera.

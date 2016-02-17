@@ -649,18 +649,15 @@ class TormentaGUI(QtGui.QMainWindow):
         self.framePar = self.tree.p.param('Image frame')
         self.binPar = self.framePar.param('Binning')
         self.binPar.sigValueChanged.connect(self.setBinning)
-#        self.nrrowPar = self.framePar.param('Nr of rows')
-#        self.nrrowPar.sigValueChanged.connect(self.setNrrows)
-#        self.nrcolPar = self.framePar.param('Nr of columns')
-#        self.nrcolPar.sigValueChanged.connect(self.setNrcols)
-        self.TestParam = self.framePar.param('Test')
-        self.TestParam.sigStateChanged.connect(self.setNrrows)
         self.FrameMode = self.framePar.param('Mode')
         self.FrameMode.sigValueChanged.connect(self.updateFrame)
         self.X0par= self.framePar.param('X0')
         self.Y0par= self.framePar.param('Y0')
         self.Widthpar= self.framePar.param('Width')
         self.Heightpar= self.framePar.param('Height')
+        self.TestParam = self.framePar.param('Test')
+#        self.TestParam.sigStateChanged.connect()
+
         
         # Exposition signals
         changeExposure = lambda: self.setExposure()
@@ -766,13 +763,12 @@ class TormentaGUI(QtGui.QMainWindow):
         self.img = pg.ImageItem()
         self.lut = guitools.cubehelix()
         self.img.setLookupTable(self.lut)
-#        self.img.translate(-0.5, -0.5)
         self.img.translate(-0.5, -0.5)
 #        self.img.setPxMode(True)
         self.vb.addItem(self.img)
         self.vb.setAspectLocked(True)
         self.hist = pg.HistogramLUTItem(image=self.img)
-        self.hist.vb.setLimits(yMin=0, yMax=20000)
+        self.hist.vb.setLimits(yMin=0, yMax=2048)
         imageWidget.addItem(self.hist, row=1, col=2)
 
 
@@ -995,10 +991,10 @@ class TormentaGUI(QtGui.QMainWindow):
 
             
         
-    def setNrrows(self):
-        
-        """Method to change the number of rows of the captured frame"""
-        self.changeParameter(lambda: self.orcaflash.setPropertyValue('subarray_vsize', 8))
+#    def setNrrows(self):
+#        
+#        """Method to change the number of rows of the captured frame"""
+#        self.changeParameter(lambda: self.orcaflash.setPropertyValue('subarray_vsize', 8))
 #
 #    def setNrcols(self):
 #        
@@ -1061,10 +1057,11 @@ class TormentaGUI(QtGui.QMainWindow):
         image widget accordingly. It needs a previous change in self.shape
         and self.frameStart)
         """
+        
 #        self.andor.set_image(shape=self.shape, p_0=self.frameStart)
         self.changeParameter(lambda: self.cropOrca(self.frameStart[0], self.frameStart[1], self.shape[0], self.shape[1]))
-        self.vb.setLimits(xMin= -0.5, xMax=self.shape[0] - 0.5, minXRange=4,
-                          yMin= -0.5, yMax=self.shape[1] - 0.5, minYRange=4)
+#        self.vb.setLimits(xMin= -0.5, xMax=self.shape[0] - 0.5, minXRange=4,
+#                          yMin= -0.5, yMax=self.shape[1] - 0.5, minYRange=4)
 
         self.updateTimings()
 
@@ -1129,7 +1126,7 @@ scaleSnap=True, translateSnap=True)
         self.frameStart = (self.X0par.value(), self.Y0par.value())
 
         self.adjustFrame()
-        self.ROI.hide()
+#        self.ROI.hide()
 #        self.grid.update(self.shape)
 #        self.recWidget.shape = self.shape
 
@@ -1203,8 +1200,6 @@ scaleSnap=True, translateSnap=True)
 #        self.img.setImage(image, autoLevels=False, lut=self.lut)
 #        if update:
 #            self.updateLevels(image)
-        self.xRange = (0, 2048)
-        self.yRange = (0, 2048)
         self.viewtimer.start(0)
 #        while self.liveviewButton.isChecked():
 #            self.updateView()
