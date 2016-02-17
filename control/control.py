@@ -467,19 +467,20 @@ class CamParamTree(ParameterTree):
                   {'name': 'Image frame', 'type': 'group', 'children': [
                       {'name': 'Binning', 'type': 'list', 
                                   'values': [b'1x1', b'2x2', b'4x4'], 'tip': BinTip},
-{'name': 'Nr of rows', 'type': 'list',
-                       'values': [2048, 1024, 512, 256, 128, 64, 8]}, 
-{'name': 'Nr of columns', 'type': 'list',
-                       'values': [2048, 1024, 512, 256, 128, 64, 8]},
-{'name': 'Mode', 'type': 'list', 'values': ['Full chip', 'Standard', 'Custom']},
-{'name': 'X0', 'type': 'int', 'value': 1, 'limits': (1, 2048)},
-{'name': 'X1', 'type': 'int', 'value': 2018, 'limits': (1, 2048)},
-{'name': 'Y0', 'type': 'int', 'value': 1, 'limits': (1, 2048)},
-{'name': 'Y1', 'type': 'int', 'value': 2048, 'limits': (1, 2048)}, 
-                                  {'name': 'Apply', 'type': 'action'}]},
+#{'name': 'Nr of rows', 'type': 'list',
+#                       'values': [2048, 1024, 512, 256, 128, 64, 8]}, 
+#{'name': 'Nr of columns', 'type': 'list',
+#                       'values': [2048, 1024, 512, 256, 128, 64, 8]},
+{'name': 'Mode', 'type': 'list', 'values': ['Full chip', 'Custom']},
+{'name': 'X0', 'type': 'int', 'value': 0, 'limits': (0, 2044)},
+{'name': 'Y0', 'type': 'int', 'value': 0, 'limits': (0, 2044)},
+{'name': 'Width', 'type': 'int', 'value': 2048, 'limits': (1, 2048)},
+{'name': 'Height', 'type': 'int', 'value': 2048, 'limits': (1, 2048)}, 
+                                  {'name': 'Apply', 'type': 'action'},
+{'name': 'Test', 'type': 'action'}]},
                   {'name': 'Timings', 'type': 'group', 'children': [
                       {'name': 'Set exposure time', 'type': 'float',
-                       'value': 0.1, 'limits': (0,
+                       'value': 0.01, 'limits': (0,
                                                 9999),
                        'siPrefix': True, 'suffix': 's'},
                       {'name': 'Real exposure time', 'type': 'float',
@@ -568,8 +569,8 @@ class TormentaGUI(QtGui.QMainWindow):
 
         self.orcaflash = orcaflash
         self.orcaflash.setPropertyValue("exposure_time", 0.001)
-        self.shape = [self.orcaflash.getPropertyValue('image_height')[0], self.orcaflash.getPropertyValue('image_width')[0]]
-        self.frameStart = (1, 1)
+        self.shape = (self.orcaflash.getPropertyValue('image_height')[0], self.orcaflash.getPropertyValue('image_width')[0])
+        self.frameStart = (0, 0)
         self.bluelaser = bluelaser
         self.violetlaser = violetlaser
         self.uvlaser = uvlaser
@@ -648,14 +649,18 @@ class TormentaGUI(QtGui.QMainWindow):
         self.framePar = self.tree.p.param('Image frame')
         self.binPar = self.framePar.param('Binning')
         self.binPar.sigValueChanged.connect(self.setBinning)
-        self.nrrowPar = self.framePar.param('Nr of rows')
-        self.nrrowPar.sigValueChanged.connect(self.setNrrows)
-        self.nrcolPar = self.framePar.param('Nr of columns')
-        self.nrcolPar.sigValueChanged.connect(self.setNrcols)
-#        self.applyParam = framePar.param('Apply')
-#        self.applyParam.sigStateChanged.connect(self.OptForROI)
-        self.updFrame = self.framePar.param('Mode')
-        self.updFrame.sigValueChanged.connect(self.updateFrame)
+#        self.nrrowPar = self.framePar.param('Nr of rows')
+#        self.nrrowPar.sigValueChanged.connect(self.setNrrows)
+#        self.nrcolPar = self.framePar.param('Nr of columns')
+#        self.nrcolPar.sigValueChanged.connect(self.setNrcols)
+        self.TestParam = self.framePar.param('Test')
+        self.TestParam.sigStateChanged.connect(self.setNrrows)
+        self.FrameMode = self.framePar.param('Mode')
+        self.FrameMode.sigValueChanged.connect(self.updateFrame)
+        self.X0par= self.framePar.param('X0')
+        self.Y0par= self.framePar.param('Y0')
+        self.Widthpar= self.framePar.param('Width')
+        self.Heightpar= self.framePar.param('Height')
         
         # Exposition signals
         changeExposure = lambda: self.setExposure()
@@ -761,7 +766,9 @@ class TormentaGUI(QtGui.QMainWindow):
         self.img = pg.ImageItem()
         self.lut = guitools.cubehelix()
         self.img.setLookupTable(self.lut)
+#        self.img.translate(-0.5, -0.5)
         self.img.translate(-0.5, -0.5)
+        self.img.setPxMode(True)
         self.vb.addItem(self.img)
         self.vb.setAspectLocked(True)
         self.hist = pg.HistogramLUTItem(image=self.img)
@@ -891,42 +898,6 @@ class TormentaGUI(QtGui.QMainWindow):
         self.daq.flipper = value
 
 
-
-    def OptForROI(self):
-#        targetRect = self.vb.targetRect()
-#        viewRect = self.vb.viewRect()
-        viewRange = self.vb.viewRange()
-        print(viewRange)
-#        print('targetRect: ', targetRect)
-#        print('viewRect: ', viewRect)
-#        print('viewRange', self.vb.viewRange())
-        framemidW = self.nrcolPar.value() /2
-        framemidH = self.nrrowPar.value() /2
-        print('framemidW: ', framemidW)
-        print('framemidH: ', framemidH)
-#        print(self.xRange[1])
-        width = 2 * max(framemidW - viewRange[0][0], viewRange[0][1] - framemidW)
-        height = 2 * max(framemidH - viewRange[1][0], viewRange[1][1] - framemidH)
-        width = min(2*framemidW, np.power(2, np.ceil(np.log2(width))))
-        height = min(2*framemidH, np.power(2, np.ceil(np.log2(height))))
-        print('width: ', width,'height: ', height)
-        try:
-            self.orcaflash.setPropertyValue('subarray_hsize', width)
-            self.orcaflash.setPropertyValue('subarray_vsize', height)
-        except:
-            self.liveviewStop()
-            self.orcaflash.setPropertyValue('subarray_hsize', width)
-            self.orcaflash.setPropertyValue('subarray_vsize', height)
-            self.liveviewStart()
-            
-        self.nrrowPar.setValue(height)
-        self.nrcolPar.setValue(width)
-#        print('\nOld state: ', self.vb.getState(copy = True))    
-        self.vb.setRange(xRange = (framemidW - (framemidW - viewRange[0][0]), width/2 - (framemidW - viewRange[0][1])), 
-                         yRange = (framemidH - (framemidH - viewRange[1][0]), height/2 - (framemidH - viewRange[1][1])),
-padding = 0.0)
-#        print('\nNew state: ',self.vb.getState(copy = True))
-
     def cropCCD(self):
 
         if self.cropParam.param('Enable').value():
@@ -1027,12 +998,12 @@ padding = 0.0)
     def setNrrows(self):
         
         """Method to change the number of rows of the captured frame"""
-        self.changeParameter(lambda: self.orcaflash.setPropertyValue('subarray_vsize', self.nrrowPar.value()))
-
-    def setNrcols(self):
-        
-        """Method to change the number of rows of the captured frame"""
-        self.changeParameter(lambda: self.orcaflash.setPropertyValue('subarray_hsize', self.nrcolPar.value()))
+        self.changeParameter(lambda: self.orcaflash.setPropertyValue('subarray_vsize', 8))
+#
+#    def setNrcols(self):
+#        
+#        """Method to change the number of rows of the captured frame"""
+#        self.changeParameter(lambda: self.orcaflash.setPropertyValue('subarray_hsize', self.nrcolPar.value()))
 
     def setGain(self):
         """ Method to change the pre-amp gain and main gain of the EMCCD
@@ -1069,28 +1040,31 @@ padding = 0.0)
         
     def cropOrca(self, hpos, vpos, hsize, vsize):
         """Method to crop the fram read out by Orcaflash """
-#       Round to closest "divisable by 8" value.
-        vpos = 8*np.ceil(vpos/8)
-        hpos = 8*np.ceil(hpos/8)
-        vsize = 8*np.ceil(vsize/8)
-        hsize = 8*np.ceil(hsize/8)
+#       Round to closest "divisable by 4" value.
+        vpos = 4*np.ceil(vpos/4)
+        hpos = 4*np.ceil(hpos/4)
+        vsize = min(2048 - vpos, 4*np.ceil(vsize/4))
+        hsize = min(2048 - hpos, 4*np.ceil(hsize/4))
         
         print(vpos, hpos, vsize, hsize)
         
         self.orcaflash.setPropertyValue('subarray_vpos', vpos)
+        print('vpos set')
         self.orcaflash.setPropertyValue('subarray_hpos', hpos)
+        print('hpos set')
         self.orcaflash.setPropertyValue('subarray_vsize', vsize)
+        print('vsize set')
         self.orcaflash.setPropertyValue('subarray_hsize', hsize)
 
     def adjustFrame(self):
-        """ Method to change the area of the CCD to be used and adjust the
+        """ Method to change the area of the sensor to be used and adjust the
         image widget accordingly. It needs a previous change in self.shape
         and self.frameStart)
         """
 #        self.andor.set_image(shape=self.shape, p_0=self.frameStart)
-        self.changeParameter(lambda: self.cropOrca(self.frameStart[0] - self.shape[0] / 2, self.frameStart[1] - self.shape[1] / 2, self.shape[0], self.shape[1]))
-        self.vb.setLimits(xMin=-0.5, xMax=self.shape[0] - 0.5, minXRange=4,
-                          yMin=-0.5, yMax=self.shape[1] - 0.5, minYRange=4)
+        self.changeParameter(lambda: self.cropOrca(self.frameStart[0], self.frameStart[1], self.shape[0], self.shape[1]))
+        self.vb.setLimits(xMin= -0.5, xMax=self.shape[0] - 0.5, minXRange=4,
+                          yMin= -0.5, yMax=self.shape[1] - 0.5, minYRange=4)
 
         self.updateTimings()
 
@@ -1104,21 +1078,30 @@ padding = 0.0)
         if frameParam.param('Mode').value() == 'Custom':
 
 #            if not(self.customFrameLoaded):
-            ROIpos = (0.5 * self.shape[0] - 64, 0.5 * self.shape[1] - 64)
-            self.ROI = guitools.ROI(self.shape, self.vb, ROIpos,
+            ROIsize = (int(0.2 * self.vb.viewRect().width()), int(0.2 * self.vb.viewRect().height()))
+            ROIcenter = (int(self.vb.viewRect().center().x()), int(self.vb.viewRect().center().y()))
+            ROIpos = (ROIcenter[0] - 0.5*ROIsize[0], ROIcenter[1] - 0.5*ROIsize[1])
+            self.ROI = guitools.ROI(ROIsize, self.vb, ROIpos,
                                     handlePos=(1, 0), handleCenter=(0, 1),
 scaleSnap=True, translateSnap=True)
+            self.ROIchanged()
                 # Signals
             self.applyParam = self.framePar.param('Apply')
             self.applyParam.sigStateChanged.connect(self.customFrame)
+            self.ROI.sigRegionChangeFinished.connect(self.ROIchanged)
 
         elif frameParam.param('Mode').value() == 'Full chip':
             print('Full chip')
-            self.shape = [2048, 2048]
-            self.frameStart = (1, 1)
+            self.shape = (2048, 2048)
+            self.frameStart = (0, 0)
             self.changeParameter(self.adjustFrame)
 
             self.applyParam.sigStateChanged.disconnect()
+#            try:
+            self.ROI.hide()
+#            except:
+#                pass
+                    
 
 
         else:
@@ -1130,11 +1113,20 @@ scaleSnap=True, translateSnap=True)
             self.changeParameter(self.adjustFrame)
 #            self.applyParam.disable()
 
+    def ROIchanged(self):
+        print('In ROIchanged..., ROI.pos[0]= ', self.ROI.pos()[0])
+        self.X0par.setValue(self.ROI.pos()[0])
+        self.Y0par.setValue(self.ROI.pos()[1])
+        self.Widthpar.setValue(self.ROI.size()[0])
+        self.Heightpar.setValue(self.ROI.size()[1])
+    
     def customFrame(self):
 
-        ROISize = self.ROI.size()
-        self.shape = (int(ROISize[0]), int(ROISize[1]))
-        self.frameStart = (int(self.ROI.pos()[0]), int(self.ROI.pos()[1]))
+#        ROISize = self.ROI.size()
+#        self.shape = (int(ROISize[0]), int(ROISize[1]))
+        self.shape = (self.Widthpar.value(), self.Heightpar.value())
+#        self.frameStart = (int(self.ROI.pos()[0]), int(self.ROI.pos()[1]))
+        self.frameStart = (self.X0par.value(), self.Y0par.value())
 
         self.adjustFrame()
         self.ROI.hide()
@@ -1247,7 +1239,7 @@ scaleSnap=True, translateSnap=True)
 #            if self.moleculeWidget.enabled:
 #                self.moleculeWidget.graph.update(image)
         now = time.clock()
-        self.img.setImage(self.image1, autoLevels=False)
+        self.img.setImage(self.image1, autoLevels=False, autoDownsample = True)
 #        print("Time taken by setImage function: ", time.clock() - now)
 #        if self.crosshair.showed:
 #            ycoord = int(np.round(self.crosshair.hLine.pos()[1]))

@@ -406,14 +406,14 @@ class ROI(pg.ROI):
 
         self.mainShape = shape
 
-        pg.ROI.__init__(self, pos, size=(128, 128), pen='y', *args, **kwargs)
+        pg.ROI.__init__(self, pos, size=shape, pen='y', *args, **kwargs)
         self.addScaleHandle(handlePos, handleCenter, lockAspect=True)
         vb.addItem(self)
 
         self.label = pg.TextItem()
         self.label.setPos(self.pos()[0] + self.size()[0],
                           self.pos()[1] + self.size()[1])
-        self.label.setText('128x128')
+        self.label.setText('{}x{}'.format(shape[0], shape[1]))
 
         self.sigRegionChanged.connect(self.updateText)
 
