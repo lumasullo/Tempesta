@@ -22,7 +22,7 @@ class HMockCamData():
     # @param size The size of the data object in bytes.
     #
     def __init__(self, size):
-        self.np_array = np.random.randint(1, 256, int(size))
+        self.np_array = np.random.randint(1, 65536, int(size))
         self.size = size
 
     ## __getitem__

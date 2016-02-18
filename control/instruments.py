@@ -128,7 +128,7 @@ class Camera(object):
 
         try:     
             import lantz.drivers.hamamatsu.hamamatsu_camera as hm
-            orcaflash = hm.HamamatsuCamera(0)
+            orcaflash = hm.HamamatsuCameraMR(0)
             print('Initializing Hamamatsu Camera Object, model: ', orcaflash.camera_model)
             return orcaflash
 

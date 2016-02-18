@@ -41,8 +41,13 @@ class RecordingWidget(QtGui.QFrame):
 
         self.main = main
         self.dataname = 'data'      # In case I need a QLineEdit for this
-        self.initialDir = r'C:\Users\Usuario\Documents\Data'
-
+        startdir = r'C:\Users\andreas.boden\Data\Snaps\%s'
+        newfolderpath =  startdir % time.strftime('%Y-%m-%d')
+        if not os.path.exists(newfolderpath):
+            os.mkdir(newfolderpath)
+            
+        self.initialDir = newfolderpath
+        
         # Title
         recTitle = QtGui.QLabel('<h2><strong>Recording</strong></h2>')
         recTitle.setTextFormat(QtCore.Qt.RichText)
@@ -54,7 +59,9 @@ class RecordingWidget(QtGui.QFrame):
         openFolderButton.clicked.connect(self.openFolder)
         loadFolderButton = QtGui.QPushButton('Load...')
         loadFolderButton.clicked.connect(self.loadFolder)
-        self.filenameEdit = QtGui.QLineEdit('filename')
+        self.specifyfile = QtGui.QCheckBox('Specify file name')
+        self.specifyfile.clicked.connect(self.specFile)
+        self.filenameEdit = QtGui.QLineEdit('Current_time')
 
         # Snap and recording buttons
         self.snapTIFFButton = QtGui.QPushButton('Snap')
@@ -62,6 +69,7 @@ class RecordingWidget(QtGui.QFrame):
         self.snapTIFFButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
                                           QtGui.QSizePolicy.Expanding)
         self.snapTIFFButton.clicked.connect(self.snapTIFF)
+#        self.snapTIFFButton.clicked.connect(self.snapHDF)
 #        self.snapHDFButton = QtGui.QPushButton('Snap HDF5')
 #        self.snapHDFButton.setStyleSheet("font-size:16px")
 #        self.snapHDFButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
@@ -108,21 +116,23 @@ class RecordingWidget(QtGui.QFrame):
         recGrid.addWidget(loadFolderButton, 1, 4)
         recGrid.addWidget(openFolderButton, 1, 3)
         recGrid.addWidget(self.folderEdit, 2, 0, 1, 5)
-        recGrid.addWidget(QtGui.QLabel('Filename'), 3, 0, 1, 2)
-        recGrid.addWidget(self.filenameEdit, 4, 0, 1, 5)
-        recGrid.addWidget(QtGui.QLabel('Number of expositions'), 5, 0)
-        recGrid.addWidget(self.currentFrame, 5, 1)
-        recGrid.addWidget(self.numExpositionsEdit, 5, 2)
+        recGrid.addWidget(self.specifyfile, 3, 0, 1, 5)
+        recGrid.addWidget(QtGui.QLabel('Filename'), 4, 0, 1, 2)
+        recGrid.addWidget(self.filenameEdit, 5, 0, 1, 5)
+        recGrid.addWidget(QtGui.QLabel('Number of expositions'), 6, 0)
+        recGrid.addWidget(self.currentFrame, 6, 1)
+        recGrid.addWidget(self.numExpositionsEdit, 6, 2)
 #        recGrid.addWidget(self.tElapsed, 5, 3)
-        recGrid.addWidget(self.progressBar, 5, 3, 1, 2)
-        recGrid.addWidget(self.tRemaining, 5, 3, 1, 2)
-        recGrid.addWidget(buttonWidget, 6, 0, 1, 5)
+        recGrid.addWidget(self.progressBar, 6, 3, 1, 2)
+        recGrid.addWidget(self.tRemaining, 6, 3, 1, 2)
+        recGrid.addWidget(buttonWidget, 7, 0, 1, 5)
 
         recGrid.setColumnMinimumWidth(0, 70)
         recGrid.setRowMinimumHeight(6, 40)
 
         self.writable = True
         self.readyToRecord = False
+        self.filenameEdit.setEnabled(False)
 
     @property
     def readyToRecord(self):
@@ -145,6 +155,15 @@ class RecordingWidget(QtGui.QFrame):
         self.filenameEdit.setEnabled(value)
         self.numExpositionsEdit.setEnabled(value)
         self._writable = value
+
+    def specFile(self):
+        
+        if self.specifyfile.checkState():
+            self.filenameEdit.setEnabled(True)
+            self.filenameEdit.setText('Filename')
+        else:
+            self.filenameEdit.setEnabled(False)
+            self.filenameEdit.setText('Current time')
 
     def n(self):
         text = self.numExpositionsEdit.text()
@@ -210,11 +229,11 @@ class RecordingWidget(QtGui.QFrame):
         folder = self.folderEdit.text()
         if os.path.exists(folder):
 
-            image = self.main.andor.most_recent_image16(self.main.shape)
-            image = np.transpose(image)
+#            image = self.main.andor.most_recent_image16(self.main.shape)
+            image = self.main.image
 
-            name = os.path.join(folder, self.filenameEdit.text())
-            savename = guitools.getUniqueName(name + '_snap.hdf5')
+            name = os.path.join(folder, self.getFileName())
+            savename = guitools.getUniqueName(name + '.hdf5')
             store_file = hdf.File(savename)
             store_file.create_dataset(name=self.dataname, data=image)
             for item in self.getAttrs():
@@ -224,19 +243,30 @@ class RecordingWidget(QtGui.QFrame):
 
         else:
             self.folderWarning()
-
+            
+    def getFileName(self):
+        
+        if self.specifyfile.checkState():
+            filename = self.filenameEdit.text()
+            
+        else:
+            filename = time.strftime('%Hh%Mm%Ss')
+            
+        return filename
+        
     def snapTIFF(self):
 
         folder = self.folderEdit.text()
         if os.path.exists(folder):
 
-            image = self.main.andor.most_recent_image16(self.main.shape)
+#            image = self.main.andor.most_recent_image16(self.main.shape)
             time.sleep(0.01)
-
-            savename = (os.path.join(folder, self.filenameEdit.text()) +
-                        '_snap.tiff')
+            savename = (os.path.join(folder, self.getFileName()) +
+                        '.tiff')
             savename = guitools.getUniqueName(savename)
-            tiff.imsave(savename, np.flipud(image.astype(np.uint16)),
+#            tiff.imsave(savename, np.flipud(image.astype(np.uint16)),
+#                        description=self.dataname, software='Tormenta')
+            tiff.imsave(savename, self.main.image.astype(np.uint16),
                         description=self.dataname, software='Tormenta')
             guitools.attrsToTxt(os.path.splitext(savename)[0], self.getAttrs())
 
@@ -289,14 +319,14 @@ class RecordingWidget(QtGui.QFrame):
                 self.main.liveviewButton.setEnabled(False)
                 self.main.viewtimer.stop()
 
-                self.savename = (os.path.join(folder, self.filenameEdit.text())
+                self.savename = (os.path.join(folder, self.getFileName())
                                  + '.hdf5')
                 self.savename = guitools.getUniqueName(self.savename)
                 self.startTime = ptime.time()
 
                 shape = (self.n(), self.main.shape[0], self.main.shape[1])
-                self.worker = RecWorker(self.main.andor, shape,
-                                        self.main.t_exp_real, self.savename,
+                self.worker = RecWorker(self.main.orcaflash, shape,
+                                        self.main.RealExpPar, self.savename,
                                         self.dataname, self.getAttrs())
                 self.worker.updateSignal.connect(self.updateGUI)
                 self.worker.doneSignal.connect(self.endRecording)
@@ -315,18 +345,18 @@ class RecordingWidget(QtGui.QFrame):
     def endRecording(self):
 
         # Attenuate excitation x1000, turn blue laser off
-        self.main.flipperInPath(True)
-        self.main.laserWidgets.blueControl.laser.power_sp = Q_(0, 'mW')
+#        self.main.flipperInPath(True)
+#        self.main.laserWidgets.blueControl.laser.power_sp = Q_(0, 'mW')
 
         self.recordingThread.terminate()
 
-        if self.main.focusWidget.focusDataBox.isChecked():
-            self.main.focusWidget.exportData()
-        else:
-            self.main.focusWidget.graph.savedDataSignal = []
-            self.main.focusWidget.graph.mean = 0
-            self.main.focusWidget.n = 1
-            self.main.focusWidget.max_dev = 0
+#        if self.main.focusWidget.focusDataBox.isChecked():
+#            self.main.focusWidget.exportData()
+#        else:
+#            self.main.focusWidget.graph.savedDataSignal = []
+#            self.main.focusWidget.graph.mean = 0
+#            self.main.focusWidget.n = 1
+#            self.main.focusWidget.max_dev = 0
 
         converterFunction = lambda: guitools.TiffConverterThread(self.savename)
         self.main.exportlastAction.triggered.connect(converterFunction)
@@ -338,7 +368,7 @@ class RecordingWidget(QtGui.QFrame):
         self.recButton.setChecked(False)
         self.main.tree.writable = True
         self.main.liveviewButton.setEnabled(True)
-        self.main.liveviewStart(update=False)
+        self.main.liveviewStart()
 
 
 class RecWorker(QtCore.QObject):
@@ -346,10 +376,10 @@ class RecWorker(QtCore.QObject):
     updateSignal = QtCore.pyqtSignal(np.ndarray)
     doneSignal = QtCore.pyqtSignal()
 
-    def __init__(self, andor, shape, t_exp, savename, dataname, attrs,
+    def __init__(self, orcaflash, shape, t_exp, savename, dataname, attrs,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.andor = andor
+        self.orcaflash = orcaflash
         self.shape = shape
         self.t_exp = t_exp
         self.savename = savename
@@ -360,19 +390,21 @@ class RecWorker(QtCore.QObject):
     def start(self):
 
         # Acquisition preparation
-        if self.andor.status != 'Camera is idle, waiting for instructions.':
-            self.andor.abort_acquisition()
-        else:
-            self.andor.shutter(0, 1, 0, 0, 0)
-
+#        if self.andor.status != 'Camera is idle, waiting for instructions.':
+#            self.andor.abort_acquisition()
+#        else:
+#            self.andor.shutter(0, 1, 0, 0, 0)
+        self.orcaflash.stopAcquisition() #In case camera is already acquiring
         # Frame counter
         self.j = 0
 
-        self.andor.free_int_mem()
-        self.andor.acquisition_mode = 'Kinetics'
-        self.andor.set_n_kinetics(self.shape[0])
-        self.andor.start_acquisition()
-        time.sleep(np.min((5 * self.t_exp.magnitude, 1)))
+#        self.andor.free_int_mem()
+#        self.andor.acquisition_mode = 'Kinetics'
+#        self.andor.set_n_kinetics(self.shape[0])
+#        self.andor.start_acquisition()
+        
+#        time.sleep(np.min((5 * self.t_exp.magnitude, 1))) 
+#        time.sleep(np.min((5 * self.t_exp.value, 1)))
 
         self.store_file = hdf.File(self.savename, "w")
         self.store_file.create_dataset(name=self.dataname, shape=self.shape,
@@ -380,28 +412,37 @@ class RecWorker(QtCore.QObject):
         self.dataset = self.store_file[self.dataname]
         self.startTime = ptime.time()
 
-        while self.j < self.shape[0] and self.pressed:
+        self.orcaflash.startAcquisition()
 
-            time.sleep(self.t_exp.magnitude)
-            if self.andor.n_images_acquired > self.j:
-                i, self.j = self.andor.new_images_index
-                newImages = self.andor.images16(i, self.j, (self.shape[1],
-                                                            self.shape[2]),
-                                                1, self.shape[0])
-                self.dataset[i - 1:self.j] = newImages
-                self.updateSignal.emit(np.transpose(self.dataset[self.j - 1]))
+#        while self.j < self.shape[0] and self.pressed:
+#
+##            time.sleep(self.t_exp.magnitude)
+#            time.sleep(self.t_exp.value)
+#            if self.andor.n_images_acquired > self.j:
+##            if self.orcaflash.newFrames
+#                i, self.j = self.andor.new_images_index
+#                newImages = self.andor.images16(i, self.j, (self.shape[1],
+#                                                            self.shape[2]),
+#                                                1, self.shape[0])
+#                self.dataset[i - 1:self.j] = newImages
+#        self.updateSignal.emit(np.transpose(self.dataset[self.j - 1]))
+        time.sleep((100 + self.shape[0] * self.t_exp.value()) / 1000)
+        print(self.orcaflash.newFrames())
+        self.orcaflash.stopAcquisition()
 
         # Crop dataset if it's stopped before finishing
-        if self.j < self.shape[0]:
-            self.dataset.resize((self.j, self.shape[1], self.shape[2]))
-
+#        if self.j < self.shape[0]:
+#            self.dataset.resize((self.j, self.shape[1], self.shape[2]))
+        print('Here! in recording')
         # Saving parameters
         for item in self.attrs:
             if item[1] is not None:
                 self.dataset.attrs[item[0]] = item[1]
+        print('Here2 in recording')        
 
         self.store_file.close()
         self.doneSignal.emit()
+        print('End of recording')
 
 
 class TemperatureStabilizer(QtCore.QObject):
@@ -483,13 +524,13 @@ class CamParamTree(ParameterTree):
                        'value': 0.01, 'limits': (0,
                                                 9999),
                        'siPrefix': True, 'suffix': 's'},
-                      {'name': 'Real exposure time', 'type': 'float',
+                      {'name': 'Internal frame interval', 'type': 'float',
                        'value': 0, 'readonly': True, 'siPrefix': False,
                        'suffix': ' ms'},
                       {'name': 'Real accumulation time', 'type': 'float',
                        'value': 0, 'readonly': True, 'siPrefix': True,
                        'suffix': 's'},
-                      {'name': 'Effective frame rate', 'type': 'float',
+                      {'name': 'Internal frame rate', 'type': 'float',
                        'value': 0, 'readonly': True, 'siPrefix': False,
                        'suffix': ' fps'}]},
                   {'name': 'Gain', 'type': 'group', 'children': [
@@ -503,8 +544,6 @@ class CamParamTree(ParameterTree):
         self.p = Parameter.create(name='params', type='group', children=params)
         self.setParameters(self.p, showTop=False)
         self._writable = True
-
-        self.timeParams = self.p.param('Timings')
 
     def enableCropMode(self):
         value = self.frameTransferParam.value()
@@ -526,18 +565,17 @@ class CamParamTree(ParameterTree):
         useful to set it as not writable during recording
         """
         self._writable = value
-        self.p.param('Image frame').param('Shape').setWritable(value)
-        self.timeParams.param('Frame Transfer Mode').setWritable(value)
-        croppedParam = self.timeParams.param('Cropped sensor mode')
-        croppedParam.param('Enable').setWritable(value)
-        self.timeParams.param('Horizontal readout rate').setWritable(value)
-        self.timeParams.param('Set exposure time').setWritable(value)
-        vpsParams = self.timeParams.param('Vertical pixel shift')
-        vpsParams.param('Speed').setWritable(True)
-        vpsParams.param('Clock voltage amplitude').setWritable(value)
-        gainParams = self.p.param('Gain')
-        gainParams.param('Pre-amp gain').setWritable(value)
-        gainParams.param('EM gain').setWritable(value)
+        framePar = self.p.param('Image frame')
+        framePar.param('Binning').setWritable(value)
+        framePar.param('Mode').setWritable(value)
+        framePar.param('X0').setWritable(value)
+        framePar.param('Y0').setWritable(value)
+        framePar.param('Width').setWritable(value)
+        framePar.param('Height').setWritable(value)
+        framePar.param('Apply').setWritable(value)
+        
+        timingPar = self.p.param('Timings')
+        timingPar.param('Set exposure time').setWritable(value)
 
     def attrs(self):
         attrs = []
@@ -664,7 +702,7 @@ class TormentaGUI(QtGui.QMainWindow):
         timingsPar = self.tree.p.param('Timings')
         self.expPar = timingsPar.param('Set exposure time')
         self.expPar.sigValueChanged.connect(changeExposure)
-        self.RealExpPar = timingsPar.param('Real exposure time')
+        self.RealExpPar = timingsPar.param('Internal frame interval')
         self.RealExpPar.setOpts(decimals = 10)
         changeExposure()    # Set default values
 
@@ -768,7 +806,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.vb.addItem(self.img)
         self.vb.setAspectLocked(True)
         self.hist = pg.HistogramLUTItem(image=self.img)
-        self.hist.vb.setLimits(yMin=0, yMax=2048)
+#        self.hist.vb.setLimits(yMin=0, yMax=2048)
         imageWidget.addItem(self.hist, row=1, col=2)
 
 
@@ -890,8 +928,9 @@ class TormentaGUI(QtGui.QMainWindow):
             self.cursorPos.setText('{}, {}'.format(x, y))
 
     def flipperInPath(self, value):
-        self.flipperButton.setChecked(not(value))
-        self.daq.flipper = value
+        pass
+#        self.flipperButton.setChecked(not(value))
+#        self.daq.flipper = value
 
 
     def cropCCD(self):
@@ -1045,11 +1084,8 @@ class TormentaGUI(QtGui.QMainWindow):
         print(vpos, hpos, vsize, hsize)
         
         self.orcaflash.setPropertyValue('subarray_vpos', vpos)
-        print('vpos set')
         self.orcaflash.setPropertyValue('subarray_hpos', hpos)
-        print('hpos set')
         self.orcaflash.setPropertyValue('subarray_vsize', vsize)
-        print('vsize set')
         self.orcaflash.setPropertyValue('subarray_hsize', hsize)
 
     def adjustFrame(self):
@@ -1084,14 +1120,16 @@ scaleSnap=True, translateSnap=True)
             self.ROIchanged()
                 # Signals
             self.applyParam = self.framePar.param('Apply')
-            self.applyParam.sigStateChanged.connect(self.customFrame)
+            self.applyParam.sigStateChanged.connect(self.resizeFrame)
             self.ROI.sigRegionChangeFinished.connect(self.ROIchanged)
 
         elif frameParam.param('Mode').value() == 'Full chip':
             print('Full chip')
-            self.shape = (2048, 2048)
-            self.frameStart = (0, 0)
-            self.changeParameter(self.adjustFrame)
+            self.X0par.setValue(0)
+            self.Y0par.setValue(0)
+            self.Widthpar.setValue(2048)
+            self.Heightpar.setValue(2048)
+            self.resizeFrame()
 
             self.applyParam.sigStateChanged.disconnect()
 #            try:
@@ -1112,12 +1150,12 @@ scaleSnap=True, translateSnap=True)
 
     def ROIchanged(self):
         print('In ROIchanged..., ROI.pos[0]= ', self.ROI.pos()[0])
-        self.X0par.setValue(self.ROI.pos()[0])
-        self.Y0par.setValue(self.ROI.pos()[1])
-        self.Widthpar.setValue(self.ROI.size()[0])
-        self.Heightpar.setValue(self.ROI.size()[1])
+        self.X0par.setValue(int(self.ROI.pos()[0]))
+        self.Y0par.setValue(int(self.ROI.pos()[1]))
+        self.Widthpar.setValue(int(self.ROI.size()[0]))
+        self.Heightpar.setValue(int(self.ROI.size()[1]))
     
-    def customFrame(self):
+    def resizeFrame(self):
 
 #        ROISize = self.ROI.size()
 #        self.shape = (int(ROISize[0]), int(ROISize[1]))
@@ -1126,7 +1164,7 @@ scaleSnap=True, translateSnap=True)
         self.frameStart = (self.X0par.value(), self.Y0par.value())
 
         self.adjustFrame()
-#        self.ROI.hide()
+        self.ROI.hide()
 #        self.grid.update(self.shape)
 #        self.recWidget.shape = self.shape
 
@@ -1137,10 +1175,10 @@ scaleSnap=True, translateSnap=True)
 #        timings = self.orcaflash.getPropertyValue('exposure_time') 
 #        self.t_exp_real, self.t_acc_real, self.t_kin_real = timings
         timingsPar = self.tree.p.param('Timings')
-        RealExpPar = timingsPar.param('Real exposure time')
+        RealExpPar = timingsPar.param('Internal frame interval')
         RealAccPar = timingsPar.param('Real accumulation time')
-        EffFRPar = timingsPar.param('Effective frame rate')
-        RealExpPar.setValue(1000 * self.orcaflash.getPropertyValue('internal_frame_interval')[0])
+        EffFRPar = timingsPar.param('Internal frame rate')
+        self.RealExpPar.setValue(1000 * self.orcaflash.getPropertyValue('internal_frame_interval')[0])
         RealAccPar.setValue(self.orcaflash.getPropertyValue('timing_readout_time')[0])
         EffFRPar.setValue(self.orcaflash.getPropertyValue('internal_frame_rate')[0])
 #        RealExpPar.setValue(self.orcaflash.getPropertyValue('exposure_time')[0])
@@ -1186,16 +1224,16 @@ scaleSnap=True, translateSnap=True)
 #
 #        self.andor.start_acquisition()
 #        time.sleep(np.max((5 * self.t_exp_real.magnitude, 1)))
-#        self.recWidget.readyToRecord = True
+        self.recWidget.readyToRecord = True
 #        self.recWidget.recButton.setEnabled(True)
 #
 #        # Initial image
-        self.rawframe = self.orcaflash.getFrames()
-        self.frame = self.rawframe[0][0].getData() #return A numpy array that contains the camera data.
-        self.frame = np.reshape(self.frame, (self.orcaflash.frame_x, self.orcaflash.frame_y))
+        rawframes = self.orcaflash.getFrames()
+        firstframe = rawframes[0][0].getData() #return A numpy array that contains the camera data.
+        self.image = np.reshape(firstframe, (self.orcaflash.frame_x, self.orcaflash.frame_y))
 #        print(self.frame)
 #        print(type(self.frame))
-        self.img.setImage(self.frame, autoLevels=False, lut=self.lut)
+        self.img.setImage(self.image, autoLevels=False, lut=self.lut) #Autolevels = True gives a stange numpy (?) warning
 #        image = np.transpose(self.andor.most_recent_image16(self.shape))
 #        self.img.setImage(image, autoLevels=False, lut=self.lut)
 #        if update:
@@ -1212,7 +1250,7 @@ scaleSnap=True, translateSnap=True)
 
     def liveviewStop(self):
         self.viewtimer.stop()
-#        self.recWidget.readyToRecord = False
+        self.recWidget.readyToRecord = False
 
         # Turn off camera, close shutter
         self.orcaflash.stopAcquisition()
@@ -1226,15 +1264,15 @@ scaleSnap=True, translateSnap=True)
 #        try:
 #        print("\nTime taken from end of last updateView to beginning of this one: ", time.clock() - self.lastTime)
         now = time.clock()
-        image = self.orcaflash.getFrames()
+        rawframes = self.orcaflash.getFrames()
 #        print("Time taken to retrieve image: ", time.clock() - now)
-        self.image = image[0][-1].getData()
-        self.image1 = np.reshape(self.image, (self.orcaflash.frame_x, self.orcaflash.frame_y))
+        firstframe = rawframes[0][-1].getData()
+        self.image = np.reshape(firstframe, (self.orcaflash.frame_x, self.orcaflash.frame_y))
 #        print("Time taken to retrieve image + getData and reshape: ", time.clock() - now)
 #            if self.moleculeWidget.enabled:
 #                self.moleculeWidget.graph.update(image)
         now = time.clock()
-        self.img.setImage(self.image1, autoLevels=False, autoDownsample = True)
+        self.img.setImage(self.image, autoLevels=False, autoDownsample = True) 
 #        print("Time taken by setImage function: ", time.clock() - now)
 #        if self.crosshair.showed:
 #            ycoord = int(np.round(self.crosshair.hLine.pos()[1]))
@@ -1244,7 +1282,7 @@ scaleSnap=True, translateSnap=True)
 
 #            self.fpsMath()
         now = time.clock()
-        self.image = image
+#        self.image = image
 #        print("Time taken to copy image: ", time.clock() - now)
         now = time.clock()
         self.updateTimings()
