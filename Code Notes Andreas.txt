@@ -18,3 +18,7 @@ Bugs or TODOs:
 
 170216
 Even though parameters like Y0 and X0 show zero they can still apparently take negative values with can give error when trying to pass to camera.
+
+190216
+Try to rearrange so that the liveview updating occurs in seperate thread so as to not "freeze" the gui at low frame rates -> big fov. See how done in 
+Recording Widget when Recworker is moved to new thread. Maybe create Liveviewer class that does the update and move to own thread before starting.
