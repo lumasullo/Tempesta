@@ -16,9 +16,9 @@ def main():
 #TO DO: create an instruments.Camera(hamamatsu) or something similar
 
 #    with instruments.Camera('hamamatsu.hamamatsu_camera.HamamatsuCameraMR') as orcaflash, \
-    with instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM7') as bluelaser, \
+    with instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM12') as bluelaser, \
          instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM11') as violetlaser, \
-         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM5') as uvlaser, \
+         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM10') as uvlaser, \
          instruments.DAQ() as daq, instruments.ScanZ(12) as scanZ:
         #instruments.Camera('andor.ccd.CCD') as andor, \
 

@@ -41,7 +41,7 @@ class RecordingWidget(QtGui.QFrame):
 
         self.main = main
         self.dataname = 'data'      # In case I need a QLineEdit for this
-        startdir = r'C:\Users\andreas.boden\Data\%s'
+        startdir = r'C:\Users\testaRES\Documents\Data\DefaultDataFolder\%s'
         newfolderpath =  startdir % time.strftime('%Y-%m-%d')
         if not os.path.exists(newfolderpath):
             os.mkdir(newfolderpath)
@@ -569,7 +569,7 @@ class CamParamTree(ParameterTree):
                    'value': orcaflash.camera_id},
                   {'name': 'Image frame', 'type': 'group', 'children': [
                       {'name': 'Binning', 'type': 'list', 
-                                  'values': [b'1x1', b'2x2', b'4x4'], 'tip': BinTip},
+                                  'values': [1, 2, 4], 'tip': BinTip},
 #{'name': 'Nr of rows', 'type': 'list',
 #                       'values': [2048, 1024, 512, 256, 128, 64, 8]}, 
 #{'name': 'Nr of columns', 'type': 'list',
@@ -1081,13 +1081,18 @@ class TormentaGUI(QtGui.QMainWindow):
         
         """Method to change the binning of the captured frame"""
         print('In setBinning')
+
+        binning = str(self.binPar.value())
+
+        binstring = binning+'x'+binning
+        coded = binstring.encode('ascii')
         
         try:
-            self.orcaflash.setPropertyValue('binning', self.binPar.value())
+            self.orcaflash.setPropertyValue('binning', coded)
         
         except:
             self.liveviewStop()
-            self.orcaflash.setPropertyValue('binning', self.binPar.value())
+            self.orcaflash.setPropertyValue('binning', coded)
             self.liveviewStart()
 
             
@@ -1157,9 +1162,9 @@ class TormentaGUI(QtGui.QMainWindow):
         image widget accordingly. It needs a previous change in self.shape
         and self.frameStart)
         """
-        
+        binning = self.binPar.value()
 #        self.andor.set_image(shape=self.shape, p_0=self.frameStart)
-        self.changeParameter(lambda: self.cropOrca(self.frameStart[0], self.frameStart[1], self.shape[0], self.shape[1]))
+        self.changeParameter(lambda: self.cropOrca(binning*self.frameStart[0], binning*self.frameStart[1], binning*self.shape[0], binning*self.shape[1]))
 #        self.vb.setLimits(xMin= -0.5, xMax=self.shape[0] - 0.5, minXRange=4,
 #                          yMin= -0.5, yMax=self.shape[1] - 0.5, minYRange=4)
 
@@ -1294,7 +1299,7 @@ scaleSnap=True, translateSnap=True)
 #        # Initial image
         rawframes = self.orcaflash.getFrames()
         firstframe = rawframes[0][-1].getData() #return A numpy array that contains the camera data. "Circular" indexing makes [-1] return the latest frame
-        self.image = np.reshape(firstframe, (self.orcaflash.frame_x, self.orcaflash.frame_y))
+        self.image = np.reshape(firstframe, (self.orcaflash.frame_x, self.orcaflash.frame_y), order='F')
 #        print(self.frame)
 #        print(type(self.frame))
         self.img.setImage(self.image, autoLevels=False, lut=self.lut) #Autolevels = True gives a stange numpy (?) warning
@@ -1341,12 +1346,12 @@ scaleSnap=True, translateSnap=True)
         rawframes = self.orcaflash.getFrames()
 #        print("Time taken to retrieve image: ", time.clock() - now)
         firstframe = rawframes[0][-1].getData() #"Circular indexing makes [-1] return the latest frame
-        self.image = np.reshape(firstframe, (self.orcaflash.frame_x, self.orcaflash.frame_y))
+        self.image = np.reshape(firstframe, (self.orcaflash.frame_x, self.orcaflash.frame_y), order='F')
 #        print("Time taken to retrieve image + getData and reshape: ", time.clock() - now)
 #            if self.moleculeWidget.enabled:
 #                self.moleculeWidget.graph.update(image)
 #        now = time.clock()
-        self.img.setImage(self.image, autoLevels=False, autoDownsample = True) 
+        self.img.setImage(self.image, autoLevels=False, autoDownsample = False) 
 #        print("Time taken by setImage function: ", time.clock() - now)
 #        if self.crosshair.showed:
 #            ycoord = int(np.round(self.crosshair.hLine.pos()[1]))
