@@ -1,0 +1,116 @@
+{'image_height': 4325920, 'system_alive': 16711696, 'trigger_active': 1048864, 'internal_frame_interval': 4208672, 'trigger_polarity': 1049120, 'subarray_hpos': 4202768, 'output_trigger_polarity[0]': 1835296, 'image_pixel_type': 4326000, 'trigger_mode': 1049104, 'sensor_mode': 4194832, 'exposure_time': 2031888, 'framebundle_mode': 4329488, 'output_trigger_delay[0]': 1835328, 'subarray_vsize': 4202816, 'conversion_factor_coeff': 16769040, 'timing_min_trigger_interval': 4206672, 'output_trigger_source[0]': 1835280, 'colortype': 4325664, 'timing_min_trigger_blanking': 4206640, 'output_trigger_kind[0]': 1835360, 'trigger_global_exposure': 2032384, 'timing_global_exposure_delay': 4206736, 'exposure_time_control': 2031920, 'bit_per_channel': 4325680, 'conversion_factor_offset': 16769056, 'image_framebytes': 4325952, 'framebundle_rowbytes': 4329520, 'number_of_output_trigger_connector': 1835024, 'framebundle_number': 4329504, 'trigger_times': 1049152, 'subarray_hsize': 4202784, 'trigger_source': 1048848, 'image_width': 4325904, 'trigger_delay': 1049184, 'timing_invalid_exposure_period': 4206704, 'timing_cyclic_trigger_period': 4206624, 'image_top_offset_bytes': 4325968, 'subarray_vpos': 4202800, 'timing_readout_time': 4206608, 'framebundle_frame_step_bytes': 4329536, 'timing_exposure': 4206688, 'binning': 4198672, 'output_trigger_active[0]': 1835312, 'image_rowbytes': 4325936, 'output_trigger_period[0]': 1835344, 'subarray_mode': 4202832, 'defect_correct_mode': 4653072, 'readout_speed': 4194576, 'internal_frame_rate': 4208656, 'sensor_cooler_status': 2097984}
+1.0
+camera 0 model: b'C11440-22CU'
+Supported properties:
+   0 ) binning  =  1  type is: MODE , read, write
+          option / value
+          b'1x1' / 1
+          b'2x2' / 2
+          b'4x4' / 4
+   1 ) bit_per_channel  =  16  type is: LONG , read
+   2 ) colortype  =  1  type is: MODE , read
+          option / value
+          b'B/W' / 1
+   3 ) conversion_factor_coeff  =  0.51  type is: REAL , read
+   4 ) conversion_factor_offset  =  100.0  type is: REAL , read
+   5 ) defect_correct_mode  =  1  type is: MODE , read, write
+          option / value
+          b'OFF' / 1
+          b'ON' / 2
+   6 ) exposure_time  =  0.03332570940256119  type is: REAL , read, write
+   7 ) exposure_time_control  =  2  type is: MODE , read, write
+          option / value
+          b'OFF' / 1
+          b'NORMAL' / 2
+   8 ) framebundle_frame_step_bytes  =  8388608  type is: LONG , read
+   9 ) framebundle_mode  =  1  type is: MODE , read
+          option / value
+          b'OFF' / 1
+          b'ON' / 2
+   10 ) framebundle_number  =  4  type is: LONG , read
+   11 ) framebundle_rowbytes  =  4096  type is: LONG , read
+   12 ) image_framebytes  =  8388608  type is: LONG , read
+   13 ) image_height  =  2048  type is: LONG , read
+   14 ) image_pixel_type  =  2  type is: MODE , read
+          option / value
+          b'MONO16' / 2
+   15 ) image_rowbytes  =  4096  type is: LONG , read
+   16 ) image_top_offset_bytes  =  0  type is: LONG , read
+   17 ) image_width  =  2048  type is: LONG , read
+   18 ) internal_frame_interval  =  0.033325714157860335  type is: REAL , read
+   19 ) internal_frame_rate  =  30.00685882568359  type is: REAL , read
+   20 ) number_of_output_trigger_connector  =  3  type is: LONG , read
+   21 ) output_trigger_active[0]  =  1  type is: MODE , read
+          option / value
+          b'EDGE' / 1
+   22 ) output_trigger_delay[0]  =  -0.0  type is: REAL , read, write
+   23 ) output_trigger_kind[0]  =  2  type is: MODE , read, write
+          option / value
+          b'LOW' / 1
+          b'EXPOSURE' / 2
+          b'PROGRAMABLE' / 3
+          b'TRIGGER READY' / 4
+          b'HIGH' / 5
+   24 ) output_trigger_period[0]  =  0.0009999999974752427  type is: REAL , read, write
+   25 ) output_trigger_polarity[0]  =  1  type is: MODE , read, write
+          option / value
+          b'NEGATIVE' / 1
+          b'POSITIVE' / 2
+   26 ) output_trigger_source[0]  =  2  type is: MODE , read, write
+          option / value
+          b'READOUT END' / 2
+          b'VSYNC' / 3
+   27 ) readout_speed  =  2  type is: LONG , read, write
+   28 ) sensor_cooler_status  =  2  type is: MODE , read
+          option / value
+          b'OFF' / 1
+          b'READY' / 2
+          b'BUSY' / 3
+   29 ) sensor_mode  =  1  type is: MODE , read
+          option / value
+          b'AREA' / 1
+   30 ) subarray_hpos  =  0  type is: LONG , read, write
+   31 ) subarray_hsize  =  2048  type is: LONG , read, write
+   32 ) subarray_mode  =  1  type is: MODE , read, write
+          option / value
+          b'OFF' / 1
+          b'ON' / 2
+   33 ) subarray_vpos  =  0  type is: LONG , read, write
+   34 ) subarray_vsize  =  2048  type is: LONG , read, write
+   35 ) system_alive  =  2  type is: MODE , read
+          option / value
+          b'OFFLINE' / 1
+          b'ONLINE' / 2
+   36 ) timing_cyclic_trigger_period  =  0.0  type is: REAL , read
+   37 ) timing_exposure  =  3  type is: MODE , read
+          option / value
+          b'ROLLING' / 3
+   38 ) timing_global_exposure_delay  =  0.03332570940256119  type is: REAL , read
+   39 ) timing_invalid_exposure_period  =  0.023347483838651414  type is: REAL , read
+   40 ) timing_min_trigger_blanking  =  1e-05  type is: REAL , read
+   41 ) timing_min_trigger_interval  =  0.03333571415786034  type is: REAL , read
+   42 ) timing_readout_time  =  0.033325714157860335  type is: REAL , read
+   43 ) trigger_active  =  1  type is: MODE , read, write
+          option / value
+          b'EDGE' / 1
+          b'LEVEL' / 2
+          b'SYNCREADOUT' / 3
+   44 ) trigger_delay  =  0.0  type is: REAL , read, write
+   45 ) trigger_global_exposure  =  3  type is: MODE , read, write
+          option / value
+          b'DELAYED' / 3
+          b'GLOBAL RESET' / 5
+   46 ) trigger_mode  =  1  type is: MODE , read, write
+          option / value
+          b'NORMAL' / 1
+          b'START' / 6
+   47 ) trigger_polarity  =  1  type is: MODE , read, write
+          option / value
+          b'NEGATIVE' / 1
+          b'POSITIVE' / 2
+   48 ) trigger_source  =  1  type is: MODE , read, write
+          option / value
+          b'INTERNAL' / 1
+          b'EXTERNAL' / 2
+          b'SOFTWARE' / 3
+   49 ) trigger_times  =  1  type is: LONG , read, write
