@@ -168,9 +168,16 @@ class RecordingWidget(QtGui.QFrame):
 
     @writable.setter
     def writable(self, value):
-        self.folderEdit.setEnabled(value)
-        self.filenameEdit.setEnabled(value)
-        self.numExpositionsEdit.setEnabled(value)
+        if value:
+            if self.specifyFrames.isChecked():
+                self.specFrames()
+            else:
+                self.specTime()
+        else:
+            self.numExpositionsEdit.setEnabled(False)
+            self.timeToRec.setEnabled(False)
+#        self.folderEdit.setEnabled(value)
+#        self.filenameEdit.setEnabled(value)
         self._writable = value
 
     def specFile(self):
@@ -190,6 +197,7 @@ class RecordingWidget(QtGui.QFrame):
     def specTime(self):
         self.numExpositionsEdit.setEnabled(False)
         self.timeToRec.setEnabled(True)
+        self.specifyTime.setChecked(True)
             
 
     def n(self):
@@ -334,9 +342,10 @@ class RecordingWidget(QtGui.QFrame):
         nframe = int(self.worker.timerecorded / self.main.RealExpPar.value())
         rFrames = int(self.numExpositionsEdit.text()) - nframe
         rSecs = self.getRecTime() - eSecs
-        rText = '{}'.format(datetime.timedelta(seconds=rSecs))
+        rText = '{}'.format(datetime.timedelta(seconds=max(0, rSecs)))
         self.tRemaining.setText(rText)
         self.currentFrame.setText(str(nframe) + ' /')
+        self.currentTime.setText(str(int(eSecs)) + ' /')
         self.progressBar.setValue(100*(1 - rSecs / (eSecs + rSecs)))
 
     def startRecording(self):
@@ -404,6 +413,9 @@ class RecordingWidget(QtGui.QFrame):
         self.main.tree.writable = True
         self.main.liveviewButton.setEnabled(True)
         self.main.liveviewStart()
+        self.progressBar.setValue(0)
+        self.currentTime.setText('0 /')
+        self.currentFrame.setText('0 /')
 
 
 class RecWorker(QtCore.QObject):
