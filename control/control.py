@@ -12,6 +12,8 @@ import os
 import datetime
 import time
 import re
+import ctypes
+import matplotlib.pyplot as plt
 
 from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
@@ -47,6 +49,11 @@ class RecordingWidget(QtGui.QFrame):
             os.mkdir(newfolderpath)
             
         self.initialDir = newfolderpath
+        
+        self.filesizewar = QtGui.QMessageBox()
+        self.filesizewar.setText("File size is very big!")
+        self.filesizewar.setInformativeText("Are you sure you want to continue?")
+        self.filesizewar.setStandardButtons(QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
         
         # Title
         recTitle = QtGui.QLabel('<h2><strong>Recording</strong></h2>')
@@ -89,6 +96,7 @@ class RecordingWidget(QtGui.QFrame):
         self.specifyTime.clicked.connect(self.specTime) 
         self.timeToRec = QtGui.QLineEdit('1')
         self.timeToRec.setFixedWidth(45)
+        self.timeToRec.textChanged.connect(self.filesizeupdate)
         self.currentTime = QtGui.QLabel('0 /')
         self.currentTime.setAlignment((QtCore.Qt.AlignRight |
                                         QtCore.Qt.AlignVCenter))
@@ -101,11 +109,15 @@ class RecordingWidget(QtGui.QFrame):
         self.tRemaining = QtGui.QLabel()
         self.tRemaining.setAlignment((QtCore.Qt.AlignCenter |
                                       QtCore.Qt.AlignVCenter))
-        self.numExpositionsEdit.textChanged.connect(self.nChanged)
+        self.numExpositionsEdit.textChanged.connect(self.filesizeupdate)
 #        self.updateRemaining()
 
         self.progressBar = QtGui.QProgressBar()
         self.progressBar.setTextVisible(False)
+        
+        self.filesizeBar = QtGui.QProgressBar()
+        self.filesizeBar.setTextVisible(False)
+        self.filesizeBar.setRange(0, 2000000000)
 
         # Layout
         buttonWidget = QtGui.QWidget()
@@ -132,13 +144,15 @@ class RecordingWidget(QtGui.QFrame):
 #        recGrid.addWidget(QtGui.QLabel('Number of expositions'), 4, 1)
         recGrid.addWidget(self.currentFrame, 4, 1)
         recGrid.addWidget(self.numExpositionsEdit, 4, 2)
+        recGrid.addWidget(QtGui.QLabel('File size'), 4, 3, 1, 2)
+        recGrid.addWidget(self.filesizeBar, 4, 4, 1, 2)
 #        recGrid.addWidget(self.tElapsed, 5, 3)
-        recGrid.addWidget(self.tRemaining, 4, 3, 1, 2)
         recGrid.addWidget(self.specifyTime, 5, 0, 1, 5)
 #        recGrid.addWidget(QtGui.QLabel('Number of expositions'), 4, 1)
         recGrid.addWidget(self.currentTime, 5, 1)
         recGrid.addWidget(self.timeToRec, 5, 2)
 #        recGrid.addWidget(self.tElapsed, 5, 3)
+        recGrid.addWidget(self.tRemaining, 5, 3, 1, 2)
         recGrid.addWidget(self.progressBar, 5, 4, 1, 2)
         recGrid.addWidget(self.tRemaining, 4, 3, 1, 2)
         recGrid.addWidget(buttonWidget, 6, 0, 1, 0)
@@ -150,6 +164,7 @@ class RecordingWidget(QtGui.QFrame):
         self.readyToRecord = False
         self.filenameEdit.setEnabled(False)
         self.specTime()
+        self.filesizeupdate()
 
     @property
     def readyToRecord(self):
@@ -193,12 +208,23 @@ class RecordingWidget(QtGui.QFrame):
         
         self.numExpositionsEdit.setEnabled(True)
         self.timeToRec.setEnabled(False)
+        self.filesizeupdate()
     
     def specTime(self):
         self.numExpositionsEdit.setEnabled(False)
         self.timeToRec.setEnabled(True)
         self.specifyTime.setChecked(True)
+        self.filesizeupdate()
             
+    def filesizeupdate(self):
+        if self.specifyFrames.isChecked():
+            frames = int(self.numExpositionsEdit.text())
+        else:
+            frames = int(self.timeToRec.text()) / self.main.RealExpPar.value()
+
+        self.filesize = 2 * frames * self.main.shape[0] * self.main.shape[1]
+        self.filesizeBar.setValue(min(2000000000, self.filesize)) #Percentage of 2 GB
+        self.filesizeBar.setFormat(str(self.filesize/1000))
 
     def n(self):
         text = self.numExpositionsEdit.text()
@@ -218,6 +244,7 @@ class RecordingWidget(QtGui.QFrame):
     def nChanged(self):
         self.updateRemaining()
         self.limitExpositions(9)
+        self.filesizeupdate()
 
 #    def updateRemaining(self):
 #        rSecs = self.main.t_acc_real.magnitude * self.n()
@@ -347,14 +374,18 @@ class RecordingWidget(QtGui.QFrame):
         self.currentFrame.setText(str(nframe) + ' /')
         self.currentTime.setText(str(int(eSecs)) + ' /')
         self.progressBar.setValue(100*(1 - rSecs / (eSecs + rSecs)))
+        self.main.img.setImage(self.worker.liveImage, autoLevels=False)
 
     def startRecording(self):
-
+        print('Orca frame size in beginning of startRecording fcn: ', [self.main.orcaflash.frame_x, self.main.orcaflash.frame_y])
         if self.recButton.isChecked():
-
+            ret = QtGui.QMessageBox.Yes
+            if self.filesize > 1500000000:
+                ret = self.filesizewar.exec_()
+                
             folder = self.folderEdit.text()
-            if os.path.exists(folder):
-
+            if os.path.exists(folder) and ret == QtGui.QMessageBox.Yes:
+                
                 self.writable = False
                 self.readyToRecord = False
                 self.recButton.setEnabled(True)
@@ -366,10 +397,10 @@ class RecordingWidget(QtGui.QFrame):
                 self.savename = (os.path.join(folder, self.getFileName()) + '_rec.hdf5')
                 self.savename = guitools.getUniqueName(self.savename)
                 self.startTime = ptime.time()
+                print('Orca frame size in 1: ', [self.main.orcaflash.frame_x, self.main.orcaflash.frame_y])
 
 #                shape = (self.n(), self.main.shape[0], self.main.shape[1])
-                print('getRecTime returns: ',self.getRecTime())
-                self.worker = RecWorker(self.main.orcaflash, self.getRecTime(), (self.main.orcaflash.frame_x, self.main.orcaflash.frame_y),
+                self.worker = RecWorker(self.main.orcaflash, self.getRecTime(), self.main.shape,
                                         self.main.RealExpPar, self.savename,
                                         self.dataname, self.getAttrs())
                 self.worker.updateSignal.connect(self.updateGUI)
@@ -380,8 +411,9 @@ class RecordingWidget(QtGui.QFrame):
                 self.recordingThread.start()
 
             else:
-                self.folderWarning()
                 self.recButton.setChecked(False)
+#                self.folderWarning()
+#                self.recButton.setChecked(False)
 
         else:
             self.worker.pressed = False
@@ -412,7 +444,7 @@ class RecordingWidget(QtGui.QFrame):
         self.recButton.setChecked(False)
         self.main.tree.writable = True
         self.main.liveviewButton.setEnabled(True)
-        self.main.liveviewStart()
+        self.main.liveviewRun()
         self.progressBar.setValue(0)
         self.currentTime.setText('0 /')
         self.currentFrame.setText('0 /')
@@ -445,6 +477,8 @@ class RecWorker(QtCore.QObject):
         self.orcaflash.stopAcquisition() #In case camera is already acquiring
         # Frame counter
         self.timerecorded = 0
+        print('Orca frame size after stop acquitition in recworcer start: ', [self.orcaflash.frame_x, self.orcaflash.frame_y])
+        print('self.shape after stop acquitition in recworcer start: ', self.shape)
 
 #        self.andor.free_int_mem()
 #        self.andor.acquisition_mode = 'Kinetics'
@@ -456,7 +490,8 @@ class RecWorker(QtCore.QObject):
 
 
         self.orcaflash.startAcquisition()
-
+        print('Orca frame size after start acquitition in recworcer start: ', [self.orcaflash.frame_x, self.orcaflash.frame_y])
+        time.sleep(0.1)
 #        while self.j < self.shape[0] and self.pressed:
 #
 #            time.sleep(self.t_exp.magnitude)
@@ -467,30 +502,43 @@ class RecWorker(QtCore.QObject):
 #                                                1, self.shape[0])
 #                self.dataset[i - 1:self.j] = newImages
         self.starttime = time.time()
+        f_count = 0
         while self.timerecorded < self.timetorec and self.pressed:
             self.timerecorded = time.time() - self.starttime
+            f_count = f_count + np.size(self.orcaflash.newFrames())
+            print('frame count is: ', f_count)
+            self.liveImage = self.orcaflash.hcam_data[f_count-2].getData()
+            self.liveImage = np.reshape(self.liveImage, (self.orcaflash.frame_y, self.orcaflash.frame_x), order='C')
+            print('before printing liveImage in recworker start')         
+            print(np.shape(self.liveImage))
+            print('after printing liveImage in recworker start')
             self.updateSignal.emit()
             
-        frames = self.orcaflash.getFrames()
-        datashape = (np.shape(frames[0])[0], self.shape[0], self.shape[1])
-        self.orcaflash.stopAcquisition()
-        
+            
+        print('has exited while')   
+        self.orcaflash.stopAcquisition()        
+        data = [];
+        for i in range(0, f_count):
+            data.append(self.orcaflash.hcam_data[i].getData())
+#        frames = self.orcaflash.getFrames()
+        datashape = (f_count, self.shape[0], self.shape[1])
+        print('after stop acquisition')
         self.store_file = hdf.File(self.savename, "w")
         self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
         self.dataset = self.store_file[self.dataname]
-        
-        data = []
-        for i in range(0, datashape[0]):
-            print(i, '...in recworker start')
-            data.append(frames[0][i].getData())
+        print('after store file')
+#        data = []
+#        for i in range(0, datashape[2]):
+#            print(i, '...in recworker start')
+#            data.append(frames[0][i].getData())
             
         print('dataset size is: ',self.dataset.size)
         print('dataset shape is: ',self.dataset.shape)        
         print('datashape is: ', datashape) 
         print('data size is: ', np.size(data))
-        croppeddata = np.reshape(data, datashape)
-        print('size of croppeddata: ', np.shape(croppeddata))
-        self.dataset[...] = croppeddata
+        reshapeddata = np.reshape(data, datashape, order='C')
+        print('size of croppeddata: ', np.shape(reshapeddata))
+        self.dataset[...] = reshapeddata
         
 
         # Crop dataset if it's stopped before finishing
@@ -506,7 +554,13 @@ class RecWorker(QtCore.QObject):
         self.doneSignal.emit()
 
 
-
+class FileWarning(QtGui.QMessageBox):    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)   
+        
+        
+        
+        
 class TemperatureStabilizer(QtCore.QObject):
     pass
 #    def __init__(self, main, *args, **kwargs):
@@ -574,16 +628,16 @@ class CamParamTree(ParameterTree):
 #                       'values': [2048, 1024, 512, 256, 128, 64, 8]}, 
 #{'name': 'Nr of columns', 'type': 'list',
 #                       'values': [2048, 1024, 512, 256, 128, 64, 8]},
-{'name': 'Mode', 'type': 'list', 'values': ['Full chip', 'Custom']},
+{'name': 'Mode', 'type': 'list', 'values': ['Full Widefield', 'Full chip', 'Custom']},
 {'name': 'X0', 'type': 'int', 'value': 0, 'limits': (0, 2044)},
 {'name': 'Y0', 'type': 'int', 'value': 0, 'limits': (0, 2044)},
 {'name': 'Width', 'type': 'int', 'value': 2048, 'limits': (1, 2048)},
 {'name': 'Height', 'type': 'int', 'value': 2048, 'limits': (1, 2048)}, 
                                   {'name': 'Apply', 'type': 'action'},
-{'name': 'Test', 'type': 'action'}]},
+{'name': 'New ROI', 'type': 'action'}]},
                   {'name': 'Timings', 'type': 'group', 'children': [
                       {'name': 'Set exposure time', 'type': 'float',
-                       'value': 0.01, 'limits': (0,
+                       'value': 0.03, 'limits': (0,
                                                 9999),
                        'siPrefix': True, 'suffix': 's'},
                       {'name': 'Internal frame interval', 'type': 'float',
@@ -594,14 +648,7 @@ class CamParamTree(ParameterTree):
                        'suffix': 's'},
                       {'name': 'Internal frame rate', 'type': 'float',
                        'value': 0, 'readonly': True, 'siPrefix': False,
-                       'suffix': ' fps'}]},
-                  {'name': 'Gain', 'type': 'group', 'children': [
-                      {'name': 'Pre-amp gain', 'type': 'list',
-                       'values': list([9999, 9999, 9999]),
-                       'tip': preampTip},
-                      {'name': 'EM gain', 'type': 'int', 'value': 1,
-                       'limits': (0, 9999),
-                       'tip': EMGainTip}]}]
+                       'suffix': ' fps'}]}]
 
         self.p = Parameter.create(name='params', type='group', children=params)
         self.setParameters(self.p, showTop=False)
@@ -634,7 +681,8 @@ class CamParamTree(ParameterTree):
         framePar.param('Y0').setWritable(value)
         framePar.param('Width').setWritable(value)
         framePar.param('Height').setWritable(value)
-        framePar.param('Apply').setWritable(value)
+#        framePar.param('Apply').setWritable(value)
+#        framePar.param('New ROI').setWritable(value)        
         
         timingPar = self.p.param('Timings')
         timingPar.param('Set exposure time').setWritable(value)
@@ -676,6 +724,8 @@ class TormentaGUI(QtGui.QMainWindow):
         self.uvlaser = uvlaser
         self.scanZ = scanZ
         self.daq = daq
+        
+        self.filewarning = FileWarning()
 
         self.s = Q_(1, 's')
         self.lastTime = time.clock()
@@ -745,18 +795,20 @@ class TormentaGUI(QtGui.QMainWindow):
         self.cropLoaded = False
 
         # Camera binning signals
-        changeExposure = lambda: self.setBinning()
         self.framePar = self.tree.p.param('Image frame')
         self.binPar = self.framePar.param('Binning')
         self.binPar.sigValueChanged.connect(self.setBinning)
         self.FrameMode = self.framePar.param('Mode')
-        self.FrameMode.sigValueChanged.connect(self.updateFrame)
+        self.FrameMode.sigValueChanged.connect(self.testfunction)
         self.X0par= self.framePar.param('X0')
         self.Y0par= self.framePar.param('Y0')
         self.Widthpar= self.framePar.param('Width')
         self.Heightpar= self.framePar.param('Height')
-        self.TestParam = self.framePar.param('Test')
-#        self.TestParam.sigStateChanged.connect()
+        self.applyParam = self.framePar.param('Apply')
+        self.NewROIParam = self.framePar.param('New ROI')
+        self.applyParam.sigStateChanged.connect(self.applyfcn)  #WARNING: This signal is emitted whenever anything about the status of the parameter changes eg is set writable or not.
+        self.NewROIParam.sigStateChanged.connect(self.updateFrame)
+
 
         
         # Exposition signals
@@ -769,12 +821,12 @@ class TormentaGUI(QtGui.QMainWindow):
         changeExposure()    # Set default values
 
         # Gain signals
-        self.PreGainPar = self.tree.p.param('Gain').param('Pre-amp gain')
-        updateGain = lambda: self.setGain
-        self.PreGainPar.sigValueChanged.connect(updateGain)
-        self.GainPar = self.tree.p.param('Gain').param('EM gain')
-        self.GainPar.sigValueChanged.connect(updateGain)
-        updateGain()        # Set default values
+#        self.PreGainPar = self.tree.p.param('Gain').param('Pre-amp gain')
+#        updateGain = lambda: self.setGain
+#        self.PreGainPar.sigValueChanged.connect(updateGain)
+#        self.GainPar = self.tree.p.param('Gain').param('EM gain')
+#        self.GainPar.sigValueChanged.connect(updateGain)
+#        updateGain()        # Set default values
 
         # Camera settings widget
         cameraWidget = QtGui.QFrame()
@@ -870,6 +922,11 @@ class TormentaGUI(QtGui.QMainWindow):
         self.hist = pg.HistogramLUTItem(image=self.img)
 #        self.hist.vb.setLimits(yMin=0, yMax=2048)
         imageWidget.addItem(self.hist, row=1, col=2)
+        self.ROI = guitools.ROI((0, 0), self.vb, (0, 0),
+                                        handlePos=(1, 0), handleCenter=(0, 1),
+scaleSnap=True, translateSnap=True)
+        self.ROI.sigRegionChangeFinished.connect(self.ROIchanged)
+        self.ROI.hide()
 
 
 #        self.grid = guitools.Grid(self.vb, self.shape)
@@ -982,6 +1039,15 @@ class TormentaGUI(QtGui.QMainWindow):
 
         layout.setRowMinimumHeight(2, 40)
         layout.setColumnMinimumWidth(2, 1000)
+        
+        
+    def testfunction(self):
+        print('In testfunction ie called from frame mode changed signal')
+        self.updateFrame()
+        
+    def applyfcn(self):
+        print('Apply pressed')
+        self.resizeFrame()
 
     def mouseMoved(self, pos):
         if self.vb.sceneBoundingRect().contains(pos):
@@ -995,57 +1061,57 @@ class TormentaGUI(QtGui.QMainWindow):
 #        self.daq.flipper = value
 
 
-    def cropCCD(self):
-
-        if self.cropParam.param('Enable').value():
-
-            # Used when cropmode is loaded from a config file
-            if self.cropLoaded:
-                self.startCropMode()
-
-            else:
-                self.FTMPar.setWritable()
-                if self.shape != self.andor.detector_shape:
-                    self.shape = self.andor.detector_shape
-                    self.frameStart = (1, 1)
-                    self.changeParameter(self.adjustFrame)
-
-                ROIpos = (0, 0)
-                self.cropROI = guitools.ROI(self.shape, self.vb, ROIpos,
-                                            handlePos=(1, 1), movable=False,
-                                            handleCenter=(0, 0),
-                                            scaleSnap=True, translateSnap=True)
-                # Signals
-                applyParam = self.cropParam.param('Apply')
-                applyParam.sigStateChanged.connect(self.startCropMode)
-
-        else:
-            self.cropROI.hide()
-            self.shape = self.andor.detector_shape
-            self.changeParameter(lambda: self.setCropMode(False))
-
-    def startCropMode(self):
-
-        # Used when cropmode is loaded from a config file
-        ROISize = self.cropROI.size()
-        self.shape = (int(ROISize[0]), int(ROISize[1]))
-        self.cropROI.hide()
-
-        self.frameStart = (1, 1)
-        self.andor.crop_mode_shape = self.shape
-        self.changeParameter(lambda: self.setCropMode(True))
-        self.vb.setLimits(xMin=-0.5, xMax=self.shape[0] - 0.5, minXRange=4,
-                          yMin=-0.5, yMax=self.shape[1] - 0.5, minYRange=4)
-        self.updateTimings()
-
-        self.grid.update(self.shape)
-        self.updateLevels()     # not working  # TODO: make this work
-
-    def setCropMode(self, state):
-        self.andor.crop_mode = state
-        if not(state):
-            self.shape = self.andor.detector_shape
-            self.adjustFrame()
+#    def cropCCD(self):
+#
+#        if self.cropParam.param('Enable').value():
+#
+#            # Used when cropmode is loaded from a config file
+#            if self.cropLoaded:
+#                self.startCropMode()
+#
+#            else:
+#                self.FTMPar.setWritable()
+#                if self.shape != self.andor.detector_shape:
+#                    self.shape = self.andor.detector_shape
+#                    self.frameStart = (1, 1)
+#                    self.changeParameter(self.adjustFrame)
+#
+#                ROIpos = (0, 0)
+#                self.cropROI = guitools.ROI(self.shape, self.vb, ROIpos,
+#                                            handlePos=(1, 1), movable=False,
+#                                            handleCenter=(0, 0),
+#                                            scaleSnap=True, translateSnap=True)
+#                # Signals
+#                applyParam = self.cropParam.param('Apply')
+#                applyParam.sigStateChanged.connect(self.startCropMode)
+#
+#        else:
+#            self.cropROI.hide()
+#            self.shape = self.andor.detector_shape
+#            self.changeParameter(lambda: self.setCropMode(False))
+#
+#    def startCropMode(self):
+#
+#        # Used when cropmode is loaded from a config file
+#        ROISize = self.cropROI.size()
+#        self.shape = (int(ROISize[0]), int(ROISize[1]))
+#        self.cropROI.hide()
+#
+#        self.frameStart = (1, 1)
+#        self.andor.crop_mode_shape = self.shape
+#        self.changeParameter(lambda: self.setCropMode(True))
+#        self.vb.setLimits(xMin=-0.5, xMax=self.shape[0] - 0.5, minXRange=4,
+#                          yMin=-0.5, yMax=self.shape[1] - 0.5, minYRange=4)
+#        self.updateTimings()
+#
+#        self.grid.update(self.shape)
+#        self.updateLevels()     # not working  # TODO: make this work
+#
+#    def setCropMode(self, state):
+#        self.andor.crop_mode = state
+#        if not(state):
+#            self.shape = self.andor.detector_shape
+#            self.adjustFrame()
 
     def changeParameter(self, function):
         """ This method is used to change those camera properties that need
@@ -1080,7 +1146,6 @@ class TormentaGUI(QtGui.QMainWindow):
     def setBinning(self):
         
         """Method to change the binning of the captured frame"""
-        print('In setBinning')
 
         binning = str(self.binPar.value())
 
@@ -1143,19 +1208,20 @@ class TormentaGUI(QtGui.QMainWindow):
     def cropOrca(self, hpos, vpos, hsize, vsize):
         """Method to crop the fram read out by Orcaflash """
 #       Round to closest "divisable by 4" value.
-        vpos = 4*np.ceil(vpos/4)
-        hpos = 4*np.ceil(hpos/4)
-        vsize = min(2048 - vpos, 4*np.ceil(vsize/4))
-        hsize = min(2048 - hpos, 4*np.ceil(hsize/4))
-        
-        print(vpos, hpos, vsize, hsize)
-        
-                
-        
+        vpos = int(4*np.ceil(vpos/4))
+        hpos = int(4*np.ceil(hpos/4))
+        vsize = int(min(2048 - vpos, 4*np.ceil(vsize/4)))
+        hsize = int(min(2048 - hpos, 4*np.ceil(hsize/4)))
+
+        self.frameStart = (vpos, hpos)
+        self.shape = (vsize, hsize)     
+        print('orca will be cropped to: ', vpos, hpos, vsize, hsize)
         self.orcaflash.setPropertyValue('subarray_vpos', vpos)
         self.orcaflash.setPropertyValue('subarray_hpos', hpos)
         self.orcaflash.setPropertyValue('subarray_vsize', vsize)
         self.orcaflash.setPropertyValue('subarray_hsize', hsize)
+        
+        print('orca has been cropped to: ', vpos, hpos, vsize, hsize)
 
     def adjustFrame(self):
         """ Method to change the area of the sensor to be used and adjust the
@@ -1169,6 +1235,7 @@ class TormentaGUI(QtGui.QMainWindow):
 #                          yMin= -0.5, yMax=self.shape[1] - 0.5, minYRange=4)
 
         self.updateTimings()
+        self.recWidget.filesizeupdate()
 
 #        self.grid.update(self.shape)
 #        self.recWidget.shape = self.shape
@@ -1176,6 +1243,7 @@ class TormentaGUI(QtGui.QMainWindow):
     def updateFrame(self):
         """ Method to change the image frame size and position in the sensor
         """
+        print('Update frame called')
         frameParam = self.tree.p.param('Image frame')
         if frameParam.param('Mode').value() == 'Custom':
 
@@ -1183,44 +1251,64 @@ class TormentaGUI(QtGui.QMainWindow):
             ROIsize = (int(0.2 * self.vb.viewRect().width()), int(0.2 * self.vb.viewRect().height()))
             ROIcenter = (int(self.vb.viewRect().center().x()), int(self.vb.viewRect().center().y()))
             ROIpos = (ROIcenter[0] - 0.5*ROIsize[0], ROIcenter[1] - 0.5*ROIsize[1])
-            self.ROI = guitools.ROI(ROIsize, self.vb, ROIpos,
-                                    handlePos=(1, 0), handleCenter=(0, 1),
-scaleSnap=True, translateSnap=True)
-            self.ROIchanged()
-                # Signals
-            self.applyParam = self.framePar.param('Apply')
-            self.applyParam.sigStateChanged.connect(self.resizeFrame)
-            self.ROI.sigRegionChangeFinished.connect(self.ROIchanged)
-
-        elif frameParam.param('Mode').value() == 'Full chip':
-            print('Full chip')
-            self.X0par.setValue(0)
-            self.Y0par.setValue(0)
-            self.Widthpar.setValue(2048)
-            self.Heightpar.setValue(2048)
-            self.resizeFrame()
-
-            self.applyParam.sigStateChanged.disconnect()
+            
 #            try:
-            self.ROI.hide()
+            self.ROI.setPos(ROIpos)
+            self.ROI.setSize(ROIsize)
+            self.ROI.show()
 #            except:
-#                pass
-                    
-
-
+#                self.ROI = guitools.ROI(ROIsize, self.vb, ROIpos,
+#                                        handlePos=(1, 0), handleCenter=(0, 1),
+#scaleSnap=True, translateSnap=True)
+                
+            self.ROIchanged()
+            self.applyParam.setWritable(True)
+            self.NewROIParam.setWritable(True)
+            
         else:
-            side = int(frameParam.param('Mode').value().split('x')[0])
-            self.shape = (side, side)
-            start = int(0.5*(self.andor.detector_shape[0] - side) + 1)
-            self.frameStart = (start, start)
+            if frameParam.param('Mode').value() == 'Full Widefield':
+                self.X0par.setValue(600)
+                self.Y0par.setValue(600)
+                self.Widthpar.setValue(900)
+                self.Heightpar.setValue(900)
+                self.resizeFrame()
+                
+    #            try:
+                self.ROI.hide()
+    #            except:
+    #                pass
 
-            self.changeParameter(self.adjustFrame)
-#            self.applyParam.disable()
+            elif frameParam.param('Mode').value() == 'Full chip':
+                print('Full chip')
+                self.X0par.setValue(0)
+                self.Y0par.setValue(0)
+                self.Widthpar.setValue(2048)
+                self.Heightpar.setValue(2048)
+                self.resizeFrame()
+                
+    #            try:
+                self.ROI.hide()
+    #            except:
+    #                pass
+#            self.applyParam.setWritable(False)
+#            self.NewROIParam.setWritable(False)
+
+
+
+#        else:
+#            pass
+#            side = int(frameParam.param('Mode').value().split('x')[0])
+#            self.shape = (side, side)
+#            start = int(0.5*(self.andor.detector_shape[0] - side) + 1)
+#            self.frameStart = (start, start)
+#
+#            self.changeParameter(self.adjustFrame)
+##            self.applyParam.disable()
 
     def ROIchanged(self):
         print('In ROIchanged..., ROI.pos[0]= ', self.ROI.pos()[0])
-        self.X0par.setValue(int(self.ROI.pos()[0]))
-        self.Y0par.setValue(int(self.ROI.pos()[1]))
+        self.X0par.setValue(self.frameStart[0] + int(self.ROI.pos()[0]))
+        self.Y0par.setValue(self.frameStart[1] + int(self.ROI.pos()[1]))
         self.Widthpar.setValue(int(self.ROI.size()[0]))
         self.Heightpar.setValue(int(self.ROI.size()[1]))
     
@@ -1229,6 +1317,8 @@ scaleSnap=True, translateSnap=True)
 #        ROISize = self.ROI.size()
 #        self.shape = (int(ROISize[0]), int(ROISize[1]))
         self.shape = (self.Widthpar.value(), self.Heightpar.value())
+        print('self.shape in resizeFrame is: ', self.shape)
+        print('type of elements in self.shape is: ', type(self.shape[0]))
 #        self.frameStart = (int(self.ROI.pos()[0]), int(self.ROI.pos()[1]))
         self.frameStart = (self.X0par.value(), self.Y0par.value())
 
@@ -1274,14 +1364,17 @@ scaleSnap=True, translateSnap=True)
 
         else:
             self.liveviewStop()
+            
+        
 
     def liveviewStart(self):
 
-        self.orcaflash.startAcquisition()
-        time.sleep(0.1)
+#        self.orcaflash.startAcquisition()
+#        time.sleep(0.3)
 #        time.sleep(np.max((5 * self.t_exp_real.magnitude, 1)))
-              
+        self.updateFrame()
         self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
+        self.liveviewRun()
 #        self.liveviewStarts.emit()
 #
 #        idle = 'Camera is idle, waiting for instructions.'
@@ -1293,21 +1386,21 @@ scaleSnap=True, translateSnap=True)
 #
 #        self.andor.start_acquisition()
 #        time.sleep(np.max((5 * self.t_exp_real.magnitude, 1)))
-        self.recWidget.readyToRecord = True
+#        self.recWidget.readyToRecord = True
 #        self.recWidget.recButton.setEnabled(True)
 #
 #        # Initial image
-        rawframes = self.orcaflash.getFrames()
-        firstframe = rawframes[0][-1].getData() #return A numpy array that contains the camera data. "Circular" indexing makes [-1] return the latest frame
-        self.image = np.reshape(firstframe, (self.orcaflash.frame_x, self.orcaflash.frame_y), order='F')
+#        rawframes = self.orcaflash.getFrames()
+#        firstframe = rawframes[0][-1].getData() #return A numpy array that contains the camera data. "Circular" indexing makes [-1] return the latest frame
+#        self.image = np.reshape(firstframe, (self.orcaflash.frame_y, self.orcaflash.frame_x), order='C')
 #        print(self.frame)
 #        print(type(self.frame))
-        self.img.setImage(self.image, autoLevels=False, lut=self.lut) #Autolevels = True gives a stange numpy (?) warning
+#        self.img.setImage(self.image, autoLevels=False, lut=self.lut) #Autolevels = True gives a stange numpy (?) warning
 #        image = np.transpose(self.andor.most_recent_image16(self.shape))
 #        self.img.setImage(image, autoLevels=False, lut=self.lut)
 #        if update:
 #            self.updateLevels(image)
-        self.viewtimer.start(0)
+#        self.viewtimer.start(0)
 #        while self.liveviewButton.isChecked():
 #            self.updateView()
 
@@ -1315,7 +1408,6 @@ scaleSnap=True, translateSnap=True)
 #        self.gridButton.setEnabled(True)
 #        self.grid2Button.setEnabled(True)
 #        self.crosshairButton.setEnabled(True)
-        pass
 
     def liveviewStop(self):
         self.viewtimer.stop()
@@ -1324,6 +1416,7 @@ scaleSnap=True, translateSnap=True)
         # Turn off camera, close shutter
         self.orcaflash.stopAcquisition()
         self.img.setImage(np.zeros(self.shape), autoLevels=False)
+        
 
 #        self.liveviewEnds.emit()
 
@@ -1337,16 +1430,26 @@ scaleSnap=True, translateSnap=True)
 #        self.updateThread = QtCore.QThread()
 #        self.
 
+    def liveviewRun(self):
+        
+        self.orcaflash.startAcquisition()
+        time.sleep(0.3)
+
+        self.recWidget.readyToRecord = True
+        self.viewtimer.start(0)
+
+
     def updateView(self):
         """ Image update while in Liveview mode
         """
 #        try:
 #        print("\nTime taken from end of last updateView to beginning of this one: ", time.clock() - self.lastTime)
 #        now = time.clock()
+
         rawframes = self.orcaflash.getFrames()
 #        print("Time taken to retrieve image: ", time.clock() - now)
         firstframe = rawframes[0][-1].getData() #"Circular indexing makes [-1] return the latest frame
-        self.image = np.reshape(firstframe, (self.orcaflash.frame_x, self.orcaflash.frame_y), order='F')
+        self.image = np.reshape(firstframe, (self.orcaflash.frame_y, self.orcaflash.frame_x), order='C')
 #        print("Time taken to retrieve image + getData and reshape: ", time.clock() - now)
 #            if self.moleculeWidget.enabled:
 #                self.moleculeWidget.graph.update(image)
@@ -1406,13 +1509,14 @@ scaleSnap=True, translateSnap=True)
 
         # Stop running threads
         self.viewtimer.stop()
-        self.stabilizer.timer.stop()
-        self.stabilizerThread.terminate()
+#        self.stabilizer.timer.stop()
+#        self.stabilizerThread.terminate()
 
         # Turn off camera, close shutter and flipper
-        if self.andor.status != 'Camera is idle, waiting for instructions.':
-            self.andor.abort_acquisition()
-        self.andor.shutter(0, 2, 0, 0, 0)
+#        if self.andor.status != 'Camera is idle, waiting for instructions.':
+#            self.andor.abort_acquisition()
+#        self.andor.shutter(0, 2, 0, 0, 0)
+        self.orcaflash.shutdown()
         self.daq.flipper = True
 
         self.laserWidgets.closeEvent(*args, **kwargs)

@@ -428,6 +428,10 @@ class ROI(pg.ROI):
     def hide(self, *args, **kwargs):
         super().hide(*args, **kwargs)
         self.label.hide()
+        
+    def show(self, *args, **kwargs):
+        super().show(*args, **kwargs)
+        self.label.show()
 
 
 class cropROI(pg.ROI):
