@@ -477,9 +477,6 @@ class RecWorker(QtCore.QObject):
         self.orcaflash.stopAcquisition() #In case camera is already acquiring
         # Frame counter
         self.timerecorded = 0
-        print('Orca frame size after stop acquitition in recworcer start: ', [self.orcaflash.frame_x, self.orcaflash.frame_y])
-        print('self.shape after stop acquitition in recworcer start: ', self.shape)
-
 #        self.andor.free_int_mem()
 #        self.andor.acquisition_mode = 'Kinetics'
 #        self.andor.set_n_kinetics(self.shape[0])
@@ -490,7 +487,6 @@ class RecWorker(QtCore.QObject):
 
 
         self.orcaflash.startAcquisition()
-        print('Orca frame size after start acquitition in recworcer start: ', [self.orcaflash.frame_x, self.orcaflash.frame_y])
         time.sleep(0.1)
 #        while self.j < self.shape[0] and self.pressed:
 #
@@ -506,38 +502,26 @@ class RecWorker(QtCore.QObject):
         while self.timerecorded < self.timetorec and self.pressed:
             self.timerecorded = time.time() - self.starttime
             f_count = f_count + np.size(self.orcaflash.newFrames())
-            print('frame count is: ', f_count)
             self.liveImage = self.orcaflash.hcam_data[f_count-2].getData()
             self.liveImage = np.reshape(self.liveImage, (self.orcaflash.frame_y, self.orcaflash.frame_x), order='C')
-            print('before printing liveImage in recworker start')         
-            print(np.shape(self.liveImage))
-            print('after printing liveImage in recworker start')
+
             self.updateSignal.emit()
             
-            
-        print('has exited while')   
         self.orcaflash.stopAcquisition()        
         data = [];
         for i in range(0, f_count):
             data.append(self.orcaflash.hcam_data[i].getData())
 #        frames = self.orcaflash.getFrames()
         datashape = (f_count, self.shape[0], self.shape[1])
-        print('after stop acquisition')
         self.store_file = hdf.File(self.savename, "w")
         self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
         self.dataset = self.store_file[self.dataname]
-        print('after store file')
 #        data = []
 #        for i in range(0, datashape[2]):
 #            print(i, '...in recworker start')
 #            data.append(frames[0][i].getData())
             
-        print('dataset size is: ',self.dataset.size)
-        print('dataset shape is: ',self.dataset.shape)        
-        print('datashape is: ', datashape) 
-        print('data size is: ', np.size(data))
         reshapeddata = np.reshape(data, datashape, order='C')
-        print('size of croppeddata: ', np.shape(reshapeddata))
         self.dataset[...] = reshapeddata
         
 
@@ -1448,7 +1432,7 @@ scaleSnap=True, translateSnap=True)
 
         rawframes = self.orcaflash.getFrames()
 #        print("Time taken to retrieve image: ", time.clock() - now)
-        firstframe = rawframes[0][-1].getData() #"Circular indexing makes [-1] return the latest frame
+        firstframe = rawframes[0][-1].getData() #"Circular indexing" makes [-1] return the latest frame
         self.image = np.reshape(firstframe, (self.orcaflash.frame_y, self.orcaflash.frame_x), order='C')
 #        print("Time taken to retrieve image + getData and reshape: ", time.clock() - now)
 #            if self.moleculeWidget.enabled:
