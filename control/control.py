@@ -719,18 +719,22 @@ class TormentaGUI(QtGui.QMainWindow):
 
         
         # Exposition signals
-        self.setExposure()
         timingsPar = self.tree.p.param('Timings')
         self.expPar = timingsPar.param('Set exposure time')
         self.expPar.sigValueChanged.connect(self.setExposure)
         self.RealExpPar = timingsPar.param('Internal frame interval')
         self.RealExpPar.setOpts(decimals = 5)
         self.setExposure()    # Set default values
-        
-        
 
-        # Camera settings widget. Creates a widget that holds the camera settings and sets the layout 
-        # for the widget.
+        # Gain signals
+#        self.PreGainPar = self.tree.p.param('Gain').param('Pre-amp gain')
+#        updateGain = lambda: self.setGain
+#        self.PreGainPar.sigValueChanged.connect(updateGain)
+#        self.GainPar = self.tree.p.param('Gain').param('EM gain')
+#        self.GainPar.sigValueChanged.connect(updateGain)
+#        updateGain()        # Set default values
+
+        # Camera settings widget
         cameraWidget = QtGui.QFrame()
         cameraWidget.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
         cameraTitle = QtGui.QLabel('<h2><strong>Camera settings</strong></h2>')
