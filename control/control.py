@@ -34,7 +34,9 @@ import control.molecules_counter as moleculesCounter
 import control.ontime as ontime
 import control.guitools as guitools
 
-
+#Widget to control image or sequence recording. Recording only possible when liveview active.
+#StartRecording called when "Rec" presset. Creates recording thread with RecWorker, recording is then 
+#done in this seperate thread.
 
 class RecordingWidget(QtGui.QFrame):
 
@@ -76,12 +78,6 @@ class RecordingWidget(QtGui.QFrame):
         self.snapTIFFButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
                                           QtGui.QSizePolicy.Expanding)
         self.snapTIFFButton.clicked.connect(self.snapTIFF)
-#        self.snapTIFFButton.clicked.connect(self.snapHDF)
-#        self.snapHDFButton = QtGui.QPushButton('Snap HDF5')
-#        self.snapHDFButton.setStyleSheet("font-size:16px")
-#        self.snapHDFButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
-#                                         QtGui.QSizePolicy.Expanding)
-#        self.snapHDFButton.clicked.connect(self.snapHDF)
         self.recButton = QtGui.QPushButton('REC')
         self.recButton.setStyleSheet("font-size:16px")
         self.recButton.setCheckable(True)
