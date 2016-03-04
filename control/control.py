@@ -45,7 +45,7 @@ class RecordingWidget(QtGui.QFrame):
 
         self.main = main
         self.dataname = 'data'      # In case I need a QLineEdit for this
-        startdir = r'C:\Users\testaRES\Documents\Data\DefaultDataFolder\%s'
+        startdir = r'C:\Users\andreas.boden\Documents\Data\DefaultDataFolder\%s'
         newfolderpath =  startdir % time.strftime('%Y-%m-%d')
         if not os.path.exists(newfolderpath):
             os.mkdir(newfolderpath)
@@ -128,27 +128,24 @@ class RecordingWidget(QtGui.QFrame):
         recGrid = QtGui.QGridLayout()
         self.setLayout(recGrid)
 
+# Graphically adding the labels and fields etc to the gui. Four numbers specify row, column, rowspan
+# and columnspan.
         recGrid.addWidget(recTitle, 0, 0, 1, 3)
         recGrid.addWidget(QtGui.QLabel('Folder'), 2, 0)
         recGrid.addWidget(loadFolderButton, 1, 5)
         recGrid.addWidget(openFolderButton, 1, 4)
         recGrid.addWidget(self.folderEdit, 2, 1, 1, 5)
         recGrid.addWidget(self.specifyfile, 3, 0, 1, 5)
-#        recGrid.addWidget(QtGui.QLabel('Filename'), 4, 0, 1, 2)
         recGrid.addWidget(self.filenameEdit, 3, 2, 1, 4)
         recGrid.addWidget(self.specifyFrames, 4, 0, 1, 5)
-#        recGrid.addWidget(QtGui.QLabel('Number of expositions'), 4, 1)
         recGrid.addWidget(self.currentFrame, 4, 1)
         recGrid.addWidget(self.numExpositionsEdit, 4, 2)
         recGrid.addWidget(QtGui.QLabel('File size'), 4, 3, 1, 2)
         recGrid.addWidget(self.filesizeBar, 4, 4, 1, 2)
-#        recGrid.addWidget(self.tElapsed, 5, 3)
         recGrid.addWidget(self.specifyTime, 5, 0, 1, 5)
-#        recGrid.addWidget(QtGui.QLabel('Number of expositions'), 4, 1)
         recGrid.addWidget(self.currentTime, 5, 1)
         recGrid.addWidget(self.timeToRec, 5, 2)
-#        recGrid.addWidget(self.tElapsed, 5, 3)
-        recGrid.addWidget(self.tRemaining, 5, 3, 1, 2)
+        recGrid.addWidget(self.tRemaining, 5, 4, 1, 2)
         recGrid.addWidget(self.progressBar, 5, 4, 1, 2)
         recGrid.addWidget(self.tRemaining, 4, 3, 1, 2)
         recGrid.addWidget(buttonWidget, 6, 0, 1, 0)
@@ -156,6 +153,7 @@ class RecordingWidget(QtGui.QFrame):
         recGrid.setColumnMinimumWidth(0, 70)
         recGrid.setRowMinimumHeight(6, 40)
 
+# Initial condition of fields and checkboxes.
         self.writable = True
         self.readyToRecord = False
         self.filenameEdit.setEnabled(False)
@@ -176,6 +174,9 @@ class RecordingWidget(QtGui.QFrame):
     @property
     def writable(self):
         return self._writable
+
+# Setter for the writable property. If Nr of frame is checked only the frames field is
+# set active and vice versa.
 
     @writable.setter
     def writable(self, value):
@@ -199,6 +200,8 @@ class RecordingWidget(QtGui.QFrame):
         else:
             self.filenameEdit.setEnabled(False)
             self.filenameEdit.setText('Current time')
+
+# Functions for changing between choosing frames or time when recording.
             
     def specFrames(self):
         
@@ -211,6 +214,9 @@ class RecordingWidget(QtGui.QFrame):
         self.timeToRec.setEnabled(True)
         self.specifyTime.setChecked(True)
         self.filesizeupdate()
+            
+# For updating the appriximated file size of and eventual recording. Called when frame dimensions
+# or frames to record is changed.            
             
     def filesizeupdate(self):
         if self.specifyFrames.isChecked():
@@ -228,6 +234,8 @@ class RecordingWidget(QtGui.QFrame):
             return 0
         else:
             return int(text)
+
+# Function that returns the time to record in order to record the correct number of frames.
             
     def getRecTime(self):
         
@@ -236,26 +244,6 @@ class RecordingWidget(QtGui.QFrame):
             return time
         else:
             return int(self.timeToRec.text())
-
-    def nChanged(self):
-        self.updateRemaining()
-        self.limitExpositions(9)
-        self.filesizeupdate()
-
-#    def updateRemaining(self):
-#        rSecs = self.main.t_acc_real.magnitude * self.n()
-#        rTime = datetime.timedelta(seconds=np.round(rSecs))
-#        self.tRemaining.setText('{}'.format(rTime))
-
-    def nPixels(self):
-        return self.main.shape[0] * self.main.shape[1]
-
-    # Setting a xGB limit on file sizes to be able to open them in Fiji
-    def limitExpositions(self, xGB):
-        # nMax = xGB * 8 * 1024**3 / (pixels * 16)
-        nMax = xGB * 2**29 / self.nPixels()
-        if self.n() > nMax:
-            self.numExpositionsEdit.setText(str(np.round(nMax).astype(int)))
 
     def openFolder(self, path):
         if sys.platform == 'darwin':
@@ -346,24 +334,9 @@ class RecordingWidget(QtGui.QFrame):
         root.destroy()
 
     def updateGUI(self):
-#        self.main.img.setImage(image, autoLevels=False)
 
-#        if self.main.moleculeWidget.enabled:
-#            self.main.moleculeWidget.graph.update(image)
-
-#        if self.main.crosshair.showed:
-#                ycoord = int(np.round(self.crosshair.hLine.pos()[1]))
-#                xcoord = int(np.round(self.crosshair.vLine.pos()[0]))
-#                self.xProfile.setData(image[:, ycoord])
-#                self.yProfile.setData(image[xcoord])
-
-        # fps calculation
-#        self.main.fpsMath()
-
-        # Elapsed and remaining times and frames
         eSecs = self.worker.timerecorded
         nframe = int(self.worker.timerecorded / self.main.RealExpPar.value())
-        rFrames = int(self.numExpositionsEdit.text()) - nframe
         rSecs = self.getRecTime() - eSecs
         rText = '{}'.format(datetime.timedelta(seconds=max(0, rSecs)))
         self.tRemaining.setText(rText)
@@ -372,63 +345,51 @@ class RecordingWidget(QtGui.QFrame):
         self.progressBar.setValue(100*(1 - rSecs / (eSecs + rSecs)))
         self.main.img.setImage(self.worker.liveImage, autoLevels=False)
 
+# This funciton is called when "Rec" button is pressed. 
+
     def startRecording(self):
-        print('Orca frame size in beginning of startRecording fcn: ', [self.main.orcaflash.frame_x, self.main.orcaflash.frame_y])
-        if self.recButton.isChecked():
+        if self.recButton.isChecked():  
             ret = QtGui.QMessageBox.Yes
-            if self.filesize > 1500000000:
+            if self.filesize > 1500000000:  # Checks if estimated file size is dangourusly large, > 1,5GB-.
                 ret = self.filesizewar.exec_()
                 
             folder = self.folderEdit.text()
             if os.path.exists(folder) and ret == QtGui.QMessageBox.Yes:
                 
-                self.writable = False
+                self.writable = False # Sets Recording widget to not be writable during recording.
                 self.readyToRecord = False
                 self.recButton.setEnabled(True)
                 self.recButton.setText('STOP')
-                self.main.tree.writable = False
+                self.main.tree.writable = False # Sets camera parameters to not be writable during recording.
                 self.main.liveviewButton.setEnabled(False)
-                self.main.viewtimer.stop()
+                self.main.liveviewPause() # Stops liveview from updating
 
-                self.savename = (os.path.join(folder, self.getFileName()) + '_rec.hdf5')
-                self.savename = guitools.getUniqueName(self.savename)
-                self.startTime = ptime.time()
-                print('Orca frame size in 1: ', [self.main.orcaflash.frame_x, self.main.orcaflash.frame_y])
+                self.savename = (os.path.join(folder, self.getFileName()) + '_rec.hdf5') # Sets name for final output file
+                self.savename = guitools.getUniqueName(self.savename) # If same  filename exists it is appended by (1) or (2) etc.
+                self.startTime = ptime.time() # Saves the time when started to calculate remaining time.
 
-#                shape = (self.n(), self.main.shape[0], self.main.shape[1])
-                self.worker = RecWorker(self.main.orcaflash, self.getRecTime(), self.main.shape,
+                self.worker = RecWorker(self.main.orcaflash, self.getRecTime(), self.main.shape,  #Creates an instance of RecWorker class.
                                         self.main.RealExpPar, self.savename,
                                         self.dataname, self.getAttrs())
-                self.worker.updateSignal.connect(self.updateGUI)
-                self.worker.doneSignal.connect(self.endRecording)
-                self.recordingThread = QtCore.QThread()
-                self.worker.moveToThread(self.recordingThread)
+                self.worker.updateSignal.connect(self.updateGUI)    # Connects the updatesignal that is continously emitted from recworker to updateGUI function.
+                self.worker.doneSignal.connect(self.endRecording) # Connects the donesignal emitted from recworker to endrecording function.
+                self.recordingThread = QtCore.QThread() # Creates a new thread
+                self.worker.moveToThread(self.recordingThread) # moves the worker object to this thread. 
                 self.recordingThread.started.connect(self.worker.start)
                 self.recordingThread.start()
 
             else:
                 self.recButton.setChecked(False)
-#                self.folderWarning()
-#                self.recButton.setChecked(False)
+                self.folderWarning()
 
         else:
             self.worker.pressed = False
 
+# Function called when recording finishes to reset relevent parameters.
+
     def endRecording(self):
 
-        # Attenuate excitation x1000, turn blue laser off
-#        self.main.flipperInPath(True)
-#        self.main.laserWidgets.blueControl.laser.power_sp = Q_(0, 'mW')
-
-        self.recordingThread.terminate()
-
-#        if self.main.focusWidget.focusDataBox.isChecked():
-#            self.main.focusWidget.exportData()
-#        else:
-#            self.main.focusWidget.graph.savedDataSignal = []
-#            self.main.focusWidget.graph.mean = 0
-#            self.main.focusWidget.n = 1
-#            self.main.focusWidget.max_dev = 0
+        self.recordingThread.terminate() 
 
         converterFunction = lambda: guitools.TiffConverterThread(self.savename)
         self.main.exportlastAction.triggered.connect(converterFunction)
@@ -464,35 +425,12 @@ class RecWorker(QtCore.QObject):
         self.pressed = True
 
     def start(self):
-
-        # Acquisition preparation
-#        if self.andor.status != 'Camera is idle, waiting for instructions.':
-#            self.andor.abort_acquisition()
-#        else:
-#            self.andor.shutter(0, 1, 0, 0, 0)
-        self.orcaflash.stopAcquisition() #In case camera is already acquiring
-        # Frame counter
         self.timerecorded = 0
-#        self.andor.free_int_mem()
-#        self.andor.acquisition_mode = 'Kinetics'
-#        self.andor.set_n_kinetics(self.shape[0])
-#        self.andor.start_acquisition()
-        
-#        time.sleep(np.min((5 * self.t_exp.magnitude, 1))) 
-#        time.sleep(np.min((5 * self.t_exp.value, 1)))
 
 
         self.orcaflash.startAcquisition()
         time.sleep(0.1)
-#        while self.j < self.shape[0] and self.pressed:
-#
-#            time.sleep(self.t_exp.magnitude)
-#            if self.andor.n_images_acquired > self.j:
-#                i, self.j = self.andor.new_images_index
-#                newImages = self.andor.images16(i, self.j, (self.shape[1],
-#                                                            self.shape[2]),
-#                                                1, self.shape[0])
-#                self.dataset[i - 1:self.j] = newImages
+
         self.starttime = time.time()
         f_count = 0
         while self.timerecorded < self.timetorec and self.pressed:
@@ -507,28 +445,14 @@ class RecWorker(QtCore.QObject):
         data = [];
         for i in range(0, f_count):
             data.append(self.orcaflash.hcam_data[i].getData())
-#        frames = self.orcaflash.getFrames()
         datashape = (f_count, self.shape[0], self.shape[1])
         self.store_file = hdf.File(self.savename, "w")
         self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
         self.dataset = self.store_file[self.dataname]
-#        data = []
-#        for i in range(0, datashape[2]):
-#            print(i, '...in recworker start')
-#            data.append(frames[0][i].getData())
+
             
         reshapeddata = np.reshape(data, datashape, order='C')
         self.dataset[...] = reshapeddata
-        
-
-        # Crop dataset if it's stopped before finishing
-#        if self.j < self.shape[0]:
-#            self.dataset.resize((self.j, self.shape[1], self.shape[2]))
-
-        # Saving parameters
-#        for item in self.attrs:
-#            if item[1] is not None:
-#                self.dataset.attrs[item[0]] = item[1]
      
         self.store_file.close()
         self.doneSignal.emit()
@@ -661,8 +585,8 @@ class CamParamTree(ParameterTree):
         framePar.param('Y0').setWritable(value)
         framePar.param('Width').setWritable(value)
         framePar.param('Height').setWritable(value)
-#        framePar.param('Apply').setWritable(value)
-#        framePar.param('New ROI').setWritable(value)        
+#       WARNING: If Apply and New ROI button are included here as are they will emit status changed signal
+        # and their respective functions will be called... -> problems.
         
         timingPar = self.p.param('Timings')
         timingPar.param('Set exposure time').setWritable(value)
@@ -685,6 +609,8 @@ class CamParamTree(ParameterTree):
                                 attrs.append((str(ssParName), ssPar.value()))
         return attrs
 
+
+# The main GUI class.
 
 class TormentaGUI(QtGui.QMainWindow):
 
@@ -768,13 +694,14 @@ class TormentaGUI(QtGui.QMainWindow):
 
         self.tree = CamParamTree(self.orcaflash)
 
-        # Frame signals
-
-        # Indicator for loading frame shape from a preset setting
+        # Indicator for loading frame shape from a preset setting 
+        # Currently not used.
         self.customFrameLoaded = False
         self.cropLoaded = False
 
-        # Camera binning signals
+        # Camera binning signals. Defines seperate variables for each parameter and connects the signal
+        # emitted when they've been changed to a function that actually changes the parameters on the camera
+        # or other appropriate action.
         self.framePar = self.tree.p.param('Image frame')
         self.binPar = self.framePar.param('Binning')
         self.binPar.sigValueChanged.connect(self.setBinning)
@@ -792,23 +719,18 @@ class TormentaGUI(QtGui.QMainWindow):
 
         
         # Exposition signals
-        changeExposure = lambda: self.setExposure()
+        self.setExposure()
         timingsPar = self.tree.p.param('Timings')
         self.expPar = timingsPar.param('Set exposure time')
-        self.expPar.sigValueChanged.connect(changeExposure)
+        self.expPar.sigValueChanged.connect(self.setExposure)
         self.RealExpPar = timingsPar.param('Internal frame interval')
-        self.RealExpPar.setOpts(decimals = 10)
-        changeExposure()    # Set default values
+        self.RealExpPar.setOpts(decimals = 5)
+        self.setExposure()    # Set default values
+        
+        
 
-        # Gain signals
-#        self.PreGainPar = self.tree.p.param('Gain').param('Pre-amp gain')
-#        updateGain = lambda: self.setGain
-#        self.PreGainPar.sigValueChanged.connect(updateGain)
-#        self.GainPar = self.tree.p.param('Gain').param('EM gain')
-#        self.GainPar.sigValueChanged.connect(updateGain)
-#        updateGain()        # Set default values
-
-        # Camera settings widget
+        # Camera settings widget. Creates a widget that holds the camera settings and sets the layout 
+        # for the widget.
         cameraWidget = QtGui.QFrame()
         cameraWidget.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
         cameraTitle = QtGui.QLabel('<h2><strong>Camera settings</strong></h2>')
@@ -1354,6 +1276,7 @@ scaleSnap=True, translateSnap=True)
 #        time.sleep(np.max((5 * self.t_exp_real.magnitude, 1)))
         self.updateFrame()
         self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
+        self.recWidget.readyToRecord = True
         self.liveviewRun()
 #        self.liveviewStarts.emit()
 #
@@ -1414,65 +1337,26 @@ scaleSnap=True, translateSnap=True)
         
         self.orcaflash.startAcquisition()
         time.sleep(0.3)
-
-        self.recWidget.readyToRecord = True
         self.viewtimer.start(0)
-
+    
+    def liveviewPause(self):
+        
+        self.viewtimer.stop()
+        self.orcaflash.stopAcquisition()
 
     def updateView(self):
         """ Image update while in Liveview mode
         """
-#        try:
-#        print("\nTime taken from end of last updateView to beginning of this one: ", time.clock() - self.lastTime)
-#        now = time.clock()
 
         rawframes = self.orcaflash.getFrames()
-#        print("Time taken to retrieve image: ", time.clock() - now)
+
         firstframe = rawframes[0][-1].getData() #"Circular indexing" makes [-1] return the latest frame
         self.image = np.reshape(firstframe, (self.orcaflash.frame_y, self.orcaflash.frame_x), order='C')
-#        print("Time taken to retrieve image + getData and reshape: ", time.clock() - now)
-#            if self.moleculeWidget.enabled:
-#                self.moleculeWidget.graph.update(image)
-#        now = time.clock()
-        self.img.setImage(self.image, autoLevels=False, autoDownsample = False) 
-#        print("Time taken by setImage function: ", time.clock() - now)
-#        if self.crosshair.showed:
-#            ycoord = int(np.round(self.crosshair.hLine.pos()[1]))
-#            xcoord = int(np.round(self.crosshair.vLine.pos()[0]))
-#            self.xProfile.setData(image[:, ycoord])
-#            self.yProfile.setData(image[xcoord])
 
-#            self.fpsMath()
-#        now = time.clock()
-#        self.image = image
-#        print("Time taken to copy image: ", time.clock() - now)
-#        now = time.clock()
+        self.img.setImage(self.image, autoLevels=False, autoDownsample = False) 
+
         self.updateTimings()
-#        print("Time taken to update timings: ", time.clock() - now)
-#        since_last = time.clock() - self.lastTime
-#        self.lastTime = time.clock()
-#        print("Liveview frame rate = ", 1/since_last, " fps")
-#        except:
-#            pass        
-        
-        
-#        try:
-#            image = np.transpose(self.andor.most_recent_image16(self.shape))
-#            if self.moleculeWidget.enabled:
-#                self.moleculeWidget.graph.update(image)
-#            self.img.setImage(image, autoLevels=False)
-#
-#            if self.crosshair.showed:
-#                ycoord = int(np.round(self.crosshair.hLine.pos()[1]))
-#                xcoord = int(np.round(self.crosshair.vLine.pos()[0]))
-#                self.xProfile.setData(image[:, ycoord])
-#                self.yProfile.setData(image[xcoord])
-#
-#            self.fpsMath()
-#            self.image = image
-#
-#        except:
-#            pass
+
 
     def fpsMath(self):
         now = ptime.time()
