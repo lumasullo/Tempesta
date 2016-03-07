@@ -29,6 +29,7 @@ from lantz import Q_
 
 # tormenta imports
 import control.lasercontrol as lasercontrol
+import control.SignalGen as SignalGen
 import control.focus as focus
 import control.molecules_counter as moleculesCounter
 import control.ontime as ontime
@@ -45,7 +46,7 @@ class RecordingWidget(QtGui.QFrame):
 
         self.main = main
         self.dataname = 'data'      # In case I need a QLineEdit for this
-        startdir = r'C:\Users\andreas.boden\Documents\Data\DefaultDataFolder\%s'
+        startdir = r'C:\Users\TestaRES\Documents\Data\DefaultDataFolder\%s'
         newfolderpath =  startdir % time.strftime('%Y-%m-%d')
         if not os.path.exists(newfolderpath):
             os.mkdir(newfolderpath)
@@ -462,11 +463,11 @@ class FileWarning(QtGui.QMessageBox):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)   
         
-        
+#class PulseWidget(QtGui.QFrame):
         
         
 class TemperatureStabilizer(QtCore.QObject):
-    pass
+        pass
 #    def __init__(self, main, *args, **kwargs):
 #
 #        super().__init__(*args, **kwargs)
@@ -499,6 +500,8 @@ class TemperatureStabilizer(QtCore.QObject):
 #
 #        else:
 #            self.timer.stop()
+
+
 
 
 class CamParamTree(ParameterTree):
@@ -921,6 +924,12 @@ scaleSnap=True, translateSnap=True)
         self.laserWidgets = lasercontrol.LaserWidget(self.lasers, self.daq)
         laserDock.addWidget(self.laserWidgets)
         dockArea.addDock(laserDock, 'above', moleculesDock)
+        
+        signalDock = Dock('Signal Generator')
+        self.signalWidget = SignalGen.SigGenWidget()
+        signalDock.addWidget(self.signalWidget)
+        dockArea.addDock(signalDock, 'above', laserDock)
+        
 
         self.setWindowTitle('Tempesta')
         self.cwidget = QtGui.QWidget()
