@@ -1395,7 +1395,10 @@ scaleSnap=True, translateSnap=True)
 #        self.andor.shutter(0, 2, 0, 0, 0)
         self.orcaflash.shutdown()
         self.daq.flipper = True
+        self.signalWidget.StartStop()
 
         self.laserWidgets.closeEvent(*args, **kwargs)
         self.focusWidget.closeEvent(*args, **kwargs)
+        self.signalsWidget.closeEvent(*args, **kwargs)
+
         super().closeEvent(*args, **kwargs)
