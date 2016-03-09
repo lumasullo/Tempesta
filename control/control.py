@@ -452,7 +452,7 @@ class RecWorker(QtCore.QObject):
         self.dataset = self.store_file[self.dataname]
 
             
-        reshapeddata = np.reshape(data, datashape, order='C')
+        reshapeddata = np.reshape(data, datashape, order='F')
         self.dataset[...] = reshapeddata
      
         self.store_file.close()
@@ -1036,11 +1036,9 @@ scaleSnap=True, translateSnap=True)
             function()
         except:
 
-            self.viewtimer.stop()
-            self.orcaflash.stopAcquisition()
+            self.liveviewPause()
             function()
-            self.orcaflash.startAcquisition()
-            self.viewtimer.start(0)
+            self.liveviewRun()
 
 #        status = self.andor.status
 #        if status != ('Camera is idle, waiting for instructions.'):
@@ -1071,9 +1069,9 @@ scaleSnap=True, translateSnap=True)
             self.orcaflash.setPropertyValue('binning', coded)
         
         except:
-            self.liveviewStop()
+            self.liveviewPause()
             self.orcaflash.setPropertyValue('binning', coded)
-            self.liveviewStart()
+            self.liveviewRun()
 
             
         
@@ -1123,18 +1121,24 @@ scaleSnap=True, translateSnap=True)
     def cropOrca(self, hpos, vpos, hsize, vsize):
         """Method to crop the fram read out by Orcaflash """
 #       Round to closest "divisable by 4" value.
+        self.orcaflash.setPropertyValue('subarray_vpos', 0)
+        self.orcaflash.setPropertyValue('subarray_hpos', 0)
+        self.orcaflash.setPropertyValue('subarray_vsize', 2048)
+        self.orcaflash.setPropertyValue('subarray_hsize', 2048)
+
+ 
         vpos = int(4*np.ceil(vpos/4))
         hpos = int(4*np.ceil(hpos/4))
         vsize = int(min(2048 - vpos, 4*np.ceil(vsize/4)))
         hsize = int(min(2048 - hpos, 4*np.ceil(hsize/4)))
 
-        self.frameStart = (vpos, hpos)
-        self.shape = (vsize, hsize)     
+        self.frameStart = (hpos, vpos)
+        self.shape = (hsize, vsize)     
         print('orca will be cropped to: ', vpos, hpos, vsize, hsize)
-        self.orcaflash.setPropertyValue('subarray_vpos', vpos)
-        self.orcaflash.setPropertyValue('subarray_hpos', hpos)
         self.orcaflash.setPropertyValue('subarray_vsize', vsize)
         self.orcaflash.setPropertyValue('subarray_hsize', hsize)
+        self.orcaflash.setPropertyValue('subarray_vpos', vpos)
+        self.orcaflash.setPropertyValue('subarray_hpos', hpos)
         
         print('orca has been cropped to: ', vpos, hpos, vsize, hsize)
 
@@ -1395,10 +1399,11 @@ scaleSnap=True, translateSnap=True)
 #        self.andor.shutter(0, 2, 0, 0, 0)
         self.orcaflash.shutdown()
         self.daq.flipper = True
-        self.signalWidget.StartStop()
+        if self.signalWidget.running:
+            self.signalWidget.StartStop()
 
         self.laserWidgets.closeEvent(*args, **kwargs)
         self.focusWidget.closeEvent(*args, **kwargs)
-        self.signalsWidget.closeEvent(*args, **kwargs)
+        self.signalWidget.closeEvent(*args, **kwargs)
 
         super().closeEvent(*args, **kwargs)
