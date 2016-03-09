@@ -438,7 +438,7 @@ class RecWorker(QtCore.QObject):
             self.timerecorded = time.time() - self.starttime
             f_count = f_count + np.size(self.orcaflash.newFrames())
             self.liveImage = self.orcaflash.hcam_data[f_count-2].getData()
-            self.liveImage = np.reshape(self.liveImage, (self.orcaflash.frame_y, self.orcaflash.frame_x), order='C')
+            self.liveImage = np.reshape(self.liveImage, (self.orcaflash.frame_x, self.orcaflash.frame_y), order='F')
 
             self.updateSignal.emit()
             
@@ -446,13 +446,13 @@ class RecWorker(QtCore.QObject):
         data = [];
         for i in range(0, f_count):
             data.append(self.orcaflash.hcam_data[i].getData())
-        datashape = (f_count, self.shape[0], self.shape[1])
+        datashape = (f_count, self.shape[1], self.shape[0])     # Adapted for ImageJ data read shape
         self.store_file = hdf.File(self.savename, "w")
         self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
         self.dataset = self.store_file[self.dataname]
 
             
-        reshapeddata = np.reshape(data, datashape, order='F')
+        reshapeddata = np.reshape(data, datashape, order='C')
         self.dataset[...] = reshapeddata
      
         self.store_file.close()
@@ -1228,8 +1228,10 @@ scaleSnap=True, translateSnap=True)
         print('In ROIchanged..., ROI.pos[0]= ', self.ROI.pos()[0])
         self.X0par.setValue(self.frameStart[0] + int(self.ROI.pos()[0]))
         self.Y0par.setValue(self.frameStart[1] + int(self.ROI.pos()[1]))
-        self.Widthpar.setValue(int(self.ROI.size()[0]))
-        self.Heightpar.setValue(int(self.ROI.size()[1]))
+        print(self.ROI.size()[0])
+        print(self.ROI.size()[1])
+        self.Widthpar.setValue(int(self.ROI.size()[0])) # [0] is Width
+        self.Heightpar.setValue(int(self.ROI.size()[1])) # [1] is Height
     
     def resizeFrame(self):
 
@@ -1368,7 +1370,7 @@ scaleSnap=True, translateSnap=True)
         rawframes = self.orcaflash.getFrames()
 
         firstframe = rawframes[0][-1].getData() #"Circular indexing" makes [-1] return the latest frame
-        self.image = np.reshape(firstframe, (self.orcaflash.frame_y, self.orcaflash.frame_x), order='C')
+        self.image = np.reshape(firstframe, (self.orcaflash.frame_x, self.orcaflash.frame_y), order='F')
 
         self.img.setImage(self.image, autoLevels=False, autoDownsample = False) 
 
