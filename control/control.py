@@ -271,6 +271,7 @@ class RecordingWidget(QtGui.QFrame):
 
     # Attributes saving
     def getAttrs(self):
+        self.main.AbortROI()
         attrs = self.main.tree.attrs()
         attrs.extend([('Date', time.strftime("%Y-%m-%d")),
                       ('Saved at', time.strftime("%H:%M:%S")),
@@ -311,7 +312,6 @@ class RecordingWidget(QtGui.QFrame):
         return filename
         
     def snapTIFF(self):
-        self.main.AbortROI()
         folder = self.folderEdit.text()
         if os.path.exists(folder):
 
@@ -428,39 +428,39 @@ class RecWorker(QtCore.QObject):
 
     def start(self):
         
-        N = 201
-        for i in range(1, N):
-            dir = r'C:\Users\TestaRES\Documents\Data\DefaultDataFolder\DarkNoise\%s'
-            self.savename = dir % (str(i) + '.hdf5')
-            print('Recording file nr: ', i, 'of', N, '  with filename: ', self.savename)
-            self.timerecorded = 0
-            self.orcaflash.startAcquisition()
-            time.sleep(0.1)
-    
-            self.starttime = time.time()
-            f_count = 0
-            while self.timerecorded < self.timetorec and self.pressed:
-                self.timerecorded = time.time() - self.starttime
-                f_count = f_count + np.size(self.orcaflash.newFrames())
-                self.liveImage = self.orcaflash.hcam_data[f_count-2].getData()
-                self.liveImage = np.reshape(self.liveImage, (self.orcaflash.frame_x, self.orcaflash.frame_y), order='F')
-    
-                self.updateSignal.emit()
-                
-            self.orcaflash.stopAcquisition()        
-            data = [];
-            for i in range(0, f_count):
-                data.append(self.orcaflash.hcam_data[i].getData())
-            datashape = (f_count, self.shape[1], self.shape[0])     # Adapted for ImageJ data read shape
-            self.store_file = hdf.File(self.savename, "w")
-            self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
-            self.dataset = self.store_file[self.dataname]
-    
-                
-            reshapeddata = np.reshape(data, datashape, order='C')
-            self.dataset[...] = reshapeddata
-         
-            self.store_file.close()
+        self.timerecorded = 0
+        self.orcaflash.startAcquisition()
+        time.sleep(0.1)
+
+        self.starttime = time.time()
+        f_count = 0
+        while self.timerecorded < self.timetorec and self.pressed:
+            self.timerecorded = time.time() - self.starttime
+            f_count = f_count + np.size(self.orcaflash.newFrames())
+            self.liveImage = self.orcaflash.hcam_data[f_count-2].getData()
+            self.liveImage = np.reshape(self.liveImage, (self.orcaflash.frame_x, self.orcaflash.frame_y), order='F')
+
+            self.updateSignal.emit()
+            
+        self.orcaflash.stopAcquisition()        
+        data = [];
+        for i in range(0, f_count):
+            data.append(self.orcaflash.hcam_data[i].getData())
+        datashape = (f_count, self.shape[1], self.shape[0])     # Adapted for ImageJ data read shape
+        self.store_file = hdf.File(self.savename, "w")
+        self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
+        self.dataset = self.store_file[self.dataname]
+
+            
+        reshapeddata = np.reshape(data, datashape, order='C')
+        self.dataset[...] = reshapeddata
+        
+        # Saving parameters
+        for item in self.attrs:
+            if item[1] is not None:
+                dataset.attrs[item[0]] = item[1]
+     
+        self.store_file.close()
             
         self.doneSignal.emit()
 
