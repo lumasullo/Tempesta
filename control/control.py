@@ -449,11 +449,11 @@ class RecWorker(QtCore.QObject):
         datashape = (f_count, self.shape[1], self.shape[0])     # Adapted for ImageJ data read shape
         self.store_file = hdf.File(self.savename, "w")
         self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
-        self.dataset = self.store_file[self.dataname]
+        dataset = self.store_file[self.dataname]
 
             
         reshapeddata = np.reshape(data, datashape, order='C')
-        self.dataset[...] = reshapeddata
+        dataset[...] = reshapeddata
         
         # Saving parameters
         for item in self.attrs:
