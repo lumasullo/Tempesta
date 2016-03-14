@@ -519,17 +519,7 @@ class CamParamTree(ParameterTree):
 
         BinTip = ("Sets binning mode. Binning mode specifies if and how many \n"
                     "pixels are to be read out and interpreted as a single pixel value.")
-
-        preampTip = ("Andor recommend using the highest value setting for \n"
-                     "most low-light applications")
-
-        EMGainTip = ("A gain of x4-5 the read noise (see spec sheet) is \n"
-                     "enough to render this noise source negligible. In \n"
-                     "practice, this can always be achieved with EM Gain of \n"
-                     "less than x300 (often much less). Pushing gain beyond \n"
-                     "300 would give little or no extra SNR benefit and \n"
-                     "would only reduce dynamic range.")
-
+                    
 
         # Parameter tree for the camera configuration
         params = [{'name': 'Camera', 'type': 'str',
@@ -537,17 +527,13 @@ class CamParamTree(ParameterTree):
                   {'name': 'Image frame', 'type': 'group', 'children': [
                       {'name': 'Binning', 'type': 'list', 
                                   'values': [1, 2, 4], 'tip': BinTip},
-#{'name': 'Nr of rows', 'type': 'list',
-#                       'values': [2048, 1024, 512, 256, 128, 64, 8]}, 
-#{'name': 'Nr of columns', 'type': 'list',
-#                       'values': [2048, 1024, 512, 256, 128, 64, 8]},
 {'name': 'Mode', 'type': 'list', 'values': ['Full Widefield', 'Full chip', 'Custom']},
 {'name': 'X0', 'type': 'int', 'value': 0, 'limits': (0, 2044)},
 {'name': 'Y0', 'type': 'int', 'value': 0, 'limits': (0, 2044)},
 {'name': 'Width', 'type': 'int', 'value': 2048, 'limits': (1, 2048)},
 {'name': 'Height', 'type': 'int', 'value': 2048, 'limits': (1, 2048)}, 
                                   {'name': 'Apply', 'type': 'action'},
-{'name': 'New ROI', 'type': 'action'}]},
+{'name': 'New ROI', 'type': 'action'}, {'name': 'Abort ROI', 'type': 'action', 'align': 'right'}]},
                   {'name': 'Timings', 'type': 'group', 'children': [
                       {'name': 'Set exposure time', 'type': 'float',
                        'value': 0.03, 'limits': (0,
@@ -727,8 +713,10 @@ class TormentaGUI(QtGui.QMainWindow):
         self.Heightpar= self.framePar.param('Height')
         self.applyParam = self.framePar.param('Apply')
         self.NewROIParam = self.framePar.param('New ROI')
+        self.AbortROIParam = self.framePar.param('Abort ROI')
         self.applyParam.sigStateChanged.connect(self.applyfcn)  #WARNING: This signal is emitted whenever anything about the status of the parameter changes eg is set writable or not.
         self.NewROIParam.sigStateChanged.connect(self.updateFrame)
+        self.AbortROIParam.sigStateChanged.connect(self.AbortROI)
 
 
         
