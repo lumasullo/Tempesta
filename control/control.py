@@ -555,7 +555,11 @@ class CamParamTree(ParameterTree):
                        'suffix': 's'},
                       {'name': 'Internal frame rate', 'type': 'float',
                        'value': 0, 'readonly': True, 'siPrefix': False,
-                       'suffix': ' fps'}]}]
+                       'suffix': ' fps'}]}, 
+                       {'name': 'Acquisition mode', 'type': 'group', 'children': [
+                      {'name': 'Trigger source', 'type': 'list',
+                       'values': ['Internal trigger', 'External trigger'],
+                       'siPrefix': True, 'suffix': 's'}]}]
 
         self.p = Parameter.create(name='params', type='group', children=params)
         self.setParameters(self.p, showTop=False)
@@ -728,6 +732,11 @@ class TormentaGUI(QtGui.QMainWindow):
         self.RealExpPar = timingsPar.param('Internal frame interval')
         self.RealExpPar.setOpts(decimals = 5)
         self.setExposure()    # Set default values
+        
+        #Acquisition signals
+        acquisParam = self.tree.p.param('Acquisition mode')
+        self.trigsourceparam = acquisParam.param('Trigger source')
+        self.trigsourceparam.sigValueChanged.connect(self.ChangeTriggerSource)
 
         # Gain signals
 #        self.PreGainPar = self.tree.p.param('Gain').param('Pre-amp gain')
@@ -1052,6 +1061,18 @@ scaleSnap=True, translateSnap=True)
 #            time.sleep(np.min((5 * self.t_exp_real.magnitude, 1)))
 #            self.viewtimer.start(0)
 
+
+    def ChangeTriggerSource(self):
+        
+        if self.trigsourceparam.value() == 'Internal trigger':
+            self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_source', 1))
+            
+        elif self.trigsourceparam.value() == 'External trigger':
+            self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_source', 2))
+        else:
+            pass
+                
+
     def updateLevels(self, image):
         std = np.std(image)
         self.hist.setLevels(np.min(image) - std, np.max(image) + std)
@@ -1065,13 +1086,9 @@ scaleSnap=True, translateSnap=True)
         binstring = binning+'x'+binning
         coded = binstring.encode('ascii')
         
-        try:
-            self.orcaflash.setPropertyValue('binning', coded)
-        
-        except:
-            self.liveviewPause()
-            self.orcaflash.setPropertyValue('binning', coded)
-            self.liveviewRun()
+
+        self.changeParameter(lambda: self.orcaflash.setPropertyValue('binning', coded))
+
 
             
         
