@@ -29,7 +29,7 @@ from lantz import Q_
 
 # tormenta imports
 import control.lasercontrol as lasercontrol
-import control.SignalGen as SignalGen
+#import control.SignalGen as SignalGen
 import control.focus as focus
 import control.molecules_counter as moleculesCounter
 import control.ontime as ontime
@@ -46,7 +46,10 @@ class RecordingWidget(QtGui.QFrame):
 
         self.main = main
         self.dataname = 'data'      # In case I need a QLineEdit for this
-        startdir = r'C:\Users\TestaRES\Documents\Data\DefaultDataFolder\%s'
+        try:
+            startdir = r'C:\Users\andreas.boden\Documents\Data\DefaultDataFolder\%s'
+        except:
+            startdir = r'C:\Users\TestaRES\Documents\Data\DefaultDataFolder\%s'
         newfolderpath =  startdir % time.strftime('%Y-%m-%d')
         if not os.path.exists(newfolderpath):
             os.mkdir(newfolderpath)
@@ -308,7 +311,7 @@ class RecordingWidget(QtGui.QFrame):
         return filename
         
     def snapTIFF(self):
-
+        self.main.AbortROI()
         folder = self.folderEdit.text()
         if os.path.exists(folder):
 
@@ -939,8 +942,8 @@ scaleSnap=True, translateSnap=True)
         dockArea.addDock(laserDock, 'above', moleculesDock)
         
         signalDock = Dock('Signal Generator')
-        self.signalWidget = SignalGen.SigGenWidget()
-        signalDock.addWidget(self.signalWidget)
+#        self.signalWidget = SignalGen.SigGenWidget()
+#        signalDock.addWidget(self.signalWidget)
         dockArea.addDock(signalDock, 'above', laserDock)
         
 
@@ -975,7 +978,7 @@ scaleSnap=True, translateSnap=True)
         
     def applyfcn(self):
         print('Apply pressed')
-        self.resizeFrame()
+        self.adjustFrame()
 
     def mouseMoved(self, pos):
         if self.vb.sceneBoundingRect().contains(pos):
@@ -1153,13 +1156,13 @@ scaleSnap=True, translateSnap=True)
         vsize = int(min(2048 - vpos, 4*np.ceil(vsize/4)))
         hsize = int(min(2048 - hpos, 4*np.ceil(hsize/4)))
 
-        self.frameStart = (hpos, vpos)
-        self.shape = (hsize, vsize)     
-        print('orca will be cropped to: ', vpos, hpos, vsize, hsize)
         self.orcaflash.setPropertyValue('subarray_vsize', vsize)
         self.orcaflash.setPropertyValue('subarray_hsize', hsize)
         self.orcaflash.setPropertyValue('subarray_vpos', vpos)
         self.orcaflash.setPropertyValue('subarray_hpos', hpos)
+        
+        self.frameStart = (hpos, vpos) # Should be only place where self.frameStart is changed
+        self.shape = (hsize, vsize)     # Only place self.shape is changed
         
         print('orca has been cropped to: ', vpos, hpos, vsize, hsize)
 
@@ -1169,16 +1172,11 @@ scaleSnap=True, translateSnap=True)
         and self.frameStart)
         """
         binning = self.binPar.value()
-#        self.andor.set_image(shape=self.shape, p_0=self.frameStart)
-        self.changeParameter(lambda: self.cropOrca(binning*self.frameStart[0], binning*self.frameStart[1], binning*self.shape[0], binning*self.shape[1]))
-#        self.vb.setLimits(xMin= -0.5, xMax=self.shape[0] - 0.5, minXRange=4,
-#                          yMin= -0.5, yMax=self.shape[1] - 0.5, minYRange=4)
+
+        self.changeParameter(lambda: self.cropOrca(binning*self.X0par.value(), binning*self.Y0par.value(), binning*self.Widthpar.value(), self.Heightpar.value()))
 
         self.updateTimings()
         self.recWidget.filesizeupdate()
-
-#        self.grid.update(self.shape)
-#        self.recWidget.shape = self.shape
 
     def updateFrame(self):
         """ Method to change the image frame size and position in the sensor
@@ -1211,12 +1209,10 @@ scaleSnap=True, translateSnap=True)
                 self.Y0par.setValue(600)
                 self.Widthpar.setValue(900)
                 self.Heightpar.setValue(900)
-                self.resizeFrame()
-                
-    #            try:
+                self.adjustFrame()
+
                 self.ROI.hide()
-    #            except:
-    #                pass
+
 
             elif frameParam.param('Mode').value() == 'Full chip':
                 print('Full chip')
@@ -1224,14 +1220,10 @@ scaleSnap=True, translateSnap=True)
                 self.Y0par.setValue(0)
                 self.Widthpar.setValue(2048)
                 self.Heightpar.setValue(2048)
-                self.resizeFrame()
-                
-    #            try:
+                self.adjustFrame()
+
                 self.ROI.hide()
-    #            except:
-    #                pass
-#            self.applyParam.setWritable(False)
-#            self.NewROIParam.setWritable(False)
+
 
 
 
@@ -1246,28 +1238,23 @@ scaleSnap=True, translateSnap=True)
 ##            self.applyParam.disable()
 
     def ROIchanged(self):
-        print('In ROIchanged..., ROI.pos[0]= ', self.ROI.pos()[0])
+
         self.X0par.setValue(self.frameStart[0] + int(self.ROI.pos()[0]))
         self.Y0par.setValue(self.frameStart[1] + int(self.ROI.pos()[1]))
-        print(self.ROI.size()[0])
-        print(self.ROI.size()[1])
+
         self.Widthpar.setValue(int(self.ROI.size()[0])) # [0] is Width
         self.Heightpar.setValue(int(self.ROI.size()[1])) # [1] is Height
-    
-    def resizeFrame(self):
-
-#        ROISize = self.ROI.size()
-#        self.shape = (int(ROISize[0]), int(ROISize[1]))
-        self.shape = (self.Widthpar.value(), self.Heightpar.value())
-        print('self.shape in resizeFrame is: ', self.shape)
-        print('type of elements in self.shape is: ', type(self.shape[0]))
-#        self.frameStart = (int(self.ROI.pos()[0]), int(self.ROI.pos()[1]))
-        self.frameStart = (self.X0par.value(), self.Y0par.value())
-
-        self.adjustFrame()
+        
+        
+    def AbortROI(self):
+        
         self.ROI.hide()
-#        self.grid.update(self.shape)
-#        self.recWidget.shape = self.shape
+        
+        self.X0par.setValue(self.frameStart[0])
+        self.Y0par.setValue(self.frameStart[1])
+
+        self.Widthpar.setValue(self.shape[0]) # [0] is Width
+        self.Heightpar.setValue(self.shape[1]) # [1] is Height    
 
     def updateTimings(self):
         """ Update the real exposition and accumulation times in the parameter
