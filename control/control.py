@@ -270,10 +270,8 @@ class RecordingWidget(QtGui.QFrame):
     def getAttrs(self):
         attrs = self.main.tree.attrs()
         attrs.extend([('Date', time.strftime("%Y-%m-%d")),
-                      ('Start time', time.strftime("%H:%M:%S")),
-                      ('element_size_um', (1, 0.120, 0.120)),
-                      ('NA', 1.42),
-                      ('lambda_em', 670)])
+                      ('Saved at', time.strftime("%H:%M:%S")),
+                      ('NA', 1.42)])
         for laserControl in self.main.laserWidgets.controls:
             name = re.sub('<[^<]+?>', '', laserControl.name.text())
             attrs.append((name, laserControl.laser.power))
@@ -426,36 +424,41 @@ class RecWorker(QtCore.QObject):
         self.pressed = True
 
     def start(self):
-        self.timerecorded = 0
-
-
-        self.orcaflash.startAcquisition()
-        time.sleep(0.1)
-
-        self.starttime = time.time()
-        f_count = 0
-        while self.timerecorded < self.timetorec and self.pressed:
-            self.timerecorded = time.time() - self.starttime
-            f_count = f_count + np.size(self.orcaflash.newFrames())
-            self.liveImage = self.orcaflash.hcam_data[f_count-2].getData()
-            self.liveImage = np.reshape(self.liveImage, (self.orcaflash.frame_x, self.orcaflash.frame_y), order='F')
-
-            self.updateSignal.emit()
+        
+        N = 201
+        for i in range(1, N):
+            dir = r'C:\Users\TestaRES\Documents\Data\DefaultDataFolder\DarkNoise\%s'
+            self.savename = dir % (str(i) + '.hdf5')
+            print('Recording file nr: ', i, 'of', N, '  with filename: ', self.savename)
+            self.timerecorded = 0
+            self.orcaflash.startAcquisition()
+            time.sleep(0.1)
+    
+            self.starttime = time.time()
+            f_count = 0
+            while self.timerecorded < self.timetorec and self.pressed:
+                self.timerecorded = time.time() - self.starttime
+                f_count = f_count + np.size(self.orcaflash.newFrames())
+                self.liveImage = self.orcaflash.hcam_data[f_count-2].getData()
+                self.liveImage = np.reshape(self.liveImage, (self.orcaflash.frame_x, self.orcaflash.frame_y), order='F')
+    
+                self.updateSignal.emit()
+                
+            self.orcaflash.stopAcquisition()        
+            data = [];
+            for i in range(0, f_count):
+                data.append(self.orcaflash.hcam_data[i].getData())
+            datashape = (f_count, self.shape[1], self.shape[0])     # Adapted for ImageJ data read shape
+            self.store_file = hdf.File(self.savename, "w")
+            self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
+            self.dataset = self.store_file[self.dataname]
+    
+                
+            reshapeddata = np.reshape(data, datashape, order='C')
+            self.dataset[...] = reshapeddata
+         
+            self.store_file.close()
             
-        self.orcaflash.stopAcquisition()        
-        data = [];
-        for i in range(0, f_count):
-            data.append(self.orcaflash.hcam_data[i].getData())
-        datashape = (f_count, self.shape[1], self.shape[0])     # Adapted for ImageJ data read shape
-        self.store_file = hdf.File(self.savename, "w")
-        self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
-        self.dataset = self.store_file[self.dataname]
-
-            
-        reshapeddata = np.reshape(data, datashape, order='C')
-        self.dataset[...] = reshapeddata
-     
-        self.store_file.close()
         self.doneSignal.emit()
 
 
@@ -601,6 +604,7 @@ class CamParamTree(ParameterTree):
     def attrs(self):
         attrs = []
         for ParName in self.p.getValues():
+            print(ParName)
             Par = self.p.param(str(ParName))
             if not(Par.hasChildren()):
                 attrs.append((str(ParName), Par.value()))
