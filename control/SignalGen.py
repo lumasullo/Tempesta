@@ -7,7 +7,6 @@ Created on Mon Mar  7 13:11:27 2016
 
 
 from control import libnidaqmx
-#import libnidaqmx
 import numpy as np
 import time
 from numpy import arange
@@ -56,12 +55,12 @@ class SignalGenerator(QtCore.QObject):
     Also initiates the devive and created necessary channels and task. Fcn Generate() connatenated the
     and writes to task. Then the task is started. Fcn Stop() stops the task. """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, device, *args, **kwargs):
         super(QtCore.QObject, self).__init__(*args, **kwargs)
 
         self.TimeBase = r'100kHzTimeBase'
         self.nSamples = None
-        self.nidaq = libnidaqmx.Device('Dev1')
+        self.nidaq = device
         self.nidaq.reset()
         
         self.digtask = libnidaqmx.DigitalOutputTask('dtask')
@@ -95,7 +94,7 @@ class SignalGenerator(QtCore.QObject):
       
         
 class GraphFrame(pg.GraphicsWindow):
-    """Class is child of pg.GraphicsWindow and created the plot that plots the preview of the pulses. 
+    """Class is child of pg.GraphicsWindow and creats the plot that plots the preview of the pulses. 
     Fcn update() updates the plot of "device" with signal "signal"  """
 
     def __init__(self, *args, **kwargs):
@@ -203,12 +202,20 @@ class SignalFrame(QtGui.QFrame):
       
 class SigGenWidget(QtGui.QFrame):
     """ Class defines the parent widget. Containt SignalFrames for four signals and the GraphFrame. """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, device, *args, **kwargs):
 
         super().__init__(*args, **kwargs)
         
+#        data = np.ones(1000)
+#        data[range(0, 1000)] = 1
+#        #data[range(501, 1000)] = 0.2
+#        task = libnidaqmx.AnalogOutputTask()
+#        task.create_voltage_channel('Dev1/ao0', min_val=-10.0, max_val=10.0)
+#        task.configure_timing_sample_clock(rate = 1000.0)
+#        task.write(data)                
+        
         self.running = False
-        self.generator = SignalGenerator()
+        self.generator = SignalGenerator(device)
         self.Cycletimelabel = QtGui.QLabel('Cycletime (ms): ')
         self.Cycletimeedit = QtGui.QLineEdit('100')
         

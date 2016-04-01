@@ -29,11 +29,13 @@ from lantz import Q_
 
 # tormenta imports
 import control.lasercontrol as lasercontrol
-#import control.SignalGen as SignalGen
+import control.SignalGen as SignalGen
+import control.Scan as Scan
 import control.focus as focus
 import control.molecules_counter as moleculesCounter
 import control.ontime as ontime
 import control.guitools as guitools
+from control import libnidaqmx
 
 #Widget to control image or sequence recording. Recording only possible when liveview active.
 #StartRecording called when "Rec" presset. Creates recording thread with RecWorker, recording is then 
@@ -48,11 +50,15 @@ class RecordingWidget(QtGui.QFrame):
         self.dataname = 'data'      # In case I need a QLineEdit for this
         try:
             startdir = r'C:\Users\andreas.boden\Documents\Data\DefaultDataFolder\%s'
+            newfolderpath =  startdir % time.strftime('%Y-%m-%d')
+            if not os.path.exists(newfolderpath):
+                os.mkdir(newfolderpath)
         except:
             startdir = r'C:\Users\TestaRES\Documents\Data\DefaultDataFolder\%s'
-        newfolderpath =  startdir % time.strftime('%Y-%m-%d')
-        if not os.path.exists(newfolderpath):
-            os.mkdir(newfolderpath)
+            newfolderpath =  startdir % time.strftime('%Y-%m-%d')
+            if not os.path.exists(newfolderpath):
+                os.mkdir(newfolderpath)
+
             
         self.initialDir = newfolderpath
         
@@ -622,7 +628,6 @@ class TormentaGUI(QtGui.QMainWindow):
         super().__init__(*args, **kwargs)
 
         self.orcaflash = orcaflash
-        self.orcaflash.setPropertyValue("exposure_time", 0.001)
         self.shape = (self.orcaflash.getPropertyValue('image_height')[0], self.orcaflash.getPropertyValue('image_width')[0])
         self.frameStart = (0, 0)
         self.bluelaser = bluelaser
@@ -630,6 +635,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.uvlaser = uvlaser
         self.scanZ = scanZ
         self.daq = daq
+        self.nidaq = libnidaqmx.Device('Dev1')
         
         self.filewarning = FileWarning()
 
@@ -929,10 +935,17 @@ scaleSnap=True, translateSnap=True)
         laserDock.addWidget(self.laserWidgets)
         dockArea.addDock(laserDock, 'above', moleculesDock)
         
+        
+        # Signal generation widget
         signalDock = Dock('Signal Generator')
-#        self.signalWidget = SignalGen.SigGenWidget()
-#        signalDock.addWidget(self.signalWidget)
+        self.signalWidget = SignalGen.SigGenWidget(self.nidaq)
+        signalDock.addWidget(self.signalWidget)
         dockArea.addDock(signalDock, 'above', laserDock)
+        
+        scanDock = Dock('Scan')
+        self.scanWidget = Scan.ScanWidget(self.nidaq)
+        scanDock.addWidget(self.scanWidget)
+        dockArea.addDock(scanDock, 'above', laserDock)
         
 
         self.setWindowTitle('Tempesta')
@@ -1060,9 +1073,11 @@ scaleSnap=True, translateSnap=True)
     def ChangeTriggerSource(self):
         
         if self.trigsourceparam.value() == 'Internal trigger':
+            print('Changing to internal trigger')
             self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_source', 1))
             
         elif self.trigsourceparam.value() == 'External trigger':
+            print('Changing to external trigger')
             self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_source', 2))
         else:
             pass
@@ -1165,6 +1180,7 @@ scaleSnap=True, translateSnap=True)
 
         self.updateTimings()
         self.recWidget.filesizeupdate()
+        self.ROI.hide()
 
     def updateFrame(self):
         """ Method to change the image frame size and position in the sensor
@@ -1351,7 +1367,7 @@ scaleSnap=True, translateSnap=True)
     def liveviewRun(self):
         
         self.orcaflash.startAcquisition()
-        time.sleep(0.3)
+#        time.sleep(0.3)
         self.viewtimer.start(0)
     
     def liveviewPause(self):
@@ -1397,11 +1413,12 @@ scaleSnap=True, translateSnap=True)
 #        self.andor.shutter(0, 2, 0, 0, 0)
         self.orcaflash.shutdown()
         self.daq.flipper = True
-        if self.signalWidget.running:
-            self.signalWidget.StartStop()
+#        if self.signalWidget.running:
+#            self.signalWidget.StartStop()
 
+        self.nidaq.reset()        
         self.laserWidgets.closeEvent(*args, **kwargs)
         self.focusWidget.closeEvent(*args, **kwargs)
-        self.signalWidget.closeEvent(*args, **kwargs)
+#        self.signalWidget.closeEvent(*args, **kwargs)
 
         super().closeEvent(*args, **kwargs)

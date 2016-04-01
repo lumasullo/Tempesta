@@ -22,6 +22,7 @@ import ctypes
 import ctypes.util
 import warnings
 from inspect import getargspec
+import time
 
 ########################################################################
 
@@ -261,10 +262,10 @@ def CALL(name, *args):
     for a in args:
         if isinstance(a, str):
             print(name, 'argument', a, 'is unicode', file=sys.stderr)
-            new_args.append (bytes(a, encoding='utf-8'))
+            new_args.append(bytes(a, encoding='utf-8'))
         else:
-            new_args.append (a)
-    # pylint: disable=star-args
+            new_args.append(a)
+#    pylint: disable=star-args
     r = func(*new_args)
     r = CHK(r, funcname, *new_args)
     return r
@@ -643,7 +644,7 @@ class Device(str):
         Stops and deletes all tasks on a device and resets outputs to their defaults
         calls  int32 DAQmxResetDevice (const char deviceName[]);
         """
-        return CALL('ResetDevice',self)
+        return CALL('ResetDevice', self)
 
 
 class System(object):
@@ -3233,7 +3234,7 @@ class AnalogOutputTask (Task):
         r = CALL('CreateAOVoltageChan', self, phys_channel, channel_name,
                  float64(min_val), float64(max_val), units_val, custom_scale_name)
         self._set_channel_type(self.get_channel_type(channel_name))
-        return r==0    
+        r==0    
 
     def write(self, data,
               auto_start=True, timeout=10.0, layout='group_by_scan_number'):
@@ -3618,6 +3619,7 @@ class DigitalOutputTask(DigitalTask):
         layout_val = self._get_map_value('layout', layout_map, layout)
         samples_written = int32(0)
 
+#        print(np.ones(1))               #This line only fixes the problem...
         number_of_channels = self.get_number_of_channels()
 
         # pylint: disable=no-member
@@ -3628,8 +3630,8 @@ class DigitalOutputTask(DigitalTask):
         # pylint: enable=no-member
         
         data, samples_per_channel = self._reshape_data(data, layout)
-
-        CALL('WriteDigitalLines', self, samples_per_channel, 
+        print('data.ctypes.data in digital write ', data.ctypes.data)
+        CALL('WriteDigitalLines', self, int32(samples_per_channel), 
              bool32(auto_start),
              float64(timeout), layout_val, 
              data.ctypes.data, ctypes.byref(samples_written), None)
