@@ -65,10 +65,10 @@ class SignalGenerator(QtCore.QObject):
         
         self.digtask = libnidaqmx.DigitalOutputTask('dtask')
             
-        self.digtask.create_channel('Dev1/port0/line2', '355')
-        self.digtask.create_channel('Dev1/port0/line0', '405')
-        self.digtask.create_channel('Dev1/port0/line1', '488')
-        self.digtask.create_channel('Dev1/port0/line3', 'dchannel4')
+        self.digtask.create_channel('Dev1/port0/line0', 'TiSa')
+        self.digtask.create_channel('Dev1/port0/line2', '405')
+        self.digtask.create_channel('Dev1/port0/line3', '488')
+        self.digtask.create_channel('Dev1/port0/line4', 'dchannel4')
             
         
         self.signal355 = Signal()
@@ -103,9 +103,9 @@ class GraphFrame(pg.GraphicsWindow):
         
         self.plot = self.addPlot(row=1, col=0)
         self.plot.showGrid(x=False, y=False)
-        self.plotsig355 = self.plot.plot(pen='b')
-        self.plotsig405 = self.plot.plot(pen='g')
-        self.plotsig488 = self.plot.plot(pen='r')
+        self.plotsig355 = self.plot.plot(pen=pg.mkPen(100, 0, 0))
+        self.plotsig405 = self.plot.plot(pen=pg.mkPen(73, 0, 188))
+        self.plotsig488 = self.plot.plot(pen=pg.mkPen(0, 247, 255))
         self.plotsigCam = self.plot.plot(pen='w')
         
     def update(self, device, signal):
@@ -225,7 +225,7 @@ class SigGenWidget(QtGui.QFrame):
 #        self.sig1frame = SignalFrame('X')
 #        self.sig2frame = SignalFrame('Y') 
 #        self.sig3frame = SignalFrame('Z') 
-        self.sig4frame = SignalFrame(self, '355', 'TTL 355') 
+        self.sig4frame = SignalFrame(self, '355', 'TTL TiSa') 
         self.sig5frame = SignalFrame(self, '405', 'TTL 405')
         self.sig6frame = SignalFrame(self, '488', 'TTL 488')
         self.sig7frame = SignalFrame(self, 'Cam', 'Camera')        

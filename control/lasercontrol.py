@@ -167,7 +167,7 @@ class LaserControl(QtGui.QFrame):
                 grid.addWidget(self.digimodButton, 6, 0)
                 self.digimodButton.toggled.connect(self.digitalMod)
                 # Initial values
-                self.digimodButton.setChecked(False)
+#                self.digimodButton.setChecked(False)
 
         # Connections
         self.enableButton.toggled.connect(self.toggleLaser)

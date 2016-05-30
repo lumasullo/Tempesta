@@ -24,6 +24,8 @@ import warnings
 from inspect import getargspec
 import time
 
+print("HELLOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+
 ########################################################################
 
 __all__ = [
@@ -2689,6 +2691,7 @@ class Task(uInt32):
           success_status : bool
 
         """
+#        print(np.ones(1))               #This line only fixes the problem...
         return CALL('WaitUntilTaskDone', self, float64 (timeout))==0
 
     def get_read_relative_to(self):
@@ -3630,7 +3633,6 @@ class DigitalOutputTask(DigitalTask):
         # pylint: enable=no-member
         
         data, samples_per_channel = self._reshape_data(data, layout)
-        print('data.ctypes.data in digital write ', data.ctypes.data)
         CALL('WriteDigitalLines', self, int32(samples_per_channel), 
              bool32(auto_start),
              float64(timeout), layout_val, 

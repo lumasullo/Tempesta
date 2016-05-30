@@ -67,9 +67,9 @@ class MockHamamatsu(Driver):
         self.camera_id = 9999
         self.camera_model = 'Mock Hamamatsu camera'
         self.debug = False
-        self.frame_bytes = 0
-        self.frame_x = 0
-        self.frame_y = 0
+        self.frame_x = 500
+        self.frame_y = 500
+        self.frame_bytes = self.frame_x*self.frame_y*2
         self.last_frame_number = 0
         self.properties = {}
         self.max_backlog = 0
@@ -100,6 +100,8 @@ class MockHamamatsu(Driver):
         # Get camera max width, height.
         self.max_width = self.getPropertyValue("image_width")[0]
         self.max_height = self.getPropertyValue("image_height")[0]
+        
+        
 
     ## captureSetup
     #
@@ -259,7 +261,7 @@ class MockHamamatsu(Driver):
     def newFrames(self):
 
         # Create a list of the new frames.
-        new_frames = [9999, 9999, 9999]
+        new_frames = [0]
 
         return new_frames
 
@@ -314,7 +316,16 @@ class MockHamamatsu(Driver):
     #
     def startAcquisition(self):
         self.captureSetup()
-        pass
+        n_buffers = int((2.0 * 1024 * 1024 * 1024)/self.frame_bytes)
+        self.number_image_buffers = n_buffers
+
+        self.hcam_data = []
+        for i in range(1,2):
+            hc_data = HMockCamData(self.frame_x*self.frame_y)
+            self.hcam_data.append(hc_data)
+        
+        print('size of hcam_data = ', np.size(self.hcam_data))
+
 
     ## stopAcquisition
     #

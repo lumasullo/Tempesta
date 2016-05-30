@@ -1,2 +1,0 @@
-160211
-Some changes made in hamamatsu_camera.py in setPropertyValue and setSubArrayMode. Changes described above function as comments.

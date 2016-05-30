@@ -155,9 +155,8 @@ class RecordingWidget(QtGui.QFrame):
         recGrid.addWidget(self.specifyTime, 5, 0, 1, 5)
         recGrid.addWidget(self.currentTime, 5, 1)
         recGrid.addWidget(self.timeToRec, 5, 2)
-        recGrid.addWidget(self.tRemaining, 5, 4, 1, 2)
+        recGrid.addWidget(self.tRemaining, 5, 3, 1, 2)
         recGrid.addWidget(self.progressBar, 5, 4, 1, 2)
-        recGrid.addWidget(self.tRemaining, 4, 3, 1, 2)
         recGrid.addWidget(buttonWidget, 6, 0, 1, 0)
 
         recGrid.setColumnMinimumWidth(0, 70)
@@ -328,7 +327,7 @@ class RecordingWidget(QtGui.QFrame):
             savename = guitools.getUniqueName(savename)
 #            tiff.imsave(savename, np.flipud(image.astype(np.uint16)),
 #                        description=self.dataname, software='Tormenta')
-            tiff.imsave(savename, self.main.image.astype(np.uint16),
+            tiff.imsave(savename, self.main.latest_image.astype(np.uint16),
                         description=self.dataname, software='Tormenta')
             guitools.attrsToTxt(os.path.splitext(savename)[0], self.getAttrs())
 
@@ -351,7 +350,7 @@ class RecordingWidget(QtGui.QFrame):
         self.currentFrame.setText(str(nframe) + ' /')
         self.currentTime.setText(str(int(eSecs)) + ' /')
         self.progressBar.setValue(100*(1 - rSecs / (eSecs + rSecs)))
-        self.main.img.setImage(self.worker.liveImage, autoLevels=False)
+#        self.main.img.setImage(self.worker.liveImage, autoLevels=False)
 
 # This funciton is called when "Rec" button is pressed. 
 
@@ -370,13 +369,13 @@ class RecordingWidget(QtGui.QFrame):
                 self.recButton.setText('STOP')
                 self.main.tree.writable = False # Sets camera parameters to not be writable during recording.
                 self.main.liveviewButton.setEnabled(False)
-                self.main.liveviewPause() # Stops liveview from updating
+#                self.main.liveviewStop() # Stops liveview from updating
 
                 self.savename = (os.path.join(folder, self.getFileName()) + '_rec.hdf5') # Sets name for final output file
                 self.savename = guitools.getUniqueName(self.savename) # If same  filename exists it is appended by (1) or (2) etc.
                 self.startTime = ptime.time() # Saves the time when started to calculate remaining time.
 
-                self.worker = RecWorker(self.main.orcaflash, self.getRecTime(), self.main.shape,  #Creates an instance of RecWorker class.
+                self.worker = RecWorker(self.main.orcaflash, self.getRecTime(), self.main.shape, self.main.lvworker,  #Creates an instance of RecWorker class.
                                         self.main.RealExpPar, self.savename,
                                         self.dataname, self.getAttrs())
                 self.worker.updateSignal.connect(self.updateGUI)    # Connects the updatesignal that is continously emitted from recworker to updateGUI function.
@@ -408,8 +407,9 @@ class RecordingWidget(QtGui.QFrame):
         self.recButton.setText('REC')
         self.recButton.setChecked(False)
         self.main.tree.writable = True
+        self.main.orcaflash.startAcquisition()
         self.main.liveviewButton.setEnabled(True)
-        self.main.liveviewRun()
+#        self.main.liveviewStart()
         self.progressBar.setValue(0)
         self.currentTime.setText('0 /')
         self.currentFrame.setText('0 /')
@@ -420,54 +420,88 @@ class RecWorker(QtCore.QObject):
     updateSignal = QtCore.pyqtSignal()
     doneSignal = QtCore.pyqtSignal()
 
-    def __init__(self, orcaflash, timetorec, shape, t_exp, savename, dataname, attrs,
+    def __init__(self, orcaflash, timetorec, shape, lvworker, t_exp, savename, dataname, attrs,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.orcaflash = orcaflash
         self.timetorec = timetorec
         self.shape = shape # Shape of one frame
+        self.lvworker = lvworker
         self.t_exp = t_exp
         self.savename = savename
         self.dataname = dataname
         self.attrs = attrs
         self.pressed = True
 
+
     def start(self):
-        
-        self.timerecorded = 0
-        self.orcaflash.startAcquisition()
-        time.sleep(0.1)
-
-        self.starttime = time.time()
-        f_count = 0
-        while self.timerecorded < self.timetorec and self.pressed:
-            self.timerecorded = time.time() - self.starttime
-            f_count = f_count + np.size(self.orcaflash.newFrames())
-            self.liveImage = self.orcaflash.hcam_data[f_count-2].getData()
-            self.liveImage = np.reshape(self.liveImage, (self.orcaflash.frame_x, self.orcaflash.frame_y), order='F')
-
-            self.updateSignal.emit()
+        self.orcaflash.stopAcquisition()
+        for k in range(0, 1):
+            print('Round :', k)
+            self.timerecorded = 0
+            self.orcaflash.startAcquisition()
+            time.sleep(0.1)
+            print('self.lvworker.f_count = ', self.lvworker.f_count)
+            last_f = self.lvworker.f_count
+            if last_f == None:
+                start_f = 0 
+                print('f_count was None so set to : ', start_f)
+            else:
+                start_f = last_f + 1 # index of first frame is one more then provious frame.
+                
+            self.starttime = time.time()
+            print('start_f = ',start_f)        
+    #        f_count = 0
+            while self.timerecorded < self.timetorec and self.pressed:
+                self.timerecorded = time.time() - self.starttime
+    #            f_count = f_count + np.size(self.orcaflash.newFrames()) # In original driver, new_Frames waited for 
+                # new frame before returning value which could cause a freeze here when if aquisition stops before 
+                # recording was finished ie in external trigger mode. This has now been commented out from driver.
+    #            self.liveImage = self.orcaflash.hcam_data[f_count-1].getData()
+    #            self.liveImage = np.reshape(self.liveImage, (self.orcaflash.frame_x, self.orcaflash.frame_y), order='F')
+                time.sleep(0.1)
+                self.updateSignal.emit()
+                
+    #        frames = self.orcaflash.getFrames()
+            self.orcaflash.stopAcquisition()   # To avoid overwriting buffer while saving recording
+            end_f = self.lvworker.f_count # 
+            if end_f == None:
+                end_f = -1
+                
+            if end_f >= start_f - 1:
+                f_range = range(start_f, end_f + 1)
+            else:
+                buffer_size = self.orcaflash.number_image_buffers
+                f_range = np.append(range(start_f, buffer_size), range(0, end_f + 1))
+                
+            print('Start_f = :', start_f)
+            print('End_f = :', end_f)
+            f_count = len(f_range)
+            data = [];
+            for i in f_range:
+                data.append(self.orcaflash.hcam_data[i].getData())
+    
+            datashape = (f_count, self.shape[1], self.shape[0])     # Adapted for ImageJ data read shape
+    
+    #        f_count = len(frames[0])
+    #        for i in range(0, f_count):
+    #            data.append(frames[0][i].getData())
+#            self.savename = (r'E:\Andreas\Noise\GainNoise\Noise\Sixteenth\%s.hdf5' % k)
+            print('Savename = ', self.savename)
+            self.store_file = hdf.File(self.savename, "w")
+            self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
+            dataset = self.store_file[self.dataname]
+    
+                
+            reshapeddata = np.reshape(data, datashape, order='C')
+            dataset[...] = reshapeddata
             
-        self.orcaflash.stopAcquisition()        
-        data = [];
-        for i in range(0, f_count):
-            data.append(self.orcaflash.hcam_data[i].getData())
-        datashape = (f_count, self.shape[1], self.shape[0])     # Adapted for ImageJ data read shape
-        self.store_file = hdf.File(self.savename, "w")
-        self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
-        dataset = self.store_file[self.dataname]
-
-            
-        reshapeddata = np.reshape(data, datashape, order='C')
-        dataset[...] = reshapeddata
-        
-        # Saving parameters
-        for item in self.attrs:
-            if item[1] is not None:
-                dataset.attrs[item[0]] = item[1]
-     
-        self.store_file.close()
-            
+            # Saving parameters
+            for item in self.attrs:
+                if item[1] is not None:
+                    dataset.attrs[item[0]] = item[1]
+         
+            self.store_file.close()
         self.doneSignal.emit()
 
 
@@ -533,7 +567,7 @@ class CamParamTree(ParameterTree):
                   {'name': 'Image frame', 'type': 'group', 'children': [
                       {'name': 'Binning', 'type': 'list', 
                                   'values': [1, 2, 4], 'tip': BinTip},
-{'name': 'Mode', 'type': 'list', 'values': ['Full Widefield', 'Full chip', 'Custom']},
+{'name': 'Mode', 'type': 'list', 'values': ['Full Widefield', 'Full chip', 'Minimal line', 'Custom']},
 {'name': 'X0', 'type': 'int', 'value': 0, 'limits': (0, 2044)},
 {'name': 'Y0', 'type': 'int', 'value': 0, 'limits': (0, 2044)},
 {'name': 'Width', 'type': 'int', 'value': 2048, 'limits': (1, 2048)},
@@ -545,10 +579,13 @@ class CamParamTree(ParameterTree):
                        'value': 0.03, 'limits': (0,
                                                 9999),
                        'siPrefix': True, 'suffix': 's'},
-                      {'name': 'Internal frame interval', 'type': 'float',
-                       'value': 0, 'readonly': True, 'siPrefix': False,
+                      {'name': 'Real exposure time', 'type': 'float',
+                       'value': 0, 'readonly': True, 'siPrefix': True,
                        'suffix': ' s'},
-                      {'name': 'Real accumulation time', 'type': 'float',
+                      {'name': 'Internal frame interval', 'type': 'float',
+                       'value': 0, 'readonly': True, 'siPrefix': True,
+                       'suffix': ' s'},
+                      {'name': 'Readout time', 'type': 'float',
                        'value': 0, 'readonly': True, 'siPrefix': True,
                        'suffix': 's'},
                       {'name': 'Internal frame rate', 'type': 'float',
@@ -590,7 +627,7 @@ class CamParamTree(ParameterTree):
         framePar.param('Y0').setWritable(value)
         framePar.param('Width').setWritable(value)
         framePar.param('Height').setWritable(value)
-#       WARNING: If Apply and New ROI button are included here as are they will emit status changed signal
+#       WARNING: If Apply and New ROI button are included here they will emit status changed signal
         # and their respective functions will be called... -> problems.
         
         timingPar = self.p.param('Timings')
@@ -616,6 +653,49 @@ class CamParamTree(ParameterTree):
         return attrs
 
 
+class LVWorker(QtCore.QObject):
+    
+    def __init__(self, main, orcaflash, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.main = main
+        self.orcaflash = orcaflash
+        self.running = False
+        self.f_count = None
+        
+    def run(self):
+        
+        self.vtimer = QtCore.QTimer()
+        self.vtimer.timeout.connect(self.update)
+        self.running = True
+        self.f_count = None # Should maybe be f_ind
+        self.vtimer.start(30)
+        print('f_count when startd = ',self.f_count)
+        
+    def update(self):
+
+        if self.running:
+            self.f_count = self.orcaflash.newFrames()[-1]
+
+            print('f_count in LVWorker:', self.f_count)
+            frame = self.orcaflash.hcam_data[self.f_count].getData()
+#                rawframes = self.orcaflash.getFrames()
+#                firstframe = rawframes[0][-1].getData() #return A numpy array that contains the camera data. "Circular" indexing makes [-1] return the latest frame
+            self.image = np.reshape(frame, (self.orcaflash.frame_x, self.orcaflash.frame_y), 'F')
+            self.main.latest_image = self.image
+
+        
+    def stop(self):
+        if self.running:
+#            self.vtimer.stop()
+            self.running = False
+            print('Acquisition stopped')
+        else:
+            print('Cannot stop when not running (from LVThread)')
+            
+    def reset(self):
+        self.f_count = None
+        print('LVworker reset, f_count = ', self.f_count)
+
 # The main GUI class.
 
 class TormentaGUI(QtGui.QMainWindow):
@@ -628,6 +708,10 @@ class TormentaGUI(QtGui.QMainWindow):
         super().__init__(*args, **kwargs)
 
         self.orcaflash = orcaflash
+        self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_polarity', 2))
+#        self.orcaflash.setPropertyValue('readout_speed', 1)
+#        self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_mode', 6))
+        self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_active', 2))
         self.shape = (self.orcaflash.getPropertyValue('image_height')[0], self.orcaflash.getPropertyValue('image_width')[0])
         self.frameStart = (0, 0)
         self.bluelaser = bluelaser
@@ -636,6 +720,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.scanZ = scanZ
         self.daq = daq
         self.nidaq = libnidaqmx.Device('Dev1')
+        self.latest_image = np.zeros(self.shape)
         
         self.filewarning = FileWarning()
 
@@ -728,9 +813,12 @@ class TormentaGUI(QtGui.QMainWindow):
         
         # Exposition signals
         timingsPar = self.tree.p.param('Timings')
+        self.EffFRPar = timingsPar.param('Internal frame rate')
         self.expPar = timingsPar.param('Set exposure time')
         self.expPar.sigValueChanged.connect(self.setExposure)
-        self.RealExpPar = timingsPar.param('Internal frame interval')
+        self.ReadoutPar = timingsPar.param('Readout time')
+        self.RealExpPar = timingsPar.param('Real exposure time')
+        self.FrameInt = timingsPar.param('Internal frame interval')
         self.RealExpPar.setOpts(decimals = 5)
         self.setExposure()    # Set default values
         
@@ -1075,10 +1163,15 @@ scaleSnap=True, translateSnap=True)
         if self.trigsourceparam.value() == 'Internal trigger':
             print('Changing to internal trigger')
             self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_source', 1))
+#            self.RealExpPar.Enable(True)
+#            self.EffFRPar.Enable(True)
             
         elif self.trigsourceparam.value() == 'External trigger':
             print('Changing to external trigger')
             self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_source', 2))
+#            self.RealExpPar.Enable(False)
+#            self.EffFRPar.Enable(False)
+            
         else:
             pass
                 
@@ -1127,6 +1220,7 @@ scaleSnap=True, translateSnap=True)
         """ Method to change the exposure time setting
         """
         self.orcaflash.setPropertyValue('exposure_time', self.expPar.value())
+        print('Exp time set to:', self.orcaflash.getPropertyValue('exposure_time'))
 #        self.andor.frame_transfer_mode = self.FTMPar.value()
 #        hhRatesArr = np.array([item.magnitude for item in self.andor.HRRates])
 #        n_hrr = np.where(hhRatesArr == self.HRRatePar.value().magnitude)[0][0]
@@ -1188,6 +1282,10 @@ scaleSnap=True, translateSnap=True)
         print('Update frame called')
         frameParam = self.tree.p.param('Image frame')
         if frameParam.param('Mode').value() == 'Custom':
+            self.X0par.setWritable(True)
+            self.Y0par.setWritable(True)
+            self.Widthpar.setWritable(True)
+            self.Heightpar.setWritable(True)
 
 #            if not(self.customFrameLoaded):
             ROIsize = (int(0.2 * self.vb.viewRect().width()), int(0.2 * self.vb.viewRect().height()))
@@ -1204,10 +1302,14 @@ scaleSnap=True, translateSnap=True)
 #scaleSnap=True, translateSnap=True)
                 
             self.ROIchanged()
-            self.applyParam.setWritable(True)
-            self.NewROIParam.setWritable(True)
             
         else:
+            self.X0par.setWritable(False)
+            self.Y0par.setWritable(False)
+            self.Widthpar.setWritable(False)
+            self.Heightpar.setWritable(False)
+
+            
             if frameParam.param('Mode').value() == 'Full Widefield':
                 self.X0par.setValue(600)
                 self.Y0par.setValue(600)
@@ -1224,6 +1326,16 @@ scaleSnap=True, translateSnap=True)
                 self.Y0par.setValue(0)
                 self.Widthpar.setValue(2048)
                 self.Heightpar.setValue(2048)
+                self.adjustFrame()
+
+                self.ROI.hide()
+                
+            elif frameParam.param('Mode').value() == 'Minimal line':
+                print('Full chip')
+                self.X0par.setValue(0)
+                self.Y0par.setValue(1020)
+                self.Widthpar.setValue(2048)
+                self.Heightpar.setValue(8)
                 self.adjustFrame()
 
                 self.ROI.hide()
@@ -1266,13 +1378,10 @@ scaleSnap=True, translateSnap=True)
         """
 #        timings = self.orcaflash.getPropertyValue('exposure_time') 
 #        self.t_exp_real, self.t_acc_real, self.t_kin_real = timings
-        timingsPar = self.tree.p.param('Timings')
-        RealExpPar = timingsPar.param('Internal frame interval')
-        RealAccPar = timingsPar.param('Real accumulation time')
-        EffFRPar = timingsPar.param('Internal frame rate')
-        self.RealExpPar.setValue(self.orcaflash.getPropertyValue('internal_frame_interval')[0])
-        RealAccPar.setValue(self.orcaflash.getPropertyValue('timing_readout_time')[0])
-        EffFRPar.setValue(self.orcaflash.getPropertyValue('internal_frame_rate')[0])
+        self.RealExpPar.setValue(self.orcaflash.getPropertyValue('exposure_time')[0])
+        self.FrameInt.setValue(self.orcaflash.getPropertyValue('internal_frame_interval')[0])
+        self.ReadoutPar.setValue(self.orcaflash.getPropertyValue('timing_readout_time')[0])
+        self.EffFRPar.setValue(self.orcaflash.getPropertyValue('internal_frame_rate')[0])
 #        RealExpPar.setValue(self.orcaflash.getPropertyValue('exposure_time')[0])
 #        RealAccPar.setValue(self.orcaflash.getPropertyValue('accumulation_time')[0])
 #        EffFRPar.setValue(1 / self.orcaflash.getPropertyValue('accumulation_time')[0])
@@ -1298,7 +1407,11 @@ scaleSnap=True, translateSnap=True)
         else:
             self.liveviewStop()
             
-        
+# Threading below  is done in this way since making LVThread a QThread resulted in QTimer
+# not functioning in the thread. Image is now also saved as latest_image in 
+# TormentaGUI class since setting image in GUI from thread resultet in 
+# issues when interacting with the viewbox from GUI. Maybe due to 
+# simultaious manipulation of viewbox from GUI and thread. 
 
     def liveviewStart(self):
 
@@ -1308,6 +1421,12 @@ scaleSnap=True, translateSnap=True)
         self.updateFrame()
         self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
         self.recWidget.readyToRecord = True
+        self.lvworker = LVWorker(self, self.orcaflash)
+        self.lvthread = QtCore.QThread()
+        self.lvworker.moveToThread(self.lvthread)
+        self.lvthread.started.connect(self.lvworker.run)
+        self.lvthread.start()
+        self.viewtimer.start(30)
         self.liveviewRun()
 #        self.liveviewStarts.emit()
 #
@@ -1344,13 +1463,15 @@ scaleSnap=True, translateSnap=True)
 #        self.crosshairButton.setEnabled(True)
 
     def liveviewStop(self):
+        self.lvworker.stop()
+        self.lvthread.terminate()
         self.viewtimer.stop()
         self.recWidget.readyToRecord = False
 
         # Turn off camera, close shutter
         self.orcaflash.stopAcquisition()
         self.img.setImage(np.zeros(self.shape), autoLevels=False)
-        
+        del self.lvthread
 
 #        self.liveviewEnds.emit()
 
@@ -1365,28 +1486,25 @@ scaleSnap=True, translateSnap=True)
 #        self.
 
     def liveviewRun(self):
-        
+#        self.lvworker.reset() # Needed if parameter is changed during liveview since that causes camera to start writing to buffer place zero again.
         self.orcaflash.startAcquisition()
 #        time.sleep(0.3)
-        self.viewtimer.start(0)
+#        self.viewtimer.start(0)
+#        self.lvthread.run()
+#        self.lvthread.start()
     
     def liveviewPause(self):
         
-        self.viewtimer.stop()
+#        self.lvworker.stop()
+#        self.viewtimer.stop()
         self.orcaflash.stopAcquisition()
 
     def updateView(self):
         """ Image update while in Liveview mode
         """
 
-        rawframes = self.orcaflash.getFrames()
+        self.img.setImage(self.latest_image, autoLevels=False, autoDownsample = False) 
 
-        firstframe = rawframes[0][-1].getData() #"Circular indexing" makes [-1] return the latest frame
-        self.image = np.reshape(firstframe, (self.orcaflash.frame_x, self.orcaflash.frame_y), order='F')
-
-        self.img.setImage(self.image, autoLevels=False, autoDownsample = False) 
-
-        self.updateTimings()
 
 
     def fpsMath(self):
@@ -1406,7 +1524,11 @@ scaleSnap=True, translateSnap=True)
         self.viewtimer.stop()
 #        self.stabilizer.timer.stop()
 #        self.stabilizerThread.terminate()
-
+        try:
+            self.lvthread.terminate()
+        except:
+            pass
+            
         # Turn off camera, close shutter and flipper
 #        if self.andor.status != 'Camera is idle, waiting for instructions.':
 #            self.andor.abort_acquisition()
