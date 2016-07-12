@@ -384,11 +384,18 @@ class Scanner(QtCore.QObject):
         final_y = self.stage_scan.sig_dict['y_sig'][written_samps - 1]
         final_samps = [final_x, final_y]
         
+#        Following code should correct channels mentioned in Buglist.
+#        final_samps = [0, 0]
+#        final_samps[self.current_aochannels['x']] = final_x
+#        final_samps[self.current_aochannels['y']] = final_y        
+        
         return_ramps = np.array([])
         for i in range(0,2):
             ramp_and_k = make_ramp(final_samps[i], 0, self.stage_scan.sample_rate)
             return_ramps = np.append(return_ramps, ramp_and_k[0])
-            
+        
+                
+        
         magic = np.ones(100)  # Seems to decrease frequency of Invalid task errors.            
             
         self.aotask.stop()    

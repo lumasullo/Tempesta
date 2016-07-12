@@ -593,7 +593,7 @@ class CamParamTree(ParameterTree):
                        'suffix': ' fps'}]}, 
                        {'name': 'Acquisition mode', 'type': 'group', 'children': [
                       {'name': 'Trigger source', 'type': 'list',
-                       'values': ['Internal trigger', 'External trigger'],
+                       'values': ['Internal trigger', 'External "Start-trigger"', 'External "frame-trigger"'],
                        'siPrefix': True, 'suffix': 's'}]}]
 
         self.p = Parameter.create(name='params', type='group', children=params)
@@ -676,12 +676,17 @@ class LVWorker(QtCore.QObject):
         if self.running:
             self.f_count = self.orcaflash.newFrames()[-1]
 
-            print('f_count in LVWorker:', self.f_count)
+#            print('f_count in LVWorker:', self.f_count)
+#            print(self.orcaflash.getPropertyValue('trigger_mode'))
+#            print(self.orcaflash.getPropertyValue('trigger_source'))
             frame = self.orcaflash.hcam_data[self.f_count].getData()
 #                rawframes = self.orcaflash.getFrames()
 #                firstframe = rawframes[0][-1].getData() #return A numpy array that contains the camera data. "Circular" indexing makes [-1] return the latest frame
             self.image = np.reshape(frame, (self.orcaflash.frame_x, self.orcaflash.frame_y), 'F')
             self.main.latest_image = self.image
+            trigger_source = self.orcaflash.getPropertyValue('trigger_source')[0]
+            if trigger_source == 1:
+                self.main.trigsourceparam.setValue(0)
 
         
     def stop(self):
@@ -1166,11 +1171,18 @@ scaleSnap=True, translateSnap=True)
 #            self.RealExpPar.Enable(True)
 #            self.EffFRPar.Enable(True)
             
-        elif self.trigsourceparam.value() == 'External trigger':
-            print('Changing to external trigger')
+        elif self.trigsourceparam.value() == 'External "Start-trigger"':
+            print('Changing to external start trigger')
             self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_source', 2))
+            self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_mode', 6))
+            print(self.orcaflash.getPropertyValue('trigger_mode'))
 #            self.RealExpPar.Enable(False)
 #            self.EffFRPar.Enable(False)
+        
+        elif self.trigsourceparam.value() == 'External "frame-trigger"':
+            print('Changing to external trigger')
+            self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_source', 2))
+            self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_mode', 1))
             
         else:
             pass
