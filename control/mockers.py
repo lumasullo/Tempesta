@@ -439,3 +439,31 @@ class MockCamera(Driver):
     @frame_transfer_mode.setter
     def frame_transfer_mode(self, state):
         self.ftm_state = state
+        
+class MockSLM(object):
+
+    def __init__(self,monitor = 1, isImageLock = False):
+        super(MockSLM).__init__()
+        print('Simulated SLM')
+        
+        def getSize():
+            return((792,600))
+            
+        def updateArray(mask):
+            pass
+        
+        def close(self):
+            pass
+
+    def start(self):
+        pass
+
+    def get_image(self):
+        arr = (100 * np.random.rand(480, 640)).astype(np.float)
+        return pygame.surfarray.make_surface(arr)
+
+    def read(self):
+        return self.get_image()        
+        
+    def stop(self):
+        pass

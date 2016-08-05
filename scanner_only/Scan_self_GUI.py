@@ -5,10 +5,9 @@ Created on Wed Mar 30 10:32:36 2016
 @author: testaRES
 """
 
-try:
-    import libnidaqmx
-except:
-    from control import libnidaqmx
+
+import nidaqmx
+
     
 import numpy as np
 import matplotlib.pyplot as plt
@@ -363,8 +362,8 @@ class Scanner(QtCore.QObject):
         self.samples_in_scan = len(self.stage_scan.sig_dict['x_sig'])
         self.main = main
         
-        self.aotask = libnidaqmx.AnalogOutputTask('aotask')
-        self.dotask = libnidaqmx.DigitalOutputTask('dotask')         
+        self.aotask = nidaqmx.AnalogOutputTask('aotask')
+        self.dotask = nidaqmx.DigitalOutputTask('dotask')         
         
         self.waiter = Wait_Thread(self.aotask)
         
@@ -384,18 +383,11 @@ class Scanner(QtCore.QObject):
         final_y = self.stage_scan.sig_dict['y_sig'][written_samps - 1]
         final_samps = [final_x, final_y]
         
-#        Following code should correct channels mentioned in Buglist.
-#        final_samps = [0, 0]
-#        final_samps[self.current_aochannels['x']] = final_x
-#        final_samps[self.current_aochannels['y']] = final_y        
-        
         return_ramps = np.array([])
         for i in range(0,2):
             ramp_and_k = make_ramp(final_samps[i], 0, self.stage_scan.sample_rate)
             return_ramps = np.append(return_ramps, ramp_and_k[0])
-        
-                
-        
+            
         magic = np.ones(100)  # Seems to decrease frequency of Invalid task errors.            
             
         self.aotask.stop()    
@@ -528,7 +520,7 @@ class LaserCycle():
         self.current_dochannels = curren_dochannels
         
     def run(self):
-        self.dotask = libnidaqmx.DigitalOutputTask('dotask') 
+        self.dotask = nidaqmx.DigitalOutputTask('dotask') 
         
         full_do_signal = []
         temp_dochannels = copy.copy(self.current_dochannels)
@@ -806,5 +798,5 @@ def distance_to_voltage_X(D_signal):
     
     
 if __name__ == '__main__':
-    ScanWid = ScanWidget(libnidaqmx.Device('Dev1'))
+    ScanWid = ScanWidget(nidaqmx.Device('Dev1'))
 #    ScanWid.update_Scan()

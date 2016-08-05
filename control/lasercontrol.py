@@ -47,9 +47,9 @@ class LaserWidget(QtGui.QFrame):
                                        daq=self.daq, port=0)
 
         self.violetControl = LaserControl(self.violetlaser,
-                                        '<h3>Cobolt 405nm</h3>',
-                                        color=(73, 0, 188), prange=(0, 200),
-                                        tickInterval=5, singleStep=0.1)
+                                        self.violetlaser.idn,
+                                        color=(255, 0, 0),
+                                        tickInterval=5, singleStep=0.1,modulable=False)
 
         self.uvControl = LaserControl(self.uvlaser,
                                          '<h3>Cobolt 355nm</h3>',
@@ -107,7 +107,7 @@ class LaserWidget(QtGui.QFrame):
 
 class LaserControl(QtGui.QFrame):
 
-    def __init__(self, laser, name, color, prange, tickInterval, singleStep,
+    def __init__(self, laser, name, color, tickInterval, singleStep, prange=None,
                  daq=None, port=None, invert=True, modulable=True, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
@@ -123,7 +123,7 @@ class LaserControl(QtGui.QFrame):
         self.powerIndicator = QtGui.QLineEdit('{:~}'.format(self.laser.power))
         self.powerIndicator.setReadOnly(True)
         self.powerIndicator.setFixedWidth(100)
-        self.setPointEdit = QtGui.QLineEdit(str(self.laser.power_sp.magnitude))
+        self.setPointEdit = QtGui.QLineEdit(str(round(self.laser.power_sp.magnitude,3) ))
         self.setPointEdit.setFixedWidth(100)
         self.enableButton = QtGui.QPushButton('ON')
         self.enableButton.setFixedWidth(100)
@@ -133,7 +133,8 @@ class LaserControl(QtGui.QFrame):
         self.name.setStyleSheet(style)
         if self.laser.enabled:
             self.enableButton.setChecked(True)
-
+        if(prange is None):
+            prange=(0,self.laser.power.magnitude)
         self.maxpower = QtGui.QLabel(str(prange[1]))
         self.maxpower.setAlignment(QtCore.Qt.AlignCenter)
         self.slider = QtGui.QSlider(QtCore.Qt.Vertical, self)
@@ -214,7 +215,7 @@ class LaserControl(QtGui.QFrame):
 
     def changeSlider(self, value):
         self.laser.power_sp = self.slider.value() * self.mW
-        self.setPointEdit.setText(str(self.laser.power_sp.magnitude))
+        self.setPointEdit.setText(str(round(self.laser.power_sp.magnitude,3)))
 
     def changeEdit(self):
         self.laser.power_sp = float(self.setPointEdit.text()) * self.mW

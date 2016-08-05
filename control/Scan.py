@@ -54,6 +54,7 @@ class ScanWidget(QtGui.QFrame):
         self.aochannels = device.get_analog_output_channels()
         self.dochannels = device.get_digital_output_lines()
         
+        #Creation of the Widget's layout
         self.widthPar = QtGui.QLineEdit('1')
         self.widthPar.editingFinished.connect(lambda: self.ScanParameterChanged('width'))
         self.heightPar = QtGui.QLineEdit('1')
@@ -279,8 +280,8 @@ class ScanWidget(QtGui.QFrame):
         self.samples_in_scan = len(self.stage_scan.sig_dict['x_sig'])
         self.nidaq.reset()
         
-        aotask = libnidaqmx.AnalogOutputTask('aotask')
-        dotask = libnidaqmx.DigitalOutputTask('dotask')  
+        aotask = libnidaqmx.AnalogOutputTask()
+        dotask = libnidaqmx.DigitalOutputTask()  
         
         
         full_ao_signal = []
@@ -604,8 +605,9 @@ def make_ramp(start, end, samples):
     
     
 if __name__ == '__main__':
-    ScanWid = ScanWidget(libnidaqmx.Device('Dev1'))
-    ScanWid.update_Scan()
+    dev=libnidaqmx.Device('Dev1')
+    ScanWid = ScanWidget(dev)
+    ScanWid.update_Scan(dev)
     ScanWid.RunScan()
     
     

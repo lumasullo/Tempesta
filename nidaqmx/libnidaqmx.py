@@ -9,10 +9,10 @@
 # pylint: disable=C,R
 
 """
-See http://pylibnidaqmx.googlecode.com/
+See https://github.com/pearu/pylibnidaqmx
 """
 
-
+from __future__ import print_function, division, unicode_literals, absolute_import
 
 import os
 import sys
@@ -22,7 +22,6 @@ import ctypes
 import ctypes.util
 import warnings
 from inspect import getargspec
-import time
 
 ########################################################################
 
@@ -170,7 +169,7 @@ def _convert_header(header_name, header_module_name):
                 print(name, value, file=sys.stderr)
 
         # DAQmxSuccess is not renamed, because it's unused and I'm lazy.
-        _d = {k.replace("DAQmx_", ""): v for k,v in list(d.items())}
+        _d = {k.replace("DAQmx_", ""): v for k,v in d.items()}
                  
     try:
         path = os.path.dirname(os.path.abspath (__file__))
@@ -262,10 +261,10 @@ def CALL(name, *args):
     for a in args:
         if isinstance(a, str):
             print(name, 'argument', a, 'is unicode', file=sys.stderr)
-            new_args.append(bytes(a, encoding='utf-8'))
+            new_args.append (bytes(a, encoding='utf-8'))
         else:
-            new_args.append(a)
-#    pylint: disable=star-args
+            new_args.append (a)
+    # pylint: disable=star-args
     r = func(*new_args)
     r = CHK(r, funcname, *new_args)
     return r
@@ -330,7 +329,7 @@ def make_pattern(paths, _main=True):
                 #assert slst == range(slst[0], slst[-1]+1), repr((slst, lst))
                 if len (slst)==1:
                     r.append(str (slst[0]))
-                elif slst == list(range(slst[0], slst[-1]+1)):
+                elif slst == range (slst[0], slst[-1]+1):
                     r.append('%s:%s' % (slst[0],slst[-1]))
                 else:
                     return None
@@ -465,7 +464,7 @@ class Device(str):
             buf_size = default_buf_size
         buf = ctypes.create_string_buffer(b'\000' * buf_size)
         CALL ('GetDevDILines', self, ctypes.byref (buf), buf_size)
-        names = [n.strip() for n in buf.value.split(',') if n.strip()]
+        names = [n.strip() for n in buf.value.decode('utf-8').split(',') if n.strip()]
         return names        
 
     def get_digital_input_ports(self, buf_size=None):
@@ -488,7 +487,7 @@ class Device(str):
             buf_size = default_buf_size
         buf = ctypes.create_string_buffer(b'\000' * buf_size)
         CALL ('GetDevDIPorts', self, ctypes.byref (buf), buf_size)
-        names = [n.strip() for n in buf.value.split(',') if n.strip()]
+        names = [n.strip() for n in buf.value.decode('utf-8').split(',') if n.strip()]
         return names        
 
     def get_digital_output_lines(self, buf_size=None):
@@ -557,7 +556,7 @@ class Device(str):
             buf_size = default_buf_size
         buf = ctypes.create_string_buffer(b'\000' * buf_size)
         CALL ('GetDevCIPhysicalChans', self, ctypes.byref (buf), buf_size)
-        names = [n.strip() for n in buf.value.split(',') if n.strip()]
+        names = [n.strip() for n in buf.value.decode('utf-8').split(',') if n.strip()]
         return names        
 
     def get_counter_output_channels (self, buf_size=None):
@@ -641,10 +640,10 @@ class Device(str):
 
     def reset(self):
         """
-        Stops and deletes all tasks on a device and resets outputs to their defaults
+        Stops and deletes all tasks on a device and rests outputs to their defaults
         calls  int32 DAQmxResetDevice (const char deviceName[]);
         """
-        return CALL('ResetDevice', self)
+        return CALL('ResetDevice',self)
 
 
 class System(object):
@@ -696,7 +695,7 @@ class System(object):
         buf_size = default_buf_size
         buf = ctypes.create_string_buffer(b'\000' * buf_size)
         CALL ('GetSysDevNames', ctypes.byref (buf), buf_size)
-        names = [Device(n.strip()) for n in buf.value.split(',') if n.strip()]
+        names = [Device(n.strip()) for n in buf.value.decode('utf-8').split(',') if n.strip()]
         return names
 
     @property
@@ -897,7 +896,7 @@ class Task(uInt32):
         val = map_.get(key)
         if val is None:
             raise ValueError('Expected %s %s but got %r'
-                             % (label, '|'.join(map_.keys()), key))
+                             % (label, '|'.join(map_.viewkeys()), key))
         return val
 
     def _reshape_data(self, data, layout):
@@ -918,6 +917,7 @@ class Task(uInt32):
                 if layout == 'group_by_scan_number':
                     data = data.reshape((samples_per_channel, number_of_channels))
                 else:
+                    print('in else', data.size, number_of_channels)
                     data = data.reshape((number_of_channels, samples_per_channel))
         else:
             assert len(data.shape) == 2, repr(data.shape)
@@ -929,8 +929,7 @@ class Task(uInt32):
                 samples_per_channel = data.shape[-1]
 
         return data, samples_per_channel
-    
-    
+
     def get_number_of_channels(self):
         """
         Indicates the number of virtual channels in the task.
@@ -959,7 +958,6 @@ class Task(uInt32):
         buf = ctypes.create_string_buffer(b'\000' * buf_size)
         CALL('GetTaskChannels', self, ctypes.byref(buf), buf_size)
         names = [n.strip() for n in buf.value.decode('utf-8').split(',') if n.strip()]
-        
         n = self.get_number_of_channels()
         assert len(names)==n,repr((names, n))
         return names
@@ -2689,7 +2687,6 @@ class Task(uInt32):
           success_status : bool
 
         """
-#        print(np.ones(1))               #This line only fixes the problem...
         return CALL('WaitUntilTaskDone', self, float64 (timeout))==0
 
     def get_read_relative_to(self):
@@ -3235,7 +3232,7 @@ class AnalogOutputTask (Task):
         r = CALL('CreateAOVoltageChan', self, phys_channel, channel_name,
                  float64(min_val), float64(max_val), units_val, custom_scale_name)
         self._set_channel_type(self.get_channel_type(channel_name))
-        r==0    
+        return r==0    
 
     def write(self, data,
               auto_start=True, timeout=10.0, layout='group_by_scan_number'):
@@ -3620,7 +3617,6 @@ class DigitalOutputTask(DigitalTask):
         layout_val = self._get_map_value('layout', layout_map, layout)
         samples_written = int32(0)
 
-#        print(np.ones(1))               #This line only fixes the problem...
         number_of_channels = self.get_number_of_channels()
 
         # pylint: disable=no-member
@@ -3631,7 +3627,8 @@ class DigitalOutputTask(DigitalTask):
         # pylint: enable=no-member
         
         data, samples_per_channel = self._reshape_data(data, layout)
-        CALL('WriteDigitalLines', self, int32(samples_per_channel), 
+
+        CALL('WriteDigitalLines', self, samples_per_channel, 
              bool32(auto_start),
              float64(timeout), layout_val, 
              data.ctypes.data, ctypes.byref(samples_written), None)
@@ -4202,6 +4199,7 @@ class CounterOutputTask(Task):
         ----------
 
         counter : str
+
           The name of the counter to use to create virtual
           channels. You can specify a list or range of physical
           channels.
@@ -4514,27 +4512,26 @@ SignalEventCallback_map = dict(AI=ctypes.CFUNCTYPE (int32, AnalogInputTask, int3
 
 def main():
     #_test_make_pattern()
-
-    nidaq = Device('PCI6731')
-    b = nidaq.get_product_type()
-    print(b)
-    c = nidaq.get_analog_output_channels()
-    print(c)
-
-
-#    t = AnalogInputTask('measure voltage')
-#    t.create_voltage_channel('PCI6731/AI0', 'measure')
-#    t.configure_timing_sample_clock()
+    pass
+#    nidaq = Device('PCI6731')
+#    b = nidaq.get_product_type()
+#    print(b)
+#    c = nidaq.get_analog_output_channels()
+#    print(c)
 #
-    g = AnalogOutputTask('generate voltage')
-    g.create_voltage_channel('PCI6731/ao1', 'generate')
-    g.write(0.8, timeout=-1)
-    import time
-    time.sleep(5)
-    g.stop()
-#    print(t.get_info_str(global_info=True))
-#    print(g.get_info_str())
+##    t = AnalogInputTask('measure voltage')
+##    t.create_voltage_channel('PCI6731/AI0', 'measure')
+##    t.configure_timing_sample_clock()
+##
+#    g = AnalogOutputTask('generate voltage')
+#    g.create_voltage_channel('PCI6731/ao1', 'generate')
+#    g.write(0.8, timeout=-1)
+#    import time
+#    time.sleep(5)
+#    g.stop()
+##    print(t.get_info_str(global_info=True))
+##    print(g.get_info_str())
     
-#if __name__=='__main__':
-#    main()
+if __name__=='__main__':
+    main()
 

@@ -5,8 +5,7 @@ Created on Mon Mar  7 13:11:27 2016
 @author: Andreas
 """
 
-
-from control import libnidaqmx
+import control.libnidaqmx as libnidaqmx
 import numpy as np
 import time
 from numpy import arange
