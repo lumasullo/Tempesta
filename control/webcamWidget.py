@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Jun 28 12:00:43 2016
-
-@author: aurelien.barbotin
-"""
 
 import numpy as np
 
@@ -13,6 +8,10 @@ import pyqtgraph as pg
 import cv2
 
 class WebcamManager(QtGui.QWidget):
+    """class handling a webcam and displaying its frames on screen
+    
+    :param TempestaGUI main: the main GUI.
+    """
     def __init__(self,main):
         super().__init__()
         self.webcam=cv2.VideoCapture(0)
@@ -65,23 +64,11 @@ class WebcamManager(QtGui.QWidget):
 
 
     def setImage(self,array):
+        """:param numpy.ndarray array: the image to display"""
         self.img.setImage(array.astype(np.float))
 
-
-    def liveviewKey(self):
-
-        if self.liveviewButton.isChecked():
-            self.liveviewStop()
-            self.liveviewButton.setChecked(False)
-
-        else:
-            self.liveviewStart(True)
-            self.liveviewButton.setChecked(True)
-
-    # This is the function triggered by pressing the liveview button
     def liveview(self):
-        """ Image live view
-        """
+        """Method called when the LiveviewButton is pressed. Starts or Stops Liveview."""
         if self.liveviewButton.isChecked():
             self.liveviewStart()
 
@@ -89,10 +76,12 @@ class WebcamManager(QtGui.QWidget):
             self.liveviewStop()
 
     def liveviewStart(self):
+        """Starts liveview"""
         self.lvworker.start()
 
 
     def liveviewStop(self):
+        """Stops Liveview"""
         self.lvworker.stop()
 
 
@@ -107,14 +96,19 @@ class WebcamManager(QtGui.QWidget):
         self.webcam.release()
         
 class LVWorker(QtCore.QThread):
-    """Thread acquiring images from the webcam and sending it to the display widget"""
+    """Thread acquiring images from the webcam and sending it to the display widget
+    
+    :param WebcamManager webcam: the webcam widget using this thread
+    :param cv2.VideoCapture webcam: the opencv instance of the webcam emitting the frames."""
     def __init__(self, main, webcam, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.main = main
         self.webcam = webcam
         self.running = False
-    def run(self):
         
+    def run(self):
+        """Runs the worker. Reads a frame from the webcam every 10ms and sends it to
+        the display with a Qt Signal"""
         self.vtimer = QtCore.QTimer()
 
         self.running = True
@@ -126,7 +120,7 @@ class LVWorker(QtCore.QThread):
             time.sleep(0.01)
 
     def setExposure(self,value):
-        """ Method to change the exposure time setting
+        """ :param float value: the new exposure time parameter
         """
         try:
             exp_time=float(value)
@@ -135,6 +129,7 @@ class LVWorker(QtCore.QThread):
         self.webcam.set(15,exp_time)
         
     def stop(self):
+        """stops the frame acquisition"""
         if self.running:
 #            self.vtimer.stop()
             self.running = False

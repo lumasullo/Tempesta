@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Jun 16 18:19:24 2014
-
-@authors: Federico Barabas, Luciano Masullo
-"""
 
 import numpy as np
 import os
@@ -30,7 +25,12 @@ import control.camera_image_manager as camera_image_manager
 import control.webcamWidget as webcamWidget
 import control.oscilloscope as oscilloscope
 #from control import libnidaqmx
-import nidaqmx
+try:
+    import nidaqmx
+except:
+    print("failed to import nidaqmx. But in only occures when generating documentation")
+    pass
+
 import control.Scan_self_GUI as scanWidget
 
 #Widget to control image or sequence recording. Recording only possible when liveview active.
@@ -44,54 +44,25 @@ datapath=u"C:\\Users\\aurelien.barbotin\Documents\Data\DefaultDataFolder"
 class FileWarning(QtGui.QMessageBox):    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)   
-        
-#class PulseWidget(QtGui.QFrame):
-        
-        
-class TemperatureStabilizer(QtCore.QObject):
-        pass
-#    def __init__(self, main, *args, **kwargs):
-#
-#        super().__init__(*args, **kwargs)
-#        self.main = main
-#        self.setPoint = main.tempSetPoint
-#        self.main.andor.temperature_setpoint = self.setPoint
-#        self.stableText = 'Temperature has stabilized at set point.'
-#
-#    def start(self):
-#        self.main.andor.cooler_on = True
-#        self.timer = QtCore.QTimer()
-#        self.timer.timeout.connect(self.update)
-#        self.timer.start(10000)
-#        self.update()
-#
-#    def stop(self):
-#        self.timer.stop()
-#
-#    def update(self):
-#        tempStatus = self.main.andor.temperature_status
-#        self.main.tempStatus.setText(tempStatus)
-#        temperature = np.round(self.main.andor.temperature, 1)
-#        self.main.temp.setText('{} ºC'.format(temperature.magnitude))
-#
-#        if tempStatus != self.stableText:
-#            threshold = Q_(0.8 * self.setPoint.magnitude, 'degC')
-#            if temperature <= threshold or self.main.andor.mock:
-#                self.main.liveviewButton.setEnabled(True)
-#                self.main.liveviewAction.setEnabled(True)
-#
-#        else:
-#            self.timer.stop()
 
 
 class TempestaGUI(QtGui.QMainWindow):
-    """Main GUI class. This class calls other modules in the control folder"""
+    """Main GUI class. This class calls other modules in the control folder
     
+    :param Laser bluelaser: object controlling one laser 
+    :param Laser violetlaser: object controlling one laser 
+    :param Laser uvlaser: object controlling one laser 
+    :param Camera orcaflash: object controlling a CCD camera
+    :param SLMdisplay slm: object controlling a SLM
+    """
+
     liveviewStarts = QtCore.pyqtSignal()
     liveviewEnds = QtCore.pyqtSignal()
 
-    def __init__(self, bluelaser, violetlaser, uvlaser, scanZ, daq, orcaflash,slm,
+    def __init__(self, bluelaser, violetlaser, uvlaser, scanZ, daq, orcaflash,slm, 
                  *args, **kwargs):
+
+
         super().__init__(*args, **kwargs)
         self.orcaflash = orcaflash
         self.bluelaser = bluelaser
@@ -155,7 +126,7 @@ class TempestaGUI(QtGui.QMainWindow):
         dockArea = DockArea()
 
         # Console widget
-        consoleDock = Dock("Console", size=(100, 100))
+        consoleDock = Dock("Console", size=(50, 50))
         console = ConsoleWidget(namespace={'pg': pg, 'np': np})
         consoleDock.addWidget(console)
         dockArea.addDock(consoleDock)
@@ -198,7 +169,7 @@ class TempestaGUI(QtGui.QMainWindow):
         dockArea.addDock(laserDock,"top",consoleDock)
         
         #SLM widget
-        slmDock = Dock("SLM",size=(300,100))
+        slmDock = Dock("SLM",size=(50,50))
         self.slmWidget = slmWidget.slmWidget(self.slm)
         slmDock.addWidget(self.slmWidget)
         dockArea.addDock(slmDock,'above',laserDock)
@@ -229,24 +200,33 @@ class TempestaGUI(QtGui.QMainWindow):
         
         #Scan Widget
         self.scanxyWidget=scanWidget.ScanWidget(self.nidaq)
-
-        #APD display ma gueule
-        self.apdDisplay_splay=self.scanxyWidget.display
-
+        
+        dockArea2 = DockArea()     
         #Webcam
+        webcamDock = Dock("webcam")
         self.webcamWidget=webcamWidget.WebcamManager(self)
+        webcamDock.addWidget(self.webcamWidget)
+        dockArea2.addDock(webcamDock)
+        
+        #APD display ma gueule
+
+        self.scanImageDock = Dock("Image from scanning", size=(300, 300))
+        self.scanImageDock.addWidget(self.scanxyWidget.display)
+        dockArea2.addDock(self.scanImageDock,"above",webcamDock)
+
+
 
         # Widgets' layout
         layout = QtGui.QGridLayout()
         self.cwidget.setLayout(layout)
-        layout.setColumnMinimumWidth(0, 100)
-#        layout.setColumnMinimumWidth(1, 350)
-        layout.setColumnMinimumWidth(2, 150)
-        layout.setColumnMinimumWidth(3, 200)
-        layout.setRowMinimumHeight(0, 350)
-        layout.setRowMinimumHeight(1, 350)
-        layout.setRowMinimumHeight(2, 350)
-        layout.setRowMinimumHeight(3, 30)
+#        layout.setColumnMinimumWidth(0, 100)
+##        layout.setColumnMinimumWidth(1, 350)
+#        layout.setColumnMinimumWidth(2, 150)
+#        layout.setColumnMinimumWidth(3, 200)
+#        layout.setRowMinimumHeight(0, 350)
+#        layout.setRowMinimumHeight(1, 350)
+#        layout.setRowMinimumHeight(2, 350)
+#        layout.setRowMinimumHeight(3, 30)
 #        layout.addWidget(self.presetsMenu, 0, 0)
 #        layout.addWidget(self.loadPresetButton, 0, 1)
         
@@ -256,36 +236,28 @@ class TempestaGUI(QtGui.QMainWindow):
 #        layout.addWidget(self.imageWidget, 0, 2, 5, 1)
         layout.addWidget(dockArea, 0, 3, 5, 1)
         layout.addWidget(self.scanxyWidget,0, 2, 5, 1)
-        layout.addWidget(self.apdDisplay_splay,0,0,1,1)
-        layout.addWidget(self.webcamWidget,1,0,1,1)
+        layout.addWidget(dockArea2,0,0,1,1)
+#        layout.addWidget(self.webcamWidget,1,0,1,1)
         
-        layout.setRowMinimumHeight(2, 40)
+#        layout.setRowMinimumHeight(2, 40)
 #        layout.setColumnMinimumWidth(2, 1000)
 
     def closeEvent(self, *args, **kwargs):
-
-        # Stop running threads
-#        self.viewtimer.stop()
-#        self.stabilizer.timer.stop()
-#        self.stabilizerThread.terminate()
+        """closes the different devices. Resets the NiDaq card, turns off the lasers and cuts communication with the SLM"""
         try:
             self.lvthread.terminate()
         except:
             pass
             
-        # Turn off camera, close shutter and flipper
-#        if self.andor.status != 'Camera is idle, waiting for instructions.':
-#            self.andor.abort_acquisition()
-#        self.andor.shutter(0, 2, 0, 0, 0)
         self.orcaflash.shutdown()
         self.daq.flipper = True
-#        if self.signalWidget.running:
-#            self.signalWidget.StartStop()
+
 
         self.nidaq.reset()        
         self.laserWidgets.closeEvent(*args, **kwargs)
-#        self.focusWidget.closeEvent(*args, **kwargs)
         self.slmWidget.closeEvent(*args, **kwargs)
-#        self.signalWidget.closeEvent(*args, **kwargs)
 
         super().closeEvent(*args, **kwargs)
+        
+if __name__=="main":
+    pass

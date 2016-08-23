@@ -24,15 +24,19 @@ s_pix=0.02  #pixel size in mm (SLM)
 lbd=785*10**-6    #wavelength in mm
 f=4.7    #focal length in mm (20x/1.0 zeiss)
 
-def createHelMask(m,n,r,u=0,v=0):
+def createHelMask(m,n,r,u=0,v=0,rotation=True):
     """This function generates an helicoidal phase mask centered in (u,v) where (0,0) corresponds to
     the center of the image"""
     x,y=np.ogrid[-m//2-u:m//2-u,-n//2-v:n//2-v]
     d2=x**2+y**2
     theta=np.arctan2(x,y)
-        
     theta[d2>r**2]=0
     theta%=2*math.pi
+    #To change the rotation direction of the helix
+    if(rotation):
+        mask_bis=np.ones((m,n))*np.pi*2
+        mask_bis[d2>r**2]=0
+        theta = mask_bis - theta
     return theta
 
 def topHat(sizex,sizey,r,sigma,u,v):

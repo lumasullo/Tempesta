@@ -137,11 +137,10 @@ class Mask(object):
         self.img=self.img.astype("uint8")   
         return
         
-    def setHelicoidal(self,R,x=0,y=0):
+    def setHelicoidal(self,R,x=0,y=0,rotation=True):
         """Transforms the current mask in a centered helicoidal mask with radius r
         the centre of the helicoid is (x,y)"""
-        
-        self.img=pm.createHelMask(self.m,self.n,R,u=x,v=y)
+        self.img=pm.createHelMask(self.m,self.n,R,u=x,v=y,rotation=rotation)
         self.two_PiToUInt8()
         return self.img
         
@@ -284,15 +283,14 @@ class DoubleMask(EvMask):
 class Helix_Hat(DoubleMask):
     """class creating a mask containing a helix on the left part of the chip and a top hat
     on the right part. R corresponds to the radius of each of the masks in pixels"""
-    def __init__(self,m,n,lbd,R,sigma,left_pos=(0,0),right_pos=(0,0)):
+    def __init__(self,m,n,lbd,R,sigma,left_pos=(0,0),right_pos=(0,0),rotation=True):
         DoubleMask.__init__(self,m,n,lbd, left_center= left_pos, right_center = right_pos)
         self.R=R
         
         if self.R>min(m//2,n//2):
             print("R out of range")
             self.R=min(m//2,n//2)
-            
-        self.left.setHelicoidal(R,left_pos[0],left_pos[1])
+        self.left.setHelicoidal(R,left_pos[0],left_pos[1],rotation)
         self.right.topHat(R,sigma,right_pos[0],right_pos[1])
         self.update()
 

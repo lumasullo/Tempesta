@@ -5,10 +5,15 @@ Created on Tue Aug 12 11:51:21 2014
 @author: Federico Barabas
 """
 
+try:
+    import nidaqmx
+except:
+    print("failed to import nidaqmx. But in only occures when generating documentation")
+    pass
+
 import time
 from PyQt4 import QtGui, QtCore
 from lantz import Q_
-from control import libnidaqmx
 import numpy as np
 
 
@@ -31,9 +36,10 @@ class UpdatePowers(QtCore.QObject):
 
 
 class LaserWidget(QtGui.QFrame):
-
+    """Defines the layout of the whole widget including all the lasers."""
     def __init__(self, lasers, daq, *args, **kwargs):
-
+        """lasers: list containing the different laser objects
+        """
         super().__init__(*args, **kwargs)
 
         self.bluelaser, self.violetlaser, self.uvlaser = lasers
@@ -57,22 +63,9 @@ class LaserWidget(QtGui.QFrame):
                                          tickInterval=10, singleStep=1,
                                          daq=self.daq, port=1, modulable=False)
                                          
-        self.tisacontrol = TiSaControl(libnidaqmx.Device('Dev1'),
-                                        '<h3>TiSa</h3>',
-                                        color=(200, 0, 0), prange=(0, 10000),
-                                        tickInterval=5, singleStep=0.01, modulable = False)
 
         self.controls = (self.blueControl, self.violetControl, self.uvControl)
 
-#        self.findTirfButton = QtGui.QPushButton('Find TIRF (no anda)')
-#        self.setEpiButton = QtGui.QPushButton('Set EPI (no anda)')
-#        self.tirfButton = QtGui.QPushButton('TIRF (no anda)')
-#        self.tirfButton.setCheckable(True)
-#        self.epiButton = QtGui.QPushButton('EPI (no anda)')
-#        self.epiButton.setCheckable(True)
-#        self.stagePosLabel = QtGui.QLabel('0 mm')
-#        self.stagePosLabel.setSizePolicy(QtGui.QSizePolicy.Preferred,
-#                                         QtGui.QSizePolicy.Expanding)
 
         self.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
         grid = QtGui.QGridLayout()
@@ -80,12 +73,6 @@ class LaserWidget(QtGui.QFrame):
         grid.addWidget(self.blueControl, 0, 0)
         grid.addWidget(self.violetControl, 0, 1)
         grid.addWidget(self.uvControl, 0, 2)
-        grid.addWidget(self.tisacontrol, 0, 3)
-#        grid.addWidget(self.findTirfButton, 1, 0)
-#        grid.addWidget(self.setEpiButton, 2, 0)
-#        grid.addWidget(self.tirfButton, 1, 1)
-#        grid.addWidget(self.epiButton, 2, 1)
-#        grid.addWidget(self.stagePosLabel, 1, 2, 2, 1)
 
         # Current power update routine
         self.updatePowers = UpdatePowers(self)
@@ -95,6 +82,7 @@ class LaserWidget(QtGui.QFrame):
         self.updateThread.started.connect(self.updatePowers.update)
 
     def closeShutters(self):
+        """Not used in this version"""
         for control in self.controls:
             if control.port is not None:
                 control.shutterBox.setChecked(False)
@@ -106,9 +94,15 @@ class LaserWidget(QtGui.QFrame):
 
 
 class LaserControl(QtGui.QFrame):
-
+    """Controls one specific laser and associates it with a specific layout: a slider and a text box to edit the
+    Laser Power, and a switch on/off button."""
     def __init__(self, laser, name, color, tickInterval, singleStep, prange=None,
                  daq=None, port=None, invert=True, modulable=True, *args, **kwargs):
+        """laser: instance of the laser to control
+        name: string (ie 561nm Laser)        
+        tickInterval: int, specifies the distance between two graduations on the laser slider
+        singleStep: size of the smallest increment of a laser slider"""
+        
         super().__init__(*args, **kwargs)
         self.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
         self.laser = laser
@@ -143,7 +137,7 @@ class LaserControl(QtGui.QFrame):
         self.slider.setMaximum(prange[1])
         self.slider.setTickInterval(tickInterval)
         self.slider.setSingleStep(singleStep)
-        self.slider.setValue(self.laser.power.magnitude)
+        self.slider.setValue(0)
         self.minpower = QtGui.QLabel(str(prange[0]))
         self.minpower.setAlignment(QtCore.Qt.AlignCenter)
 
@@ -210,14 +204,18 @@ class LaserControl(QtGui.QFrame):
             self.laser.query('cp')
             
     def enableLaser(self):
+        """Turns on the laser and sets its power to the value specified by the textbox."""
         self.laser.enabled = True
         self.laser.power_sp = float(self.setPointEdit.text()) * self.mW
 
     def changeSlider(self, value):
+        """called when the slider is moved, sets the power of the laser to value"""
         self.laser.power_sp = self.slider.value() * self.mW
         self.setPointEdit.setText(str(round(self.laser.power_sp.magnitude,3)))
 
     def changeEdit(self):
+        """called when the user manually changes the intensity value of the laser. 
+        Sets the laser power to the corresponding value"""
         self.laser.power_sp = float(self.setPointEdit.text()) * self.mW
         self.slider.setValue(self.laser.power_sp.magnitude)
 
@@ -225,12 +223,11 @@ class LaserControl(QtGui.QFrame):
         super().closeEvent(*args, **kwargs)
     
 class TiSaControl(QtGui.QFrame):
-
-    def __init__(self, nidaq, name, color, prange, tickInterval, singleStep,
+    """Specific control for a TiSa Lasre modulated with an AOM"""
+    def __init__(self, name, color, prange, tickInterval, singleStep,
                  invert=True, modulable=True, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
-        self.nidaq = nidaq
         self.mV = Q_(1, 'mV')
         init_voltage = 0
         self.name = QtGui.QLabel(name)
@@ -268,7 +265,6 @@ class TiSaControl(QtGui.QFrame):
         grid.addWidget(self.name, 0, 0)
         grid.addWidget(self.powerIndicator, 3, 0)
         grid.addWidget(self.setPointEdit, 4, 0)
-#        grid.addWidget(self.enableButton, 5, 0)
         grid.addWidget(self.maxpower, 1, 1)
         grid.addWidget(self.slider, 2, 1, 5, 1)
         grid.addWidget(self.minpower, 7, 1)
@@ -290,34 +286,15 @@ class TiSaControl(QtGui.QFrame):
 #        self.enableButton.toggled.connect(self.toggleLaser)
         self.slider.valueChanged.connect(self.changeSlider)
         self.setPointEdit.returnPressed.connect(self.changeEdit)
-#        
-#
-#        # Shutter port
-#        if self.port is not None:
-#            self.shutterBox = QtGui.QCheckBox('Shutter open')
-##            grid.addWidget(self.shutterBox, 6, 0)
-#            self.shutterBox.stateChanged.connect(self.shutterAction)
-#
-#            if invert:
-#                self.daq.digital_IO[self.port] = True
-#                self.states = {2: False, 0: True}
-#            else:
-#                self.daq.digital_IO[self.port] = False
-#                self.states = {2: True, 0: False}
-#                
-#                
-#
-#
-#    def shutterAction(self, state):
-#        self.daq.digital_IO[self.port] = self.states[state]
-        
-        
-        self.aotask = libnidaqmx.AnalogOutputTask('aotask')
-        aochannel = 3
-        self.aotask.create_voltage_channel('Dev1/ao%s'%aochannel, min_val = 0,  max_val = 10,)
-        self.aotask.configure_timing_sample_clock(rate = 100000,
-                                             sample_mode = 'finite',
-                                             samples_per_channel = 2)
+
+        #Somehow Sphinx can't load AOtask, so this part is commented just for compilation of the doc.
+#        self.aotask = nidaqmx.AnalogOutputTask()
+#        aochannel = 3
+#        self.aotask.create_voltage_channel('Dev1/ao%s'%aochannel, min_val = 0,  max_val = 10,)
+#        self.aotask.configure_timing_sample_clock(rate = 100000,
+#                                             sample_mode = 'finite',
+#                                             samples_per_channel = 2)
+
 
     def toggleLaser(self):
         if self.enableButton.isChecked():
@@ -327,16 +304,7 @@ class TiSaControl(QtGui.QFrame):
 #    
     def digitalMod(self):
         self.digimodButton.setChecked(True)
-#        if self.digimodButton.isChecked():
-#            self.laser.digital_mod = True
-#            self.laser.enter_mod_mode()
-#            print(self.laser.mod_mode)
-#        else:
-#            self.laser.query('cp')
-#            
-#    def enableLaser(self):
-#        self.laser.enabled = True
-#        self.laser.power_sp = float(self.setPointEdit.text()) * self.mW
+
 
     def changeSlider(self, value):
         new_value = self.slider.value() * self.mV

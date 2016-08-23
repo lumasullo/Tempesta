@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Tue May 24 13:39:37 2016
 
-@author: aurelien.barbotin
-"""
 import numpy as np
 #import control.slmpy as slmpy
 import control.instruments as instruments
@@ -18,8 +14,12 @@ m=600
 n=792
 
 class slmWidget(QtGui.QFrame):
-    """Class creating the window for the control of the SLM???"""
-
+    """Class creating a GUI to control the phase pattern displayed by the SLM. In this version, it is optimized to 
+    display and address 2 masks independently. The whole image is separated in two: one left part and right part. 
+    One part is selected at a time and can be controlled with the arrows from *ArrowsControl*.
+    :param SLMdisplay slm: instance of a second monitor generatd via slmpy. 
+    Communication with the SLM is initiated when Tempesta is started along with all other instruments
+        """
     def __init__(self, slm, *args, **kwargs):
 
         super().__init__(*args, **kwargs)
@@ -31,6 +31,7 @@ class slmWidget(QtGui.QFrame):
         self.sigmaPar=self.tree.p.param("sigma")
         self.anglePar=self.tree.p.param("angle")
         self.lbdPar=self.tree.p.param('lambda depletion: (nm)')
+        self.helix_rotPar=self.tree.p.param("helix clock rotation")
 
         self.slm=slm
         self.mask=Mask.Helix_Hat(m,n,self.lbdPar.value(),self.RPar.value(),self.sigmaPar.value())
@@ -88,18 +89,21 @@ class slmWidget(QtGui.QFrame):
         grid.setRowMinimumHeight(0,75)
 
     def upClicked(self):
+        """Moves the current Mask up"""
         self.moveMask(-1*self.arrowsModule.increment.value(),0)
         
         self.left_center=self.mask.left_center
         self.right_center=self.mask.right_center
         
     def downClicked(self):
+        """Moves the current Mask down"""
         self.moveMask(self.arrowsModule.increment.value(),0)
         
         self.left_center=self.mask.left_center
         self.right_center=self.mask.right_center
         
     def leftClicked(self):     
+        """Moves the current Mask left"""
         self.moveMask(0,-1*self.arrowsModule.increment.value())
         
         self.left_center=self.mask.left_center
@@ -107,12 +111,19 @@ class slmWidget(QtGui.QFrame):
 
         
     def rightClicked(self):
+        """Moves the current Mask right"""
         self.moveMask(0,self.arrowsModule.increment.value()) 
         
         self.left_center=self.mask.left_center
         self.right_center=self.mask.right_center
 
     def moveMask(self,x,y):
+        """Sends instruction to both the SLM and the display to move the corresponding mask
+        when one arrow is pressed.
+        
+        :param int x: new x position of the center of the Mask
+        :param int y: new y position of the center of the Mask"""
+        
         if(str(self.arrowsModule.maskMenu.currentText())=="Left"):
             self.mask.moveLeft(x,y)
         elif(self.arrowsModule.maskMenu.currentText()=="Right"):
@@ -123,7 +134,7 @@ class slmWidget(QtGui.QFrame):
         self.update()
     
     def setBlack(self):
-        """Sets the current mask to a white Mask. Useful to check the masks one by one"""
+        """Sets the current mask to a black (null phase) Mask. Useful to check the masks one by one"""
         if(str(self.arrowsModule.maskMenu.currentText())=="Left"):
             self.mask.left.setBlack()
             self.black_left = True
@@ -136,9 +147,9 @@ class slmWidget(QtGui.QFrame):
         self.update()
         
     def apply(self):
-        """Applies a configuration to the SLM by changing the mask displayed"""
+        """Applies a configuration to the SLM and changes the mask displayed"""
         self.mask=Mask.Helix_Hat(m,n,self.lbdPar.value(),self.RPar.value(),\
-            self.sigmaPar.value(),self.left_center,self.right_center)
+            self.sigmaPar.value(),self.left_center,self.right_center,self.helix_rotPar.value())
         self.mask.tilt(self.anglePar.value())
 #        if(self.black_left):
 #            self.mask.left.setBlack()
@@ -148,6 +159,7 @@ class slmWidget(QtGui.QFrame):
         self.update()
         
     def update(self):
+        """When any parameter changes, sends the new image to the SLM and the display"""
         #Changing the orientation of image so they have the same orientation on the slm and on the screen
         image=self.mask.img.transpose()
         image=np.fliplr(image)
@@ -157,16 +169,10 @@ class slmWidget(QtGui.QFrame):
     def closeEvent(self, *args, **kwargs):
         super().closeEvent(*args, **kwargs)
 
-    def refresh(self):
-        """closes and reopens the SLM in case of problem: sleep mode..."""
-        return
     def save(self):
-        """saves the current SLM configuration, in particular the position of the Masks"""
-#        self.a=self.tree.p.children()
-#        self.list=[json.dumps(x.saveState()) for x in self.a]
-#        self.a=json.dumps(self.list)
+        """saves the current SLM configuration, in particular the position of the Masks.
+        The informations are stored in a file 'informations.bbn' (arbitrary extension) with the module pickle. """
         state=self.tree.p.saveState()
-#        center=(self.mask.left_center,self.mask.right_center)
         mask_state= {"left_center":self.mask.left_center,"right_center":self.mask.right_center}
         with open("informations.bbn","wb") as f:
             pickler=pickle.Pickler(f)
@@ -192,7 +198,11 @@ class slmWidget(QtGui.QFrame):
         
         
 class SLMParamTree(ParameterTree):
-    """ Making the ParameterTree for configuration of the SLM during imaging
+    """ Parameter Tree containing the different parameters for the SLM's phase masks. These parameters are:
+    Radius (int): of circular phase masks, in pixels
+    sigma (float): std of the incident gaussian beam, to determine the inner radius of a top-hat phase mask, in pixels.
+    angle (float): in an off-axis configuration.
+    lambda depletion (nm): the wavelength incident on the SLM.
     """
 
     def __init__(self, *args, **kwargs):
@@ -203,6 +213,7 @@ class SLMParamTree(ParameterTree):
 {'name': 'sigma', 'type': 'float', 'value': 100, 'limits': (0.001, 10**6 )},
 {'name': 'angle', 'type': 'float', 'value': 0.1, 'limits': (0, 0.3)},
 {'name': 'lambda depletion: (nm)', 'type': 'int', 'value': 561, 'limits': (0 , 1200 )},
+{'name': 'helix clock rotation', 'type': 'bool', 'value': True},
 {'name': 'Apply', 'type': 'action'}
 ]
 
@@ -211,7 +222,8 @@ class SLMParamTree(ParameterTree):
         self._writable = True
 
 class ArrowsControl(QtGui.QFrame):
-    """Widget to control the position of the pattern on the SLM"""
+    """This widget creates four buttons able to move a circular phase mask with a tunable number of pixels. 
+    Useful to align the phase mask with the incident beam without touching any optics."""
     def __init__(self,*args,**kwargs):
         #Definition of the Widget to choose left or right part of the Mask
         super().__init__(*args,**kwargs)
@@ -290,9 +302,8 @@ class ArrowsControl(QtGui.QFrame):
         
 
 if __name__ == '__main__':
-
     app = QtGui.QApplication([])
-    slm=slmpy.SLMdisplay()
+    slm=1
     
     win = slmWidget(slm)
     win.show()

@@ -20,7 +20,7 @@ import control.mockers as mockers
 from control.SLM import slmpy
 
 class Webcam(object):
-
+    """Initiates communication with a webcam with pygame"""
     def __new__(cls, *args):
         try:
             pygame.camera.init()
@@ -33,7 +33,7 @@ class Webcam(object):
 
 
 class Laser(object):
-
+    """An object to communicate with a laser with a Lantz driver"""
     def __new__(cls, iName, *args):
         try:
             pName, driverName = iName.rsplit('.', 1)
@@ -99,6 +99,7 @@ class DAQ(object):
 
 
 class ScanZ(object):
+    """Drives a stage for Z scanning"""
     def __new__(cls, *args):
 
         try:
@@ -110,16 +111,15 @@ class ScanZ(object):
         except:
             return mockers.MockScanZ()
 
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Jun  9 16:07:36 2016
-
-@author: aurelien.barbotin
-"""
 
 class OneFiveLaser(object):
     """class used to control the 775 nm laser via a RS 232 interface. The commands are defined
-    in the laser manual, must be binary and end with an LF statement (\n here)"""
+    in the laser manual, must be binary and end with an LF statement 
+    
+    :param string port: specifies the name of the port to which the laser is connected (usually COM10).
+    :param float intensity_max: specifies the maximum intensity (in our case in W) the user can ask the laser to emit. It is used to protect sensitive hardware from high intensities
+    """
+    
     def __init__(self,port="COM10",intensity_max=0.8):
         self.serial_port = None
         self.info = None      #Contains informations about the different methods of the laser. Can be used that the communication works
@@ -176,12 +176,13 @@ class OneFiveLaser(object):
 
     @property
     def power_sp(self):
-        """To handle output power set point (mW) in APC Mode
+        """To handle output power set point (mW)
         """
         return self.power_setpoint * 100 * self.mW
 
     @power_sp.setter
     def power_sp(self, value):
+        """Handles output power. Sends a RS232 command to the laser specifying the new intensity."""
         value=value.magnitude/1000  #Conversion from mW to W
         if(self.power_setting!=1):
             print("Wrong mode: impossible to change power value. Please change the power settings")
@@ -189,7 +190,7 @@ class OneFiveLaser(object):
         if(value<0):
             value=0
         if(value>self.intensity_max):
-            value=1 #A too high intensity value can damage the SLM
+            value=self.intensity_max #A too high intensity value can damage the SLM
         value=round(value,3)
         cmd="lp="+str(value)+"\n"
         self.serial_port.write(cmd.encode())
@@ -204,6 +205,7 @@ class OneFiveLaser(object):
         return self.intensity_max * 100 * self.mW
             
     def getInfo(self):
+        """Returns available commands"""
         if self.info is None:
             self.serial_port.write(b"h\n")
             time.sleep(0.5)
@@ -233,6 +235,7 @@ class OneFiveLaser(object):
         self.serial_port.write(cmd.encode())
         
     def setCurrent(self,value):
+        """sets current in constant current mode."""
         if (self.mode!=1):
             print("You can't set the current in constant power mode")
             return
@@ -245,7 +248,7 @@ class OneFiveLaser(object):
         self.serial_port.write(cmd.encode())      
     
     def setFrequency(self,value):
-        """sets the frequency in MHz"""
+        """sets the pulse frequency in MHz"""
         if(value<18 or value>80):
             print("invalid frequency values")
             return
@@ -256,7 +259,8 @@ class OneFiveLaser(object):
     def setTriggerSource(self,source):
         """source=0: internal frequency generator
         source=1: external trigger source for adjustable trigger level, Tr-1 In
-        source=2: external trigger source for TTL trigger, Tr-2 In"""
+        source=2: external trigger source for TTL trigger, Tr-2 In
+        """
         if(source!=0 and source!=1 and source!=2):
             print("invalid source for trigger")
             return
@@ -279,12 +283,14 @@ class OneFiveLaser(object):
         
         #The get... methods return a string giving information about the laser
     def getPower(self):
+        """Returns internal measured Laser power"""
         self.serial_port.flushInput()
         self.serial_port.write(b"lpa?\n")
         value=self.serial_port.readline().decode()
         return value
         
     def getMode(self):    
+        """Returns mode of operation: constant current or current power"""
         self.serial_port.flushInput()
         self.serial_port.write(b"lip?\n")
         value=self.serial_port.readline().decode()
@@ -302,12 +308,14 @@ class OneFiveLaser(object):
         return "power command: "+value+"W"  
 
     def getTemperature(self):
+        """Gets Temperature of SHG cristal"""
         self.serial_port.flushInput()
         self.serial_port.write(b"lx_temp_shg?\n")
         value=self.serial_port.readline().decode()
         return value
         
     def getCurrent(self):
+        """Returns actual current"""
         self.serial_port.flushInput()
         self.serial_port.write(b"li?\n")
         value=self.serial_port.readline().decode()
@@ -397,8 +405,10 @@ class STORMCamera(CCD):
         self.vertAmps[0] = 'Normal'
 
 class SLM(object):
-
+    """This object communicates with an SLM as a second monitor, using a wxpython interface defined in slmpy.py. 
+    If no second monitor is detected, it replaces it by a Mocker with the same methods as the normal SLM object"""
     def __init__(self):
+        """"""
         super(SLM).__init__()
         try:
             self.slm=slmpy.SLMdisplay()

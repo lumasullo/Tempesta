@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Thu May 21 13:19:31 2015
 
-@author: federico
-"""
 from pyqtgraph.Qt import QtGui
 
 def main():
+    """Tempesta is started from here. This function calls the different instruments from
+    control.instruments and creates the GUI with the method TempestaGUI in control. The different devices to
+    use are to be specified here.
+    """
 
     from control import control
     import control.instruments as instruments    
