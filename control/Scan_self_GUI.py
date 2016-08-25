@@ -8,7 +8,7 @@ import copy
 import time
 from tkinter import Tk, filedialog, messagebox
 from PIL import Image
-
+import control.guitools as guitools
 import datetime
 
 #from numpy import arange
@@ -37,7 +37,11 @@ f_0 = 53
 #To save the sensor data
 record_sensor_output = False
 save_folder=r"C:\Users\aurelien.barbotin\Documents\Data\signals_15_8"
+
+#These dictionnaries contain values specific to the different axis of our piezo motors. 
+#correction_factors: for each direction, corresponds to the movement in µm induced by a command of 1V
 correction_factors = {'x':3.75,'y':3.75,'z':10}
+#minimum and maximum voltages which can drive the different axis
 minimum_voltages = {'x':-10,'y':-10,'z':0}
 maximum_voltages = {'x':10,'y':10,'z':10}
 
@@ -65,17 +69,15 @@ class ScanWidget(QtGui.QFrame):
         self.dochannels = device.get_digital_output_lines()
         self.saved_signal = np.array([0, 0])
         self.times_run = 0
-        
-        self.back_factor = 10
-        self.back_factor_param=QtGui.QLineEdit("2")
-        self.back_factor_param.editingFinished.connect(lambda: self.ScanParameterChanged("back_factor"))
+    
+
         
         #Creating the GUI itself
         self.widthPar = QtGui.QLineEdit('10')
         self.widthPar.editingFinished.connect(lambda: self.ScanParameterChanged('width'))
         self.heightPar = QtGui.QLineEdit('10')
         self.heightPar.editingFinished.connect(lambda: self.ScanParameterChanged('height'))
-        self.sequence_timePar = QtGui.QLineEdit('0.00007') # Seconds
+        self.sequence_timePar = QtGui.QLineEdit('0.00015') # Seconds
         self.sequence_timePar.editingFinished.connect(lambda: self.ScanParameterChanged('sequence_time'))
         self.nrFramesPar = QtGui.QLabel()
         self.frequencyLabel = QtGui.QLabel()
@@ -107,7 +109,12 @@ class ScanWidget(QtGui.QFrame):
                            'step_size': float(self.step_sizePar.text())}
                           
 
-                   
+                #Number of image planes to record when doing a 3D scan
+        self.n_planes=1
+        self.n_planes_param=QtGui.QLineEdit('1')
+        self.n_planes_param.editingFinished.connect(lambda:self.ScanParameterChanged('n_planes')) 
+        self.sted_scan_counter=0        #Counts the iterations while performing a 3D sted scan
+           
         self.start488Par = QtGui.QLineEdit('0')
         self.start488Par.editingFinished.connect(lambda: self.PixelParameterChanged('start488'))
         self.start405Par = QtGui.QLineEdit('0')
@@ -245,7 +252,7 @@ class ScanWidget(QtGui.QFrame):
         grid.addWidget(QtGui.QLabel('correction samples:'), 4, 4)
         grid.addWidget(self.delay, 4, 5)
         grid.addWidget(QtGui.QLabel('return time (ms)'), 5, 4)
-        grid.addWidget(self.back_factor_param, 5, 5)
+        grid.addWidget(self.n_planes_param, 5, 5)
         
         grid.addWidget(QtGui.QLabel('Start:'), 5, 1)
         grid.addWidget(QtGui.QLabel('End:'), 5, 2)
@@ -350,8 +357,11 @@ class ScanWidget(QtGui.QFrame):
         
         
     def ScanParameterChanged(self, parameter):
-        if not parameter == 'scan_mode':
+        if not parameter == 'scan_mode' and not parameter=="n_planes":
             self.scan_par_values[parameter] = float(self.scan_parameters[parameter].text())
+            
+        if parameter=="n_planes":
+            self.n_planes=int(parameter)
             
         if parameter == 'sequence_time':
             self.update_Scan(['TIS', '355', '405', '488', 'CAM'])
@@ -428,6 +438,29 @@ class ScanWidget(QtGui.QFrame):
         self.stage_scan.update(self.scan_par_values)
         self.pixel_cycle.update(devices, self.pixel_par_values, self.stage_scan.sequence_samples)
         
+    def sted_scan(self):
+        """does a stage scan and records data with an APD at the same time to record STED images."""
+        self.scanRadio.setChecked(True)
+        self.ScanButton.setEnabled(False)
+        self.Scan_Mode.setCurrentIndex(0)   #Set to xy scan
+            
+        if self.sted_scan_counter==0:
+            self.stage_scan.update(self.scan_par_values)
+            channels_used=[self.stage_scan.axis_1,self.stage_scan.axis_2]
+            self.positionner.reset_channels(channels_used)
+        else:
+            self.display.saveImage("sted_plane_"+str(self.sted_scan_counter))
+            
+        if self.sted_scan_counter==self.n_planes-1:
+            return
+        self.scanner = Scanner(self.nidaq, self.stage_scan, self.pixel_cycle, self.current_aochannels, self.current_dochannels,self.current_recording_device, self)   
+        self.scanner.scanDone.connect(self.sted_scan)            
+        self.scanning = True
+        self.sted_scan_counter
+        self.scanner.runScan()
+            
+        
+    
     def closeEvent(self, *args, **kwargs):        
         super().closeEvent(*args, **kwargs)
         plt.close("all")
@@ -638,8 +671,23 @@ class Scanner(QtCore.QObject):
                                            min_val = minimum_voltages[axis_2], max_val = maximum_voltages[axis_2])
         signal_2 = self.stage_scan.sig_dict['sig_'+axis_2]
         print("length signals:",len(signal_1),len(signal_2))
-        self.full_ao_signal = np.append(signal_1,signal_2)
         
+        #Generate the delay samples in the end of the scan
+        frequency=self.stage_scan.frequency        
+        self.delay =  self.stage_scan.sample_rate/frequency/2    #elimination of 1/4 period at the beginning
+        self.delay+= phase_correction(frequency)/frequency * self.stage_scan.sample_rate/2/np.pi      
+        self.delay = int(self.delay)
+        
+        sine=np.arange(self.delay)/self.delay * 2*np.pi*frequency /self.stage_scan.sample_rate
+        sine=np.sin(sine) * self.stage_scan.size_1/2
+        signal_1=np.concatenate( (signal_1,sine) )
+        signal_2 = np.concatenate(( signal_2,signal_2[-1] *np.ones(self.delay) ))
+        
+        self.stage_scan.sig_dict['sig_'+axis_1]=signal_1
+        self.stage_scan.sig_dict['sig_'+axis_2]=signal_2
+        
+        self.full_ao_signal = np.append(signal_1,signal_2)
+        print("delay in ao signal:",self.delay)
         if len(signal_1)!=len(signal_2):
             print("error: wrong signal size")
 
@@ -667,7 +715,7 @@ class Scanner(QtCore.QObject):
         
         self.aotask.configure_timing_sample_clock(rate = self.stage_scan.sample_rate,
                                              sample_mode = 'finite',
-                                             samples_per_channel = self.samples_in_scan)
+                                             samples_per_channel = self.samples_in_scan+self.delay)
                         
 #        self.dotask.configure_timing_sample_clock(source = r'ao/SampleClock', 
 #                                             rate = self.pixel_cycle.sample_rate, 
@@ -686,7 +734,7 @@ class Scanner(QtCore.QObject):
         self.aotask.write(self.full_ao_signal, layout = 'group_by_channel', auto_start = False)
         self.record_thread.setParameters(self.stage_scan.sequence_samples,self.samples_in_scan,self.stage_scan.sample_rate,self.stage_scan.samples_per_line,axis_1)
         self.record_thread.start()
-        time.sleep(0.01)    #Necessary for good synchronization
+        time.sleep(0.05)    #Necessary for good synchronization
         self.aotask.start()
         self.waiter.start()
         self.trigger.start()
@@ -753,6 +801,9 @@ class StageScan():
         self.axis_1 = self.scan_mode[0]     #x if in '[x]y scan'
         self.axis_2 = self.scan_mode[1]     #y if in 'x[y] scan'
         
+        self.size_1 = 0
+        self.size_2 = 0
+        
         self.scanWidget=main
         
         self.steps_1 = 0
@@ -793,8 +844,8 @@ class StageScan():
             start_2 = 0
             print("couldn't access to the positionner")
         print("width:",par_values['width'])
-        size_1 = par_values['width'] / correction_factors[self.axis_1]
-        size_2 = par_values['height'] / correction_factors[self.axis_2]
+        self.size_1 = par_values['width'] / correction_factors[self.axis_1]
+        self.size_2 = par_values['height'] / correction_factors[self.axis_2]
         step_size_1 = par_values['step_size'] / correction_factors[self.axis_1]
         step_size_2 = par_values['step_size'] / correction_factors[self.axis_2]
         
@@ -802,32 +853,45 @@ class StageScan():
         if self.sequence_samples==1:
             self.sequence_samples+=1
             print("not enough samples")
-        self.steps_1 = int(np.ceil(size_1 / step_size_1))
-        self.steps_2 = int(np.ceil(size_2 / step_size_2))
+        self.steps_1 = int(np.ceil(self.size_1 / step_size_1))
+        self.steps_2 = int(np.ceil(self.size_2 / step_size_2))
         self.frames = self.steps_1*self.steps_2
         
-        self.corr_step_size = size_2/self.steps_2 # Step size compatible with width
+        self.corr_step_size = self.size_2/self.steps_2 # Step size compatible with width
         row_samples = self.steps_1 * self.sequence_samples
         sig_1 = []
         sig_2 = []
-        
+
+                
         new_value = start_2
         n_samples_ramp = int(2* fraction_removed * row_samples)
         n_samples_flat= int((row_samples-n_samples_ramp)/2)
         n_samples_flat_2 = row_samples-n_samples_flat-n_samples_ramp
         ramp_axis_2 = make_ramp(0,self.corr_step_size, n_samples_ramp)[0]
         print("row samples",row_samples)
-        #sine scanning
-        sine = np.arange(0,row_samples*self.steps_2)/(row_samples*2) * 2 * np.pi
-        sine=np.sin(sine) * size_1/2    #Sine varies from -1 to 1 so need to divide by 2
+
         self.frequency = self.sample_rate/ (row_samples*2)
         print("scan, self.freq",self.frequency)
-        for i in range(0,self.steps_2):            
-            sig_2 = np.concatenate( (sig_2, new_value * np.ones(n_samples_flat),new_value+ramp_axis_2, self.corr_step_size+new_value * np.ones(n_samples_flat_2) ) )
-            new_value = new_value + self.corr_step_size       
-            
-#        self.samples_per_line = row_samples + n_samples_return
-        self.samples_per_line = row_samples
+        
+        if self.scanWidget.current_recording_device=="APD":
+            n_samples_ramp = int(2* fraction_removed * row_samples)
+            n_samples_flat= int((2*row_samples-n_samples_ramp))
+                    #sine scanning
+            sine = np.arange(0,2*row_samples*self.steps_2)/(row_samples*2) * 2 * np.pi
+            sine=np.sin(sine) * self.size_1/2    #Sine varies from -1 to 1 so need to divide by 2
+            for i in range(0,self.steps_2):            
+                sig_2 = np.concatenate( (sig_2, new_value * np.ones(n_samples_flat),new_value+ramp_axis_2 ) )
+                new_value = new_value + self.corr_step_size   
+                self.samples_per_line=2*row_samples
+        else:
+            for i in range(0,self.steps_2): 
+                        #sine scanning
+                sine = np.arange(0,row_samples*self.steps_2)/(row_samples*2) * 2 * np.pi
+                sine=np.sin(sine) * self.size_1/2    #Sine varies from -1 to 1 so need to divide by 2
+                sig_2 = np.concatenate( (sig_2, new_value * np.ones(n_samples_flat),new_value+ramp_axis_2, self.corr_step_size+new_value * np.ones(n_samples_flat_2) ) )
+                new_value = new_value + self.corr_step_size       
+                self.samples_per_line = row_samples
+        
         print("sequence samples:",self.sequence_samples)
         #Correction for amplitude:
         sig_1=sine
@@ -925,6 +989,10 @@ class ImageDisplay(QtGui.QWidget):
         self.img.setImage(self.array)
         self.vb.setMinimumHeight(200)
         
+#        self.ROI = guitools.ROI((0, 0), self.vb, (0, 0), handlePos=(1, 0), handleCenter=(0, 1),scaleSnap=True, translateSnap=True)
+#        self.ROI.sigRegionChangeFinished.connect(self.ROIchanged)
+#        self.ROI.hide()        
+        
         #To get intensity profile along a line
         self.hist = pg.HistogramLUTItem(image=self.img)
         self.graph.addItem(self.hist, row=1, col=2)
@@ -978,8 +1046,8 @@ class ImageDisplay(QtGui.QWidget):
         except:
             pass
         
-    def saveImage(self):
-        """Saves the current image conainted in *self.array* under a predefined name containing 
+    def saveImage(self,filename="default"):
+        """Saves the current image contained in *self.array* under a predefined name containing 
         the main scanning parameters along with the date, under the tiff format."""
         im = Image.fromarray(self.array)
         
@@ -994,9 +1062,20 @@ class ImageDisplay(QtGui.QWidget):
         sequence_time = self.scanWidget.scan_par_values["sequence_time"]
         step_size = self.scanWidget.scan_par_values["step_size"]
         
+        print("filename",filename)
+        if filename=="default":
+                    now = datetime.datetime.now()
+                    instant_string= str(now.day) +"_" + str(now.month) +"_" +str(now.hour) +"h"+ str(now.minute)+"_"+str(now.second)+"s_"
+                    name = instant_string + "fov"+str(width)+"x"+str(height)+"um_seqtime_"+str(sequence_time)+"s_step_size"+str(step_size)+".tif"
+                    print("in dfault")
+        else:
+            print("not in default")
+        name = filename
         now = datetime.datetime.now()
         instant_string= str(now.day) +"_" + str(now.month) +"_" +str(now.hour) +"h"+ str(now.minute)+"_"+str(now.second)+"s_"
         name = instant_string + "fov"+str(width)+"x"+str(height)+"um_seqtime_"+str(sequence_time)+"s_step_size"+str(step_size)+".tif"
+
+        print(type(self.folderEdit.text()),type(name),type("\\"))
         im.save(self.folderEdit.text()+"\\"+name)
             
     def set_pixel_value(self,val):
@@ -1039,6 +1118,9 @@ class RecordingThreadAPD(QtCore.QThread):
         self.exiting = True
         self.delay=0
         
+        #Initiation of the analog and counter input tasks necessary to avoid crashing the program in certain cases (see stop) 
+        self.aitask=0
+        self.citask=0
         
     def setParameters(self,sequence_samples,samples_per_channel,sample_rate,samples_per_line,main_axis):
         """prepares the thread for data acquisition with the different parameters values
@@ -1053,8 +1135,8 @@ class RecordingThreadAPD(QtCore.QThread):
         self.sequence_samples = sequence_samples
         self.rate = sample_rate 
         self.main_axis=main_axis #Usually it is x
-        self.frequency= self.rate / self.samples_per_line/2
-        
+        self.frequency= self.rate / self.samples_per_line
+        print("frequency in apd thread",self.frequency)
         self.steps_per_line = self.imageDisplay.shape[1]
  
         self.n_frames=self.imageDisplay.shape[0]
@@ -1116,35 +1198,34 @@ class RecordingThreadAPD(QtCore.QThread):
         while(counter>0 and not self.exiting):
             apd_data=self.citask.read(self.samples_per_line)
             sensor_data = self.aitask.read(self.samples_per_line,timeout=10)
-            if counter==5:
-                print("saving sensor data...")
-                np.save(r"C:\Users\aurelien.barbotin\Documents\Data\signal_ref_2.npy", sensor_data)
             sensor_data=sensor_data[:,0]
+            if counter==self.n_frames:
+                np.save(r"C:\Users\aurelien.barbotin\Documents\Data\signal5.npy",sensor_data)
             substraction_array = np.concatenate(([last_value],apd_data[:-1]))
             last_value = apd_data[-1]
             apd_data = apd_data-substraction_array #Now apd_data is an array contains at each position the number of counts at this position
+            
+            length_signal=len(sensor_data)//2
+            apd_data=apd_data[0:length_signal]        
+            sensor_data=sensor_data[0:length_signal]
+            
             line = line_from_sine(apd_data,sensor_data,self.steps_per_line,amplitude,initial_position)
             self.emit(QtCore.SIGNAL("line(PyQt_PyObject)"),line)
             if counter<6:
-                print("counter",counter,"exiting",self.exiting)
+                print("counter",counter)
             counter-=1
-        print("samples acquired in citask",self.citask.get_samples_per_channel_acquired(),"samples available",self.citask.get_samples_per_channel_available())
         self.exiting=True
         self.aitask.stop()
         self.citask.stop()
         
     def stop(self):
         self.exiting=True
-        try:
+        if self.aitask !=0:
             self.aitask.stop()
+            del self.aitask
+        if self.citask!=0:
             self.citask.stop()
-            del self.aitask
             del self.citask
-            print("stopped regularly")
-        except:
-            del self.aitask
-            del self.citask
-            print("deeestroyed")
         
     
 class RecordingThreadPMT(QtCore.QThread):
@@ -1502,7 +1583,21 @@ class Positionner(QtGui.QWidget):
             self.aoTask.clear()
             self.sensitivityTask.stop()
             self.sensitivityTask.clear()
+
+class ChannelManager(object):
+    """Prototype of a class to manage the channels of the NiDaq card. It centralizes the calls the different channels and 
+    prevents them from being called from 2 or more parts of the code at the same time."""        
+    def __init_(self):
+        super().__init__()
+        self.channels=["x","y","z","pmt","apd","pmt_sensitivity","x_sensor","y_sensor"]
+        self.available_channels  = self.channels
+        self.channels_used=[]
         
+    def reserve_channel(self,channel):
+        pass
+    def release_channel(self,channel):
+        pass
+    
 def make_ramp(start, end, samples):
 
     ramp = []
@@ -1555,7 +1650,7 @@ def record_from_sine(acquisition_signal, ref_signal, number_of_points):
     return lut,results
         
 def line_with_lut(data,lut):
-    """creates line from an LUT"""
+    """creates line from an LUT calculated with the method record_from_sine"""
     spli=np.split(data,lut)
     result=[np.mean(x) for x in spli]
     result=np.asarray(result)

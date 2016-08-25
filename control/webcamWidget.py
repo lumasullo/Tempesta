@@ -98,7 +98,7 @@ class WebcamManager(QtGui.QWidget):
 class LVWorker(QtCore.QThread):
     """Thread acquiring images from the webcam and sending it to the display widget
     
-    :param WebcamManager webcam: the webcam widget using this thread
+    :param WebcamManager main: the webcam widget using this thread
     :param cv2.VideoCapture webcam: the opencv instance of the webcam emitting the frames."""
     def __init__(self, main, webcam, *args, **kwargs):
         super().__init__(*args, **kwargs)

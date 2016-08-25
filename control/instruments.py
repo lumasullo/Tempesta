@@ -126,13 +126,12 @@ class OneFiveLaser(object):
         self.power_setting = 0    #To change the power with python
         self.intensity_max = intensity_max
         self.mode = 0     # Constant current or Power
-        self.triggerMode = 0
+        self.triggerMode = 2        #Trigger=TTL input
         self.enabled_state = False    #laser initially off
         self.mW = Q_(1, 'mW')
         
         try:
             import serial
-            print("On est la")
             self.serial_port = serial.Serial(
             	port=port,
             	baudrate=38400,
@@ -145,7 +144,7 @@ class OneFiveLaser(object):
             self.setPowerSetting(self.power_setting)
             self.power_setpoint=0
             self.power_sp = 0
-            print("On est la 2")
+            self.setTriggerSource(self.triggerMode)
         except:
             print("Channel Busy")
             self=mockers.MockLaser()

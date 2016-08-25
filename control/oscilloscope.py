@@ -5,11 +5,9 @@ from PyQt4 import QtGui, QtCore
 import pyqtgraph as pg
 import numpy as np
 import time
-try:
-    import nidaqmx
-except:
-    print("failed to import nidaqmx. But in only occures when generating documentation")
-    pass
+
+import nidaqmx
+
 
 class Oscilloscope(QtGui.QWidget):
     """Class defining an oscilloscope to monitor a signal from a nidaq card"""
@@ -22,8 +20,6 @@ class Oscilloscope(QtGui.QWidget):
 
         self.wave = self.plot.plot()
         
-        self.nidaq = nidaqmx.Device("Dev1")
-        self.channels = self.nidaq.get_analog_input_channels()
         
         self.plot.setXRange(0, 100)
         self.plot.setYRange(-0.5, 5.0)
@@ -32,11 +28,7 @@ class Oscilloscope(QtGui.QWidget):
         self.isRunning=False
         
         self.button.clicked.connect(self.getData)        
-        
-        self.ai_channels = QtGui.QComboBox()
-        self.ai_channels.addItems(self.channels)
-        self.ai_channels.currentIndexChanged.connect(lambda: self.changeChannel(self.ai_channels.currentText()) )
-        self.ailabel=QtGui.QLabel("available channels")
+    
         
         #Communication with the ni card        
         
@@ -49,8 +41,6 @@ class Oscilloscope(QtGui.QWidget):
         self.setLayout(layout)
         layout.addWidget(self.plotLayout,0,0,7,5)
         layout.addWidget(self.button,3,5,1,1)
-        layout.addWidget(self.ailabel,4,5,1,1)
-        layout.addWidget(self.ai_channels,5,5,1,1)
         layout.setRowMinimumHeight(6,150)
         
         
@@ -58,20 +48,6 @@ class Oscilloscope(QtGui.QWidget):
         self.timer.timeout.connect(self.getData)
 
         
-    def changeChannel(self,channel):
-        """Switches the recording channel."""
-        if(self.isRunning):
-            self.timer.stop()
-            self.vitask.stop()
-            del self.citask
-        
-        
-        self.citask = nidaqmx.AnalogInputTask()
-        self.citask.create_voltage_channel(channel, terminal = 'rse', min_val=-1, max_val=10.0)
-        self.citask.configure_timing_sample_clock(rate = 100000.0,sample_mode="continuous")
-        if(self.isRunning):
-            self.citask.start()
-            self.timer.start()
         
     def getData(self):
         """To record and display the signal. This script is called at regular time intervals."""
@@ -103,7 +79,6 @@ class Oscilloscope(QtGui.QWidget):
     def closeEvent(self,*args,**kwargs):
         super().closeEvent(*args,**kwargs)
         self.timer.stop()
-        self.nidaq.reset()
         
 if __name__=="__main__":
     app = QtGui.QApplication([])

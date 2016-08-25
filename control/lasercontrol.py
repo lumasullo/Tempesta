@@ -211,7 +211,7 @@ class LaserControl(QtGui.QFrame):
     def changeSlider(self, value):
         """called when the slider is moved, sets the power of the laser to value"""
         self.laser.power_sp = self.slider.value() * self.mW
-        self.setPointEdit.setText(str(round(self.laser.power_sp.magnitude,3)))
+        self.setPointEdit.setText(str(round(self.laser.power_sp.magnitude*10,3)))
 
     def changeEdit(self):
         """called when the user manually changes the intensity value of the laser. 
