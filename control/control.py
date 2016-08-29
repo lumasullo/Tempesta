@@ -173,19 +173,7 @@ class TempestaGUI(QtGui.QMainWindow):
         self.slmWidget = slmWidget.slmWidget(self.slm)
         slmDock.addWidget(self.slmWidget)
         dockArea.addDock(slmDock,'above',laserDock)
-        
-
-        # Signal generation widget
-#        signalDock = Dock('Signal Generator')
-#        self.signalWidget = SignalGen.SigGenWidget(self.nidaq)
-#        signalDock.addWidget(self.signalWidget)
-#        dockArea.addDock(signalDock, 'above', laserDock)
-        
-##        Scan Widget
-#        scanDock = Dock('Scan')
-#        self.scanWidget = Scan.ScanWidget(self.nidaq)
-#        scanDock.addWidget(self.scanWidget)
-#        dockArea.addDock(scanDock, 'above', signalDock)
+    
         
          #Image Manager
         imgManager=camera_image_manager.ImageManager(self.orcaflash,self)
@@ -194,12 +182,12 @@ class TempestaGUI(QtGui.QMainWindow):
         self.recWidget = imgManager.recWidget
         self.imageWidget = imgManager.imageWidget
         
-        self.setWindowTitle('Tempesta 1.01')
+        self.setWindowTitle('Tempesta 1.1')
         self.cwidget = QtGui.QWidget()
         self.setCentralWidget(self.cwidget)
         
         #Scan Widget
-        self.scanxyWidget=scanWidget.ScanWidget(self.nidaq)
+        self.scanxyWidget=scanWidget.ScanWidget(self.nidaq,self)
         
         dockArea2 = DockArea()     
         #Webcam

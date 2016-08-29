@@ -61,15 +61,16 @@ class ScanWidget(QtGui.QFrame):
     pixel dwell time, step size, scanning width and height etc. This class is intended as a widget in the bigger GUI.
     
     :param nidaqmx.Device device: NiDaq card.
+    :param QtGui.QMainWindow main: main GUI
     """
-    def __init__(self, device, *args, **kwargs):
+    def __init__(self, device,main, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.nidaq = device
         self.aochannels = device.get_analog_output_channels()
         self.dochannels = device.get_digital_output_lines()
         self.saved_signal = np.array([0, 0])
         self.times_run = 0
-    
+        self.main=main  #The main GUI
 
         
         #Creating the GUI itself
@@ -1216,6 +1217,7 @@ class RecordingThreadAPD(QtCore.QThread):
         self.samples_in_scan = samples_per_channel
             
         try:
+            #disables the oscilloscope if it is running
             if self.imageDisplay.scanWidget.main.oscilloscope.isRunning:
                 self.imageDisplay.scanWidget.main.oscilloscope.start()
         except:
