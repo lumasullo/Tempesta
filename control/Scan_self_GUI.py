@@ -205,7 +205,7 @@ class ScanWidget(QtGui.QFrame):
         self.ScanParameterChanged("width")      #Used to actualise the number of frames displayed on screen
         
         self.pixel_cycle = PixelCycle(self.sample_rate)
-        self.graph = GraphFrame(self.pixel_cycle)
+#        self.graph = GraphFrame(self.pixel_cycle)
         self.update_Scan(['TIS', '355', '405', '488', 'CAM'])
         
         self.scanRadio = QtGui.QRadioButton('Scan')
@@ -243,45 +243,51 @@ class ScanWidget(QtGui.QFrame):
 
         grid.addWidget(QtGui.QLabel('Sequence Time (s):'),2, 0)
         grid.addWidget(self.sequence_timePar, 2, 1)
-        grid.addWidget(QtGui.QLabel('Frames in scan:'), 2, 2)
+        grid.addWidget(QtGui.QLabel('Points in scan:'), 2, 2)
         grid.addWidget(self.nrFramesPar, 2, 3)
         grid.addWidget(QtGui.QLabel('Line scanning frequency(Hz):'), 3, 2)        
         grid.addWidget(self.frequencyLabel,3,3)
         grid.addWidget(QtGui.QLabel('Step size (um):'), 3, 4)
         grid.addWidget(self.step_sizePar, 3, 5)
-        grid.addWidget(QtGui.QLabel('correction samples:'), 4, 4)
-        grid.addWidget(self.delay, 4, 5)
-        grid.addWidget(QtGui.QLabel('return time (ms)'), 5, 4)
+#        grid.addWidget(QtGui.QLabel('correction samples:'), 4, 4)
+#        grid.addWidget(self.delay, 4, 5)
+        grid.addWidget(QtGui.QLabel('Number of planes for 3D scan'), 5, 4)
         grid.addWidget(self.n_planes_param, 5, 5)
         
-        grid.addWidget(QtGui.QLabel('Start:'), 5, 1)
-        grid.addWidget(QtGui.QLabel('End:'), 5, 2)
-        grid.addWidget(QtGui.QLabel('TIS:'), 6, 0)
-        grid.addWidget(self.startTISPar, 6, 1)
-        grid.addWidget(self.endTISPar, 6, 2)
-        grid.addWidget(self.chanTISPar, 6, 3)
-        grid.addWidget(QtGui.QLabel('355:'), 7, 0)
-        grid.addWidget(self.start355Par, 7, 1)
-        grid.addWidget(self.end355Par, 7, 2)
-        grid.addWidget(self.chan355Par, 7, 3)
-        grid.addWidget(self.scanRadio, 7, 4, 2, 1)
-        grid.addWidget(self.contScanRadio,8,4,2,1)
+#        grid.addWidget(QtGui.QLabel('Start:'), 5, 1)
+#        grid.addWidget(QtGui.QLabel('End:'), 5, 2)
+#        grid.addWidget(QtGui.QLabel('TIS:'), 6, 0)
+#        grid.addWidget(self.startTISPar, 6, 1)
+#        grid.addWidget(self.endTISPar, 6, 2)
+#        grid.addWidget(self.chanTISPar, 6, 3)
+#        grid.addWidget(QtGui.QLabel('355:'), 7, 0)
+#        grid.addWidget(self.start355Par, 7, 1)
+#        grid.addWidget(self.end355Par, 7, 2)
+#        grid.addWidget(self.chan355Par, 7, 3)
+        
+        grid.addWidget(self.scanRadio, 7, 2)
+        grid.addWidget(self.contScanRadio,8,2)
+        grid.addWidget(QtGui.QLabel("Scan mode:"),7,4)
         grid.addWidget(self.Scan_Mode, 7, 5)
+        
+        grid.addWidget(QtGui.QLabel("Detector:"),8,4)
         grid.addWidget(self.recording_device,8,5)
-        grid.addWidget(QtGui.QLabel('405:'), 8, 0)
-        grid.addWidget(self.start405Par, 8, 1)
-        grid.addWidget(self.end405Par, 8, 2)
-        grid.addWidget(self.chan405Par, 8, 3)
-        grid.addWidget(self.contLaserPulsesRadio, 9, 4, 2, 1)
-        grid.addWidget(QtGui.QLabel('488:'), 9, 0)
-        grid.addWidget(self.start488Par, 9, 1)
-        grid.addWidget(self.end488Par, 9, 2)
-        grid.addWidget(self.chan488Par, 9, 3)
-        grid.addWidget(QtGui.QLabel('CAM:'), 10, 0)
-        grid.addWidget(self.startCAMPar, 10, 1)
-        grid.addWidget(self.endCAMPar, 10, 2)
-        grid.addWidget(self.chanCAMPar, 10, 3)
-        grid.addWidget(self.graph, 11, 0, 1, 6)
+        
+#        grid.addWidget(QtGui.QLabel('405:'), 8, 0)
+#        grid.addWidget(self.start405Par, 8, 1)
+#        grid.addWidget(self.end405Par, 8, 2)
+#        grid.addWidget(self.chan405Par, 8, 3)
+#        grid.addWidget(self.contLaserPulsesRadio, 9, 4, 2, 1)
+#        grid.addWidget(QtGui.QLabel('488:'), 9, 0)
+#        grid.addWidget(self.start488Par, 9, 1)
+#        grid.addWidget(self.end488Par, 9, 2)
+#        grid.addWidget(self.chan488Par, 9, 3)
+#        grid.addWidget(QtGui.QLabel('CAM:'), 10, 0)
+#        grid.addWidget(self.startCAMPar, 10, 1)
+#        grid.addWidget(self.endCAMPar, 10, 2)
+#        grid.addWidget(self.chanCAMPar, 10, 3)
+#        grid.addWidget(self.graph, 11, 0, 1, 6)
+        
         grid.addWidget(self.ScanButton, 12, 3)
         grid.addWidget(self.PreviewButton, 12, 4)    
         grid.addWidget(self.positionner,13,0,1,4)    
@@ -365,17 +371,18 @@ class ScanWidget(QtGui.QFrame):
             
         if parameter == 'sequence_time':
             self.update_Scan(['TIS', '355', '405', '488', 'CAM'])
-            self.graph.update(['TIS', '355', '405', '488', 'CAM'])
+#            self.graph.update(['TIS', '355', '405', '488', 'CAM'])
         print('In ScanParameterChanged')
         self.stage_scan.update_frames(self.scan_par_values)
+        print(self.scan_par_values)
         self.nrFramesPar.setText(str(self.stage_scan.frames))
         self.frequencyLabel.setText(str(self.stage_scan.frequency) )
         
     def PixelParameterChanged(self, parameter):
         self.pixel_par_values[parameter] = float(self.pixel_parameters[parameter].text())
         device = parameter[-3]+parameter[-2]+parameter[-1]
-        self.pixel_cycle.update([device], self.pixel_par_values, self.stage_scan.sequence_samples) 
-        self.graph.update([device])
+#        self.pixel_cycle.update([device], self.pixel_par_values, self.stage_scan.sequence_samples) 
+#        self.graph.update([device])
         
     def PreviewScan(self):
         """Displays a matplotlib graph representing the scanning's trajectory."""
@@ -451,12 +458,14 @@ class ScanWidget(QtGui.QFrame):
         else:
             self.display.saveImage("sted_plane_"+str(self.sted_scan_counter))
             
-        if self.sted_scan_counter==self.n_planes-1:
+        if self.sted_scan_counter==self.n_planes:
+            print("end 3D scan")
+            self.sted_scan_counter=0
             return
         self.scanner = Scanner(self.nidaq, self.stage_scan, self.pixel_cycle, self.current_aochannels, self.current_dochannels,self.current_recording_device, self)   
         self.scanner.scanDone.connect(self.sted_scan)            
         self.scanning = True
-        self.sted_scan_counter
+        self.sted_scan_counter+=1
         self.scanner.runScan()
             
         
@@ -988,10 +997,17 @@ class ImageDisplay(QtGui.QWidget):
         self.vb.setAspectLocked(True)
         self.img.setImage(self.array)
         self.vb.setMinimumHeight(200)
-        
-#        self.ROI = guitools.ROI((0, 0), self.vb, (0, 0), handlePos=(1, 0), handleCenter=(0, 1),scaleSnap=True, translateSnap=True)
+
+        self.ROI = guitools.ROI((10, 10), self.vb, (0, 0), handlePos=(1, 0), handleCenter=(0, 1),scaleSnap=True, translateSnap=True)
 #        self.ROI.sigRegionChangeFinished.connect(self.ROIchanged)
-#        self.ROI.hide()        
+        self.ROI.hide()   
+        self.ROI_is_displayed = False
+        self.initial_position=[0,0]     #the position of the Positionner when start recording, in V
+
+        self.ROI_show_button = QtGui.QPushButton("Select zone")
+        self.ROI_show_button.clicked.connect(self.show_ROI)
+        self.ROI_go_button =  QtGui.QPushButton("Prep. scan")
+        self.ROI_go_button.clicked.connect(self.set_scan_area)
         
         #To get intensity profile along a line
         self.hist = pg.HistogramLUTItem(image=self.img)
@@ -1007,7 +1023,10 @@ class ImageDisplay(QtGui.QWidget):
         self.viewtimer = QtCore.QTimer()
         self.viewtimer.timeout.connect(self.updatePlot)
         self.viewtimer.start(50)
-
+        
+        #The size of one pixel
+        self.pixel_size=-1
+        self.scan_axes=["x","y"]
         self.isTurning = False
         
         layout=QtGui.QGridLayout()
@@ -1020,7 +1039,8 @@ class ImageDisplay(QtGui.QWidget):
         layout.addWidget(self.browseButton,5,2)
         layout.addWidget(self.folderEdit,5,0)
         
-        
+        layout.addWidget(self.ROI_show_button,5,3)
+        layout.addWidget(self.ROI_go_button,5,4)
     def update_parameters(self,shape):
         """reshapes the array with the proper dimensions before acquisition
         
@@ -1029,6 +1049,12 @@ class ImageDisplay(QtGui.QWidget):
         self.shape=(shape[0],shape[1])
         self.pos=[0,0]
         self.img.setImage(self.array)
+        self.pixel_size = float(self.scanWidget.step_sizePar.text())
+        scan_mode= self.scanWidget.Scan_Mode.currentText()
+        self.scan_axes=[scan_mode[0],scan_mode[1]]
+        x_init= getattr(self.scanWidget.positionner,self.scan_axes[0]) 
+        y_init= getattr(self.scanWidget.positionner,self.scan_axes[1]) 
+        self.initial_position=[x_init,y_init]
         
     def updatePlot(self):
         selected = self.line.getArrayRegion(self.array, self.img)
@@ -1044,7 +1070,7 @@ class ImageDisplay(QtGui.QWidget):
             if(folder != ''):
                 self.folderEdit.setText(folder)
         except:
-            pass
+            print("We are trying to solve the problem, please wait...")
         
     def saveImage(self,filename="default"):
         """Saves the current image contained in *self.array* under a predefined name containing 
@@ -1077,7 +1103,53 @@ class ImageDisplay(QtGui.QWidget):
 
         print(type(self.folderEdit.text()),type(name),type("\\"))
         im.save(self.folderEdit.text()+"\\"+name)
+        
+    def show_ROI(self):  
+        """Shows or hide an ROI on the current image to select a specific zone to scan"""
+        if self.ROI_is_displayed:
+            self.ROI.hide()
+            self.ROI_show_button.setText("Select Zone")
+            self.ROI_is_displayed = False
+        else:
+            self.ROI.show()
+            self.ROI_show_button.setText("Hide ROI")
+            self.ROI_is_displayed = True
             
+    def set_scan_area(self):
+        """gets the position of the ROI and computes appropriate scan parameters to scan in this area"""
+        if not self.ROI_is_displayed:
+            return
+        else:
+            self.show_ROI()     #Makes the ROI disappear
+        if self.pixel_size>0:
+            width=self.ROI.size()[0]*self.pixel_size
+            height=self.ROI.size()[1]*self.pixel_size
+            x0=(self.ROI.pos()[0]-self.shape[0]/2)*self.pixel_size
+            y0=self.ROI.pos()[1]*self.pixel_size
+            print("width",width,height,"x n y",x0,y0)
+            if (x0+width/2)/correction_factors[self.scan_axes[0]]>maximum_voltages[self.scan_axes[0]]:
+                print("invalid ROI")
+                return
+            if (x0-width/2)/correction_factors[self.scan_axes[0]]<minimum_voltages[self.scan_axes[0]]:
+                print("invalid ROI")
+                return   
+                
+            if (y0+height)/correction_factors[self.scan_axes[1]]>maximum_voltages[self.scan_axes[1]]:
+                print("invalid ROI")
+                return   
+            if (y0)/correction_factors[self.scan_axes[1]]<minimum_voltages[self.scan_axes[1]]:
+                print("invalid ROI")
+                return   
+                
+            self.scanWidget.widthPar.setText(str(round(width,2)))
+            self.scanWidget.ScanParameterChanged("width")
+            self.scanWidget.heightPar.setText(str(round(height,2) ))
+            self.scanWidget.ScanParameterChanged("height")
+            print("before")
+            #Careful, the position values of the positionner are in V and not in µm
+            getattr(self.scanWidget.positionner,"set_"+self.scan_axes[0] )(self.initial_position[0]+ (x0+width/2)/correction_factors[self.scan_axes[0]])
+            getattr(self.scanWidget.positionner,"set_"+self.scan_axes[1])(self.initial_position[1] + y0/correction_factors[self.scan_axes[0]])
+            print("after")
     def set_pixel_value(self,val):
         """sets the value of one pixel from an input array. Not used anymore: point by point filling is too slow,
         we use set_line_value instead."""
@@ -1143,7 +1215,11 @@ class RecordingThreadAPD(QtCore.QThread):
         
         self.samples_in_scan = samples_per_channel
             
-
+        try:
+            if self.imageDisplay.scanWidget.main.oscilloscope.isRunning:
+                self.imageDisplay.scanWidget.main.oscilloscope.start()
+        except:
+            print("error oscilloscope")
 
 
         #To record the sensor output
@@ -1206,7 +1282,7 @@ class RecordingThreadAPD(QtCore.QThread):
             apd_data = apd_data-substraction_array #Now apd_data is an array contains at each position the number of counts at this position
             
             length_signal=len(sensor_data)//2
-            apd_data=apd_data[0:length_signal]        
+            apd_data=np.absolute(apd_data[0:length_signal])        
             sensor_data=sensor_data[0:length_signal]
             
             line = line_from_sine(apd_data,sensor_data,self.steps_per_line,amplitude,initial_position)
@@ -1512,6 +1588,26 @@ class Positionner(QtGui.QWidget):
         """Method called when a position for z is entered manually. Repositions the slider
         and initiates the movement of the stage"""
         self.z_slider.setValue(100*float(self.z_value_line.text()) / z_factor)    
+        self.move()
+        
+    def set_x(self,value):
+        """This method sets x to value in Volts and moves accordingly the slider and the corresponding value line"""
+        print("in set x",value,round(value*x_factor,2))
+        new_slider_val=value*100
+        self.x_slider.setValue(new_slider_val)
+        self.x_value_line.setText(str(round(value*x_factor,2)))
+        self.move()        
+    def set_y(self,value):
+        """This method sets y to value in Volts and moves accordingly the slider and the corresponding value line"""
+        new_slider_val=value*100
+        self.y_slider.setValue(new_slider_val)
+        self.y_value_line.setText(str(round(value*y_factor,2)))
+        self.move()        
+    def set_z(self,value):
+        """This method sets x to value in Volts and moves accordingly the slider and the corresponding value line"""
+        new_slider_val=value*100
+        self.z_slider.setValue(new_slider_val)
+        self.z_value_line.setText(str(round(value*z_factor,2)))
         self.move()
         
     def go_to_zero(self):

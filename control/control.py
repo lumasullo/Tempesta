@@ -132,10 +132,10 @@ class TempestaGUI(QtGui.QMainWindow):
         dockArea.addDock(consoleDock)
 
         #Oscilloscope
-#        oscilloDock = Dock("Oscilloscope")
-#        self.oscilloscopeWidget = oscilloscope.Oscilloscope()
-#        oscilloDock.addWidget(self.oscilloscopeWidget)
-#        dockArea.addDock(oscilloDock,"above",consoleDock)
+        oscilloDock = Dock("Oscilloscope")
+        self.oscilloscope = oscilloscope.Oscilloscope()
+        oscilloDock.addWidget(self.oscilloscope)
+        dockArea.addDock(oscilloDock,"above",consoleDock)
         
         # Emission filters table widget
 #        wheelDock = Dock("Emission filters", size=(20, 20))
