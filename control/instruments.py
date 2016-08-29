@@ -143,7 +143,7 @@ class OneFiveLaser(object):
 #            self.mode=self.getMode()
             self.setPowerSetting(self.power_setting)
             self.power_setpoint=0
-            self.power_sp = 0
+            self.power_sp = 0*self.mW
             self.setTriggerSource(self.triggerMode)
         except:
             print("Channel Busy")
