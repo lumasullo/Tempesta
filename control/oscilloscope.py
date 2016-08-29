@@ -8,7 +8,8 @@ import time
 
 import nidaqmx
 
-
+channel="Dev1/ctr0"
+terminal = "PFI0"
 class Oscilloscope(QtGui.QWidget):
     """Class defining an oscilloscope to monitor a signal from a nidaq card"""
     def __init__(self):
@@ -34,8 +35,8 @@ class Oscilloscope(QtGui.QWidget):
         
         #get the input 
         self.citask = nidaqmx.CounterInputTask()
-        self.citask.create_channel_count_edges("Dev1/ctr0", init=0 )
-        self.citask.set_terminal_count_edges("Dev1/ctr0","PFI0")
+        self.citask.create_channel_count_edges(channel, init=0 )
+        self.citask.set_terminal_count_edges(channel,terminal)
 #        self.citask.configure_timing_sample_clock(source=r'ai/SampleClock',samples_per_channel=samp_per_chan+500,sample_mode="finite")
         layout= QtGui.QGridLayout()
         self.setLayout(layout)

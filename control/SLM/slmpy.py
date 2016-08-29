@@ -3,6 +3,7 @@
 Created on Sun Dec 06 20:14:02 2015
 
 @author: Sebastien Popoff
+from http://wavefrontshaping.net
 """
 
 try:
