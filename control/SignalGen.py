@@ -51,8 +51,8 @@ class Signal(QtCore.QObject):
                
         
 class SignalGenerator(QtCore.QObject):
-    """Class signal generator defines an object that containg the signals that are then to be generated. 
-    Also initiates the devive and created necessary channels and task. Fcn Generate() connatenated the
+    """Class signal generator defines an object that contains the signals that are then to be generated. 
+    Also initiates the devive and creates necessary channels and tasks. Fcn Generate() concatenates the signals
     and writes to task. Then the task is started. Fcn Stop() stops the task. """
 
     def __init__(self, device, *args, **kwargs):
@@ -137,15 +137,15 @@ class SignalFrame(QtGui.QFrame):
 #        self.S1label = QtGui.QLabel('Start (ms)')
 #        self.W1label = QtGui.QLabel('Width (ms)')  
         self.S1edit = QtGui.QLineEdit('20')
-        self.S1edit.editingFinished.connect(lambda: self.S1edit.setText(str(self.valueChanged(int(self.S1edit.text())))))
+        self.S1edit.editingFinished.connect(lambda: self.S1edit.setText(str(self.valueChanged(float(self.S1edit.text())))))
         self.W1edit = QtGui.QLineEdit('10')
-        self.W1edit.editingFinished.connect(lambda: self.W1edit.setText(str(self.valueChanged(int(self.S1edit.text()) + int(self.W1edit.text())) - int(self.S1edit.text()))))
+        self.W1edit.editingFinished.connect(lambda: self.W1edit.setText(str(self.valueChanged(float(self.S1edit.text()) + float(self.W1edit.text())) - float(self.S1edit.text()))))
 #        self.S2label = QtGui.QLabel('Start (ms)')
 #        self.W2label = QtGui.QLabel('Width (ms)')
         self.S2edit = QtGui.QLineEdit('40')
-        self.S2edit.editingFinished.connect(lambda: self.S2edit.setText(str(self.valueChanged(int(self.S2edit.text())))))
+        self.S2edit.editingFinished.connect(lambda: self.S2edit.setText(str(self.valueChanged(float(self.S2edit.text())))))
         self.W2edit = QtGui.QLineEdit('10')
-        self.W2edit.editingFinished.connect(lambda: self.W2edit.setText(str(self.valueChanged(int(self.S2edit.text()) + int(self.W2edit.text())) - int(self.S2edit.text()))))
+        self.W2edit.editingFinished.connect(lambda: self.W2edit.setText(str(self.valueChanged(float(self.S2edit.text()) + float(self.W2edit.text())) - float(self.S2edit.text()))))
 #        self.S3label = QtGui.QLabel('Start (ms)')
 #        self.W3label = QtGui.QLabel('Width (ms)')  
 #        self.S3edit = QtGui.QLineEdit()
@@ -183,18 +183,18 @@ class SignalFrame(QtGui.QFrame):
     def CheckValue(self, value):
         if value == '':
             value = 0
-        value = int(value)
-        max_value = int(self.main.Cycletimeedit.text())
+        value = float(value)
+        max_value = float(self.main.Cycletimeedit.text())
         if value > max_value:
             return max_value
         else:
             return value
             
     def checkAllValues(self):
-        self.S1edit.setText(str(self.valueChanged(int(self.S1edit.text()))))
-        self.W1edit.setText(str(self.valueChanged(int(self.S1edit.text()) + int(self.W1edit.text())) - int(self.S1edit.text())))
-        self.S2edit.setText(str(self.valueChanged(value = int(self.S2edit.text()))))
-        self.W2edit.setText(str(self.valueChanged(int(self.S2edit.text()) + int(self.W2edit.text())) - int(self.S2edit.text())))
+        self.S1edit.setText(str(self.valueChanged(float(self.S1edit.text()))))
+        self.W1edit.setText(str(self.valueChanged(float(self.S1edit.text()) + float(self.W1edit.text())) - float(self.S1edit.text())))
+        self.S2edit.setText(str(self.valueChanged(value = float(self.S2edit.text()))))
+        self.W2edit.setText(str(self.valueChanged(float(self.S2edit.text()) + float(self.W2edit.text())) - float(self.S2edit.text())))
                 
              
 
@@ -283,12 +283,12 @@ class SigGenWidget(QtGui.QFrame):
         
         
     def Updatesignal(self, device):
-#       TODO!!! Does not work for decimal inputs in start, width and probably also cycle time.
-        nSamples = int(100000 * int(self.Cycletimeedit.text()) / 1000)
+
+        nSamples = int(100000 * float(self.Cycletimeedit.text()) / 1000)
         
         if device == '355':
-            sig4p1 = Pulse(int(self.sig4frame.S1edit.text()) * 100, int(self.sig4frame.W1edit.text()) * 100)
-            sig4p2 = Pulse(int(self.sig4frame.S2edit.text()) * 100, int(self.sig4frame.W2edit.text()) * 100)
+            sig4p1 = Pulse(int(float(self.sig4frame.S1edit.text()) * 100), int(float(self.sig4frame.W1edit.text()) * 100))
+            sig4p2 = Pulse(int(float(self.sig4frame.S2edit.text()) * 100), int(float(self.sig4frame.W2edit.text()) * 100))
             self.generator.signal355.reset()
             self.generator.signal355.setLength(nSamples)
             self.generator.signal355.addPulse(sig4p1)
@@ -296,8 +296,8 @@ class SigGenWidget(QtGui.QFrame):
             self.pulsegraph.update(device, self.generator.signal355.array)
             
         elif device == '405':
-            sig5p1 = Pulse(int(self.sig5frame.S1edit.text()) * 100, int(self.sig5frame.W1edit.text()) * 100)
-            sig5p2 = Pulse(int(self.sig5frame.S2edit.text()) * 100, int(self.sig5frame.W2edit.text()) * 100)
+            sig5p1 = Pulse(int(float(self.sig5frame.S1edit.text()) * 100), int(float(self.sig5frame.W1edit.text()) * 100))
+            sig5p2 = Pulse(int(float(self.sig5frame.S2edit.text()) * 100), int(float(self.sig5frame.W2edit.text()) * 100))
             self.generator.signal405.reset()
             self.generator.signal405.setLength(nSamples)
             self.generator.signal405.addPulse(sig5p1)        
@@ -305,16 +305,16 @@ class SigGenWidget(QtGui.QFrame):
             self.pulsegraph.update(device, self.generator.signal405.array)
             
         elif device == '488':
-            sig6p1 = Pulse(int(self.sig6frame.S1edit.text()) * 100, int(self.sig6frame.W1edit.text()) * 100)
-            sig6p2 = Pulse(int(self.sig6frame.S2edit.text()) * 100, int(self.sig6frame.W2edit.text()) * 100)
+            sig6p1 = Pulse(int(float(self.sig6frame.S1edit.text()) * 100), int(float(self.sig6frame.W1edit.text()) * 100))
+            sig6p2 = Pulse(int(float(self.sig6frame.S2edit.text()) * 100), int(float(self.sig6frame.W2edit.text()) * 100))
             self.generator.signal488.reset()
             self.generator.signal488.setLength(nSamples)
             self.generator.signal488.addPulse(sig6p1)  
             self.generator.signal488.addPulse(sig6p2)
             self.pulsegraph.update(device, self.generator.signal488.array)
         elif device == 'Cam':
-            sig7p1 = Pulse(int(self.sig7frame.S1edit.text()) * 100, int(self.sig7frame.W1edit.text()) * 100)
-            sig7p2 = Pulse(int(self.sig7frame.S2edit.text()) * 100, int(self.sig7frame.W2edit.text()) * 100)
+            sig7p1 = Pulse(int(float(self.sig7frame.S1edit.text()) * 100), int(float(self.sig7frame.W1edit.text()) * 100))
+            sig7p2 = Pulse(int(float(self.sig7frame.S2edit.text()) * 100), int(float(self.sig7frame.W2edit.text()) * 100))
             self.generator.signalCam.reset()
             self.generator.signalCam.setLength(nSamples) 
             self.generator.signalCam.addPulse(sig7p1)  

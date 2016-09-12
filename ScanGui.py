@@ -7,11 +7,12 @@ Created on Thu Mar 31 11:54:52 2016
 
 from pyqtgraph.Qt import QtGui
 from scanner_only import Scan_self_GUI
-from control import control
+# from control import control
 from control import libnidaqmx
 
-def main(): 
-    
+
+def main():
+
     app = QtGui.QApplication([])
 
     win = Scan_self_GUI.ScanWidget(libnidaqmx.Device('Dev1'))
@@ -20,6 +21,6 @@ def main():
     win.show()
 
     app.exec_()
-    
+
 if __name__ == '__main__':
     main()

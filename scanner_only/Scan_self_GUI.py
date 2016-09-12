@@ -18,6 +18,8 @@ from numpy import arange
 import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
 
+import control.guitools as guitools
+
 
 
 
@@ -35,33 +37,48 @@ class ScanWidget(QtGui.QMainWindow):
         self.nidaq = device
         self.aochannels = device.get_analog_output_channels()
         self.dochannels = device.get_digital_output_lines()
+        self.all_devices = ['TIS', '355', '405', '488', 'CAM']
         self.saved_signal = np.array([0, 0])
         self.times_run = 0
+        self.saveScanBtn = QtGui.QPushButton('Save Scan')
+        saveScanFcn = lambda: guitools.saveScan(self)
+        self.saveScanBtn.clicked.connect(saveScanFcn) 
+        self.loadScanBtn = QtGui.QPushButton('Load Scan')
+        loadScanFcn = lambda: guitools.loadScan(self)
+        self.loadScanBtn.clicked.connect(loadScanFcn)        
+        
         self.widthPar = QtGui.QLineEdit('10')
         self.widthPar.editingFinished.connect(lambda: self.ScanParameterChanged('width'))
         self.heightPar = QtGui.QLineEdit('10')
         self.heightPar.editingFinished.connect(lambda: self.ScanParameterChanged('height'))
-        self.sequence_timePar = QtGui.QLineEdit('0.1') # Seconds
+        self.sequence_timePar = QtGui.QLineEdit('100') # Milliseconds
         self.sequence_timePar.editingFinished.connect(lambda: self.ScanParameterChanged('sequence_time'))
         self.nrFramesPar = QtGui.QLabel()
+        self.scanDuration = QtGui.QLabel()
         self.step_sizePar = QtGui.QLineEdit('0.5')
         self.step_sizePar.editingFinished.connect(lambda: self.ScanParameterChanged('step_size'))
         self.sample_rate = 100000
         
+        self.Scan_Mode_label= QtGui.QLabel('Scan mode:')        
         self.Scan_Mode = QtGui.QComboBox()
         self.scan_modes = ['FOV scan', 'Line scan']
         self.Scan_Mode.addItems(self.scan_modes)
         self.Scan_Mode.currentIndexChanged.connect(lambda: self.setScanMode(self.Scan_Mode.currentText()))
         
-        self.scan_parameters = {'width': self.widthPar, 'height': self.heightPar,
-                           'sequence_time': self.sequence_timePar,
-                           'conversion': self.nrFramesPar,
-                           'step_size': self.step_sizePar}
+        self.prim_scan_dim_label= QtGui.QLabel('Primary scan dim:')          
+        self.prim_scan_dim = QtGui.QComboBox()
+        self.scan_dims = ['x', 'y']
+        self.prim_scan_dim.addItems(self.scan_dims)
+        self.prim_scan_dim.currentIndexChanged.connect(lambda: self.setPrimScanDim(self.prim_scan_dim.currentText()))
+        
+        self.scan_parameters = {'width': self.widthPar, 
+                                'height': self.heightPar,
+                                'sequence_time': self.sequence_timePar,
+                                'step_size': self.step_sizePar}
 
         self.scan_par_values = {'width': float(self.widthPar.text()),
                            'height': float(self.heightPar.text()),
-                           'sequence_time': float(self.sequence_timePar.text()),
-                           'frames': '-',
+                           'sequence_time': float(self.sequence_timePar.text())/1000,
                            'step_size': float(self.step_sizePar.text())}
                            
         self.start488Par = QtGui.QLineEdit('0')
@@ -100,16 +117,16 @@ class ScanWidget(QtGui.QMainWindow):
                                  'endCAM': self.endCAMPar}
 
         
-        self.pixel_par_values = {'startTIS': float(self.startTISPar.text()),
-                                 'start355': float(self.start355Par.text()),
-                                 'start405': float(self.start405Par.text()),
-                                 'start488': float(self.start488Par.text()),
-                                 'startCAM': float(self.startCAMPar.text()),
-                                 'end488': float(self.end488Par.text()),
-                                 'end405': float(self.end405Par.text()),
-                                 'end355': float(self.end355Par.text()),
-                                 'endTIS': float(self.endTISPar.text()),
-                                 'endCAM': float(self.endCAMPar.text())}
+        self.pixel_par_values = {'startTIS': float(self.startTISPar.text())/1000,
+                                 'start355': float(self.start355Par.text())/1000,
+                                 'start405': float(self.start405Par.text())/1000,
+                                 'start488': float(self.start488Par.text())/1000,
+                                 'startCAM': float(self.startCAMPar.text())/1000,
+                                 'end488': float(self.end488Par.text())/1000,
+                                 'end405': float(self.end405Par.text())/1000,
+                                 'end355': float(self.end355Par.text())/1000,
+                                 'endTIS': float(self.endTISPar.text())/1000,
+                                 'endCAM': float(self.endCAMPar.text())/1000}
         
         self.current_dochannels = {'TIS': 0, '355': 1, '405': 2, '488': 3, 'CAM': 4}
         self.current_aochannels = {'x': 0, 'y': 1}
@@ -142,7 +159,7 @@ class ScanWidget(QtGui.QMainWindow):
         self.stage_scan = StageScan(self.sample_rate)
         self.pixel_cycle = PixelCycle(self.sample_rate)
         self.graph = GraphFrame(self.pixel_cycle)
-        self.update_Scan(['TIS', '355', '405', '488', 'CAM'])
+        self.update_Scan(self.all_devices)
         
         self.scanRadio = QtGui.QRadioButton('Scan')
         self.scanRadio.clicked.connect(lambda: self.setScanOrNot(True))
@@ -160,52 +177,59 @@ class ScanWidget(QtGui.QMainWindow):
         self.cwidget = QtGui.QWidget()
         self.setCentralWidget(self.cwidget)
         grid = QtGui.QGridLayout()
-        self.cwidget.setLayout(grid)
-#        self.setLayout(grid)
+        self.cwidget.setLayout(grid)        
+
 #        grid.setRowMaximumHeight(0, 20)
 #        grid.setRowMamimumHeight(1, 20)
-        grid.addWidget(QtGui.QLabel('X channel'), 0, 4)
-        grid.addWidget(self.XchanPar, 0, 5)
-        grid.addWidget(QtGui.QLabel('Width (um):'), 0, 0, 2, 1)
-        grid.addWidget(self.widthPar, 0, 1, 2, 1)
-        grid.addWidget(QtGui.QLabel('Height (um):'), 0, 2, 2, 1)
-        grid.addWidget(self.heightPar, 0, 3, 2, 1)
-        grid.addWidget(QtGui.QLabel('Y channel'), 1, 4)
-        grid.addWidget(self.YchanPar, 1, 5)
-        grid.addWidget(QtGui.QLabel('Sequence Time (s):'),3, 0)
-        grid.addWidget(self.sequence_timePar, 3, 1)
-        grid.addWidget(QtGui.QLabel('Frames in scan:'), 3, 2)
-        grid.addWidget(self.nrFramesPar, 3, 3)
-        grid.addWidget(QtGui.QLabel('Step size (um):'), 3, 4)
-        grid.addWidget(self.step_sizePar, 3, 5)
-        grid.addWidget(QtGui.QLabel('Start:'), 5, 1)
-        grid.addWidget(QtGui.QLabel('End:'), 5, 2)
-        grid.addWidget(QtGui.QLabel('TIS:'), 6, 0)
-        grid.addWidget(self.startTISPar, 6, 1)
-        grid.addWidget(self.endTISPar, 6, 2)
-        grid.addWidget(self.chanTISPar, 6, 3)
-        grid.addWidget(QtGui.QLabel('355:'), 7, 0)
-        grid.addWidget(self.start355Par, 7, 1)
-        grid.addWidget(self.end355Par, 7, 2)
-        grid.addWidget(self.chan355Par, 7, 3)
-        grid.addWidget(self.scanRadio, 7, 4, 2, 1)
-        grid.addWidget(self.Scan_Mode, 7, 5)
-        grid.addWidget(QtGui.QLabel('405:'), 8, 0)
-        grid.addWidget(self.start405Par, 8, 1)
-        grid.addWidget(self.end405Par, 8, 2)
-        grid.addWidget(self.chan405Par, 8, 3)
-        grid.addWidget(self.contLaserPulsesRadio, 9, 4, 2, 1)
-        grid.addWidget(QtGui.QLabel('488:'), 9, 0)
-        grid.addWidget(self.start488Par, 9, 1)
-        grid.addWidget(self.end488Par, 9, 2)
-        grid.addWidget(self.chan488Par, 9, 3)
-        grid.addWidget(QtGui.QLabel('CAM:'), 10, 0)
-        grid.addWidget(self.startCAMPar, 10, 1)
-        grid.addWidget(self.endCAMPar, 10, 2)
-        grid.addWidget(self.chanCAMPar, 10, 3)
-        grid.addWidget(self.graph, 11, 0, 1, 6)
-        grid.addWidget(self.ScanButton, 12, 3)
-        grid.addWidget(self.PreviewButton, 12, 4)        
+        grid.addWidget(self.loadScanBtn, 0 , 0)
+        grid.addWidget(self.saveScanBtn, 0 , 1)
+        grid.addWidget(QtGui.QLabel('X channel'), 1, 4)
+        grid.addWidget(self.XchanPar, 1, 5)
+        grid.addWidget(QtGui.QLabel('Width (um):'), 2, 0, 2, 1)
+        grid.addWidget(self.widthPar, 2, 1, 2, 1)
+        grid.addWidget(QtGui.QLabel('Height (um):'), 2, 2, 2, 1)
+        grid.addWidget(self.heightPar, 2, 3, 2, 1)
+        grid.addWidget(QtGui.QLabel('Y channel'), 2, 4)
+        grid.addWidget(self.YchanPar, 2, 5)
+        grid.addWidget(QtGui.QLabel('Sequence Time (ms):'),4, 0)
+        grid.addWidget(self.sequence_timePar, 4, 1)
+        grid.addWidget(QtGui.QLabel('Frames in scan:'), 4, 2)
+        grid.addWidget(self.nrFramesPar, 4, 3)
+        grid.addWidget(QtGui.QLabel('Scan duration (s):'), 5, 4)
+        grid.addWidget(self.scanDuration, 5, 5)
+        grid.addWidget(QtGui.QLabel('Step size (um):'), 4, 4)
+        grid.addWidget(self.step_sizePar, 4, 5)
+        grid.addWidget(QtGui.QLabel('Start (ms):'), 6, 1)
+        grid.addWidget(QtGui.QLabel('End (ms):'), 6, 2)
+        grid.addWidget(QtGui.QLabel('TIS:'), 7, 0)
+        grid.addWidget(self.startTISPar, 7, 1)
+        grid.addWidget(self.endTISPar, 7, 2)
+        grid.addWidget(self.chanTISPar, 7, 3)
+        grid.addWidget(QtGui.QLabel('488 OFF::'), 8, 0)
+        grid.addWidget(self.start355Par, 8, 1)
+        grid.addWidget(self.end355Par, 8, 2)
+        grid.addWidget(self.chan355Par, 8, 3)
+        grid.addWidget(self.scanRadio, 8, 4, 2, 1)
+        grid.addWidget(self.Scan_Mode_label, 7, 5)
+        grid.addWidget(self.Scan_Mode, 8, 5)
+        grid.addWidget(self.prim_scan_dim_label, 9, 5)
+        grid.addWidget(self.prim_scan_dim, 10, 5)
+        grid.addWidget(QtGui.QLabel('405:'), 9, 0)
+        grid.addWidget(self.start405Par, 9, 1)
+        grid.addWidget(self.end405Par, 9, 2)
+        grid.addWidget(self.chan405Par, 9, 3)
+        grid.addWidget(self.contLaserPulsesRadio, 10, 4, 2, 1)
+        grid.addWidget(QtGui.QLabel('488 EX:'), 10, 0)
+        grid.addWidget(self.start488Par, 10, 1)
+        grid.addWidget(self.end488Par, 10, 2)
+        grid.addWidget(self.chan488Par, 10, 3)
+        grid.addWidget(QtGui.QLabel('CAM:'), 11, 0)
+        grid.addWidget(self.startCAMPar, 11, 1)
+        grid.addWidget(self.endCAMPar, 11, 2)
+        grid.addWidget(self.chanCAMPar, 11, 3)
+        grid.addWidget(self.graph, 12, 0, 1, 6)
+        grid.addWidget(self.ScanButton, 13, 3)
+        grid.addWidget(self.PreviewButton, 13, 4)
         
     @property
     def scanOrNot(self):
@@ -219,8 +243,9 @@ class ScanWidget(QtGui.QMainWindow):
     def EnableScanPars(self, value):
         self.widthPar.setEnabled(value)
         self.heightPar.setEnabled(value)
-#        self.sequence_timePar.setEnabled(value)
         self.step_sizePar.setEnabled(value)
+        self.Scan_Mode.setEnabled(value)
+        self.prim_scan_dim.setEnabled(value)
         if value:
             self.ScanButton.setText('Scan')
         else:
@@ -233,6 +258,11 @@ class ScanWidget(QtGui.QMainWindow):
             
         self.stage_scan.set_scan_mode(mode)
         self.ScanParameterChanged('scan_mode')
+        
+    def setPrimScanDim(self, dim):             
+            
+        self.stage_scan.set_prim_scan_dim(dim)
+        self.ScanParameterChanged('prim_scan_dim')
         
     def AOchannelsChanged (self):
         
@@ -254,19 +284,21 @@ class ScanWidget(QtGui.QMainWindow):
         
         
     def ScanParameterChanged(self, parameter):
-        if not parameter == 'scan_mode':
-            self.scan_par_values[parameter] = float(self.scan_parameters[parameter].text())
+        if not parameter in ('scan_mode', 'prim_scan_dim'):
+            if parameter == 'sequence_time':
+                self.scan_par_values[parameter] = float(self.scan_parameters[parameter].text())/1000 #To get in seconds
+            else:    
+                self.scan_par_values[parameter] = float(self.scan_parameters[parameter].text())
             
         if parameter == 'sequence_time':
-            self.update_Scan(['TIS', '355', '405', '488', 'CAM'])
-            self.graph.update(['TIS', '355', '405', '488', 'CAM'])
-        print('In ScanParameterChanged')
+            self.update_Scan(self.all_devices)
+            self.graph.update(self.all_devices)
         self.stage_scan.update_frames(self.scan_par_values)
         self.nrFramesPar.setText(str(self.stage_scan.frames))
+        self.scanDuration.setText(str((1/1000)*self.stage_scan.frames*float(self.sequence_timePar.text())))
                 
-        
     def PixelParameterChanged(self, parameter):
-        self.pixel_par_values[parameter] = float(self.pixel_parameters[parameter].text())
+        self.pixel_par_values[parameter] = float(self.pixel_parameters[parameter].text()) / 1000
         device = parameter[-3]+parameter[-2]+parameter[-1]
         self.pixel_cycle.update([device], self.pixel_par_values, self.stage_scan.sequence_samples) 
         self.graph.update([device])
@@ -285,6 +317,7 @@ class ScanWidget(QtGui.QMainWindow):
         else:
             self.scanner.abort()
     
+    #PrepAndRun is only called if scanner is not running (See ScanOrAbort funciton)
     def PrepAndRun(self):
 
         if self.scanRadio.isChecked():
@@ -297,6 +330,7 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanner.runScan()
             
         elif self.ScanButton.isChecked():
+#            self.lasercycle = LaserCycle(self.pixel_cycle, self.current_dochannels)
             self.lasercycle = LaserCycle(self.nidaq, self.pixel_cycle, self.current_dochannels)
             self.ScanButton.setText('Stop')
             self.lasercycle.run()
@@ -328,8 +362,6 @@ class ScanWidget(QtGui.QMainWindow):
         except:
             pass
         
-        
-# This class was intended as a QThread to not intefere with the rest of the widgets in the GUI. 
 
 class Wait_Thread(QtCore.QThread):
     waitdoneSignal = QtCore.pyqtSignal()
@@ -385,9 +417,9 @@ class Scanner(QtCore.QObject):
         final_samps = [final_x, final_y]
         
 #        Following code should correct channels mentioned in Buglist.
-#        final_samps = [0, 0]
-#        final_samps[self.current_aochannels['x']] = final_x
-#        final_samps[self.current_aochannels['y']] = final_y        
+        final_samps = [0, 0]
+        final_samps[self.current_aochannels['x']] = final_x
+        final_samps[self.current_aochannels['y']] = final_y        
         
         return_ramps = np.array([])
         for i in range(0,2):
@@ -396,8 +428,8 @@ class Scanner(QtCore.QObject):
         
                 
         
-        magic = np.ones(100)  # Seems to decrease frequency of Invalid task errors.            
-            
+#        magic = np.ones(100)  # Seems to decrease frequency of Invalid task errors.          
+        print('aotaskis: ', self.aotask)
         self.aotask.stop()    
         self.aotask.configure_timing_sample_clock(rate = self.stage_scan.sample_rate,
                                                  sample_mode = 'finite',
@@ -417,17 +449,15 @@ class Scanner(QtCore.QObject):
         self.finalizeDone.emit()
         
     def runScan(self):
-        self.nidaq.reset()
         scan_time = self.samples_in_scan / self.main.sample_rate
         ret = QtGui.QMessageBox.Yes
-        self.scantimewar.setText("Scan will %s seconds" %scan_time)
+        self.scantimewar.setText("Scan will take %s seconds" %scan_time)
         if scan_time > self.warning_time:
             ret = self.scantimewar.exec_()
             
         if ret == QtGui.QMessageBox.No:
             self.done()
             return
-#        self.nidaq.reset() 
 
 
         full_ao_signal = []
@@ -483,6 +513,7 @@ class Scanner(QtCore.QObject):
 #            return_ramps = np.append(return_ramps, ramp_and_k[0]) 
 #            
 #        print(np.ones(1)) # This line alone fixes the problem...
+     
         self.waiter.waitdoneSignal.connect(self.finalize)
         
         self.dotask.write(full_do_signal, layout = 'group_by_channel', auto_start = False)
@@ -521,6 +552,7 @@ class Scanner(QtCore.QObject):
 
 class LaserCycle():
     
+#    def __init__(self, pixel_cycle, curren_dochannels):
     def __init__(self, device, pixel_cycle, curren_dochannels):
         
         self.nidaq = device
@@ -561,6 +593,7 @@ class StageScan():
     
     def __init__(self, sample_rate):
         self.scan_mode = 'FOV scan'
+        self.prim_scan_dim = 'x'
         self.sig_dict = {'x_sig': [], 'y_sig': []}
         self.sample_rate = sample_rate
         self.sequence_samples = None
@@ -570,7 +603,10 @@ class StageScan():
         self.frames = 0
         
     def set_scan_mode(self, mode):
-        self.scan_mode = mode  
+        self.scan_mode = mode
+        
+    def set_prim_scan_dim(self, dim):
+        self.prim_scan_dim = dim  
         
     def update_frames(self, par_values):
         self.scans[self.scan_mode].update_frames(par_values)
@@ -579,24 +615,11 @@ class StageScan():
     def update(self, par_values):
         print('in update stage_scan')
         print('self.scan_mode = ', self.scan_mode)
-        self.scans[self.scan_mode].update(par_values)
+        self.scans[self.scan_mode].update(par_values, self.prim_scan_dim)
         self.sig_dict = self.scans[self.scan_mode].sig_dict
         self.sequence_samples = self.scans[self.scan_mode].sequence_samples
         self.frames = self.scans[self.scan_mode].frames
         
-#        if self.scan_mode == 'FOV scan':
-#            print('in update FOV_scan')
-#            self.FOV_scan.update(par_values)
-#            self.sig_dict = self.FOV_scan.sig_dict
-#            self.sequence_samples = self.FOV_scan.sequence_samples
-#            self.frames = self.FOV_scan.steps_x*self.FOV_scan.steps_y
-#            
-#        elif self.scan_mode == 'Line scan':
-#            print('in update Line_scan')
-#            self.line_scan.update(par_values)  
-#            self.sig_dict = self.line_scan.sig_dict
-#            self.sequence_samples = self.line_scan.sequence_samples
-#            self.frames = self.line_scan.steps_y
             
 class Line_scan():
         
@@ -613,7 +636,7 @@ class Line_scan():
         steps_y = int(np.ceil(size_y / step_size))
         self.frames = steps_y
         
-    def update(self, par_values):
+    def update(self, par_values, prim_scan_dim):
         
         # Create signals
         start_x = 0
@@ -628,8 +651,8 @@ class Line_scan():
         ramp_and_k = make_ramp(start_y, size_y, column_samples) # ramp_and_k contains [ramp, k]
         ramp = ramp_and_k[0]
         
-        self.sig_dict['y_sig'] = 1.14 * ramp
-        self.sig_dict['x_sig'] = np.zeros(len(ramp))
+        self.sig_dict[prim_scan_dim+'_sig'] = 1.14 * ramp
+        self.sig_dict[chr(121-(ord(prim_scan_dim)%2))+'_sig'] = np.zeros(len(ramp))
         
 class FOV_Scan():
     
@@ -655,7 +678,7 @@ class FOV_Scan():
         self.frames = steps_y*steps_x
                 
         
-    def update(self, par_values):
+    def update(self, par_values, prim_scan_dim):
         
         # Create signals
         start_x = 0
@@ -686,28 +709,28 @@ class FOV_Scan():
 
         turn_rtl = ltr_ramp[-1] + turn_rtl;
 
-        x_sig = []
-        y_sig = []
+        prim_dim_sig = []
+        sec_dim_sig = []
         new_value = start_y
         for i in range(0,self.steps_y):
             if i%2==0:               
-                x_sig = np.concatenate((x_sig, ltr_ramp, turn_rtl))
+                prim_dim_sig = np.concatenate((prim_dim_sig, ltr_ramp, turn_rtl))
             else:
-                x_sig = np.concatenate((x_sig, rtl_ramp, turn_ltr))
-            y_sig = np.concatenate((y_sig, new_value*np.ones(row_samples), new_value+y_ramp_smooth))
+                prim_dim_sig = np.concatenate((prim_dim_sig, rtl_ramp, turn_ltr))
+            sec_dim_sig = np.concatenate((sec_dim_sig, new_value*np.ones(row_samples), new_value+y_ramp_smooth))
             new_value = new_value + self.corr_step_size
             
         i = i + 1
         if i%2 == 0:
-            x_sig = np.concatenate((x_sig, ltr_ramp))
+            prim_dim_sig = np.concatenate((prim_dim_sig, ltr_ramp))
         else:
-            x_sig = np.concatenate((x_sig, rtl_ramp))  
-        y_sig = np.concatenate((y_sig, new_value*np.ones(row_samples)))
+            prim_dim_sig = np.concatenate((prim_dim_sig, rtl_ramp))  
+        sec_dim_sig = np.concatenate((sec_dim_sig, new_value*np.ones(row_samples)))
 
         # Assign x_sig
-        self.sig_dict['x_sig'] = 1.14 * x_sig
+        self.sig_dict[prim_scan_dim+'_sig'] = 1.14 * prim_dim_sig
         # Assign y_sig
-        self.sig_dict['y_sig'] = 1.14 * y_sig
+        self.sig_dict[chr(121-(ord(prim_scan_dim)%2))+'_sig'] = 1.14 * sec_dim_sig
         
 # The follwing class contains the digital signals for the pixel cycle. The update function takes a parameter_values
 # dict and updates the signal accordingly.         
@@ -751,8 +774,11 @@ class GraphFrame(pg.GraphicsWindow):
                               '488': self.plot.plot(pen=pg.mkPen(0, 247, 255)), 
                               'CAM': self.plot.plot(pen='w')}
         
-    def update(self, devices):
-        
+    def update(self, devices = None):
+                 
+        if devices == None:
+            devices = self.plot_sig_dict
+            
         for device in devices:
             signal = self.pixel_cycle.sig_dict[device+'sig']
             self.plot_sig_dict[device].setData(signal)      

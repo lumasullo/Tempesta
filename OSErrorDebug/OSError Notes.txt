@@ -1,0 +1,26 @@
+For some time, an error has sporadically been thrown saying:
+
+
+OSError: exception: access violation reading 0x000007FE0B1EA090
+
+Is seems that this error is a result of some memory issue. I have now tried to investigate the source/a fix for this in focusing on the case when it is 
+thrown as a result of changing the output voltage to control the Ti-Sa laser.
+
+Starting by isolating the code from all GUIs etc and running from the Spyder console the error was (as expected) not thrown. Next step was to isolate the 
+small part of code together with its immediate GUI envoronment. The .py-files for this are in the OSErrorDebug folder.
+
+When running it like this it first appeared to work. But then I realized that if I ran the for loop changing the power repeatedly 10000 times, and while 
+this was running I changes to another active window, the OSError was immediatly thrown and output aborted/crashed. I'm can't explain why this happened
+but my conclusion from this and more playing around with this "program" is that it is for some reason very sensitive to other processes happening
+at the same time as it's running. This is further corroborated by the fact that the error has previously seemed to appear more often if alot of other 
+processed are being run at the same time. Going back to the main Tempesta program it was found that there is a updatePowers thread started from the 
+lasercontron module that continously runs in the background. When the code was modified to not start this thread, the OSError seemed to disappear. 
+If the updatePowers thread was inactive but the liveview (which initiates the LiveViewThread) was started the OSError again appeared. Conclusion 
+from this is that when threads are running in the program there is a risk of some sort of memory clash with the libnidaqmx/NIDAQmx modules/drivers.
+
+After very basically implementing the power changing analoug output in a seperate child process using the multiprocessing module the error no longer
+appeared even though the updatePower thread and the liveviewthread was running simultaneously. 
+
+For future development, further utilizing the multiprocessing module seems like an advantage, both to increase stability and overall performance. 
+
+

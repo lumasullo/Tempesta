@@ -1,0 +1,46 @@
+05-08-2016  
+
+pressed scan, no Ti-Sa
+
+
+ self.aotask.create_voltage_channel(phys_channel = chanstring, channel_name = 'chan%s'%dim, min_val = min_ao, max_val = max_ao)
+  File "C:\Users\testaRES\Documents\GitHub\Tempesta\control\libnidaqmx.py", line 3237, in create_voltage_channel
+    self._set_channel_type(self.get_channel_type(channel_name))
+  File "C:\Users\testaRES\Documents\GitHub\Tempesta\control\libnidaqmx.py", line 1887, in get_channel_type
+    CALL('GetChanType', self, channel_name, ctypes.byref(t))
+  File "C:\Users\testaRES\Documents\GitHub\Tempesta\control\libnidaqmx.py", line 270, in CALL
+    r = CHK(r, funcname, *new_args)
+  File "C:\Users\testaRES\Documents\GitHub\Tempesta\control\libnidaqmx.py", line 248, in CHK
+    raise NIDAQmxRuntimeError('%s%s:%s' % (funcname,args, text))
+control.libnidaqmx.NIDAQmxRuntimeError: DAQmxGetChanType(AnalogOutputTask(b'aotask'), b'chanx', <cparam 'P' (00000000082EFB90)>):
+  Task specified is invalid or does not exist. Status Code: -200088
+  ----------
+Aborting scan
+in finalize
+in ScanDone()
+Traceback (most recent call last):
+  File "C:\Users\testaRES\Documents\GitHub\Tempesta\scanner_only\Scan_self_GUI.py", line 286, in ScanOrAbort
+    self.scanner.abort()
+  File "C:\Users\testaRES\Documents\GitHub\Tempesta\scanner_only\Scan_self_GUI.py", line 520, in abort
+    self.finalize()        
+  File "C:\Users\testaRES\Documents\GitHub\Tempesta\scanner_only\Scan_self_GUI.py", line 380, in finalize
+    self.waiter.waitdoneSignal.disconnect(self.finalize) #Apparently important, otherwise finalize is called again when next waiting finishes.
+TypeError: 'method' object is not connected
+
+
+
+
+pwr changed during rec scan, yes Ti-Sa
+===== 2016.08.05 19:08:48 =====
+Traceback (most recent call last):
+  File "C:\Users\testaRES\Documents\GitHub\Tempesta\control\lasercontrol.py", line 229, in changeEdit
+    self.change_voltage(new_value.magnitude)
+  File "C:\Users\testaRES\Documents\GitHub\Tempesta\control\lasercontrol.py", line 234, in change_voltage
+    self.aotask_tisa.write(data, layout = 'group_by_channel') 
+  File "C:\Users\testaRES\Documents\GitHub\Tempesta\control\libnidaqmx.py", line 3315, in write
+    float64 (timeout), layout_val, data.ctypes.data, ctypes.byref(samples_written), None)
+  File "C:\Users\testaRES\Documents\GitHub\Tempesta\control\libnidaqmx.py", line 269, in CALL
+    r = func(*new_args)
+OSError: exception: access violation reading 0x000007FE0B1EA090
+
+
