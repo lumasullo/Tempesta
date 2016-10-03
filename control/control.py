@@ -32,6 +32,7 @@ import control.lasercontrol as lasercontrol
 import control.SignalGen as SignalGen
 import control.Scan as Scan
 import control.focus as focus
+import control.align as align
 import control.molecules_counter as moleculesCounter
 import control.ontime as ontime
 import control.guitools as guitools
@@ -80,6 +81,7 @@ class RecordingWidget(QtGui.QFrame):
 
         # Snap and recording buttons
         self.showZgraph = QtGui.QCheckBox('Show Z-graph after rec')
+        self.showZproj = QtGui.QCheckBox('Show Z-projection after rec')
         self.snapTIFFButton = QtGui.QPushButton('Snap')
         self.snapTIFFButton.setStyleSheet("font-size:16px")
         self.snapTIFFButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
@@ -142,6 +144,7 @@ class RecordingWidget(QtGui.QFrame):
         recGrid.addWidget(recTitle, 0, 0, 1, 3)
         recGrid.addWidget(QtGui.QLabel('Folder'), 2, 0)
         recGrid.addWidget(self.showZgraph, 1, 0)
+        recGrid.addWidget(self.showZproj, 1, 4)
 #        recGrid.addWidget(loadFolderButton, 1, 5)
 #        recGrid.addWidget(openFolderButton, 1, 4)
         recGrid.addWidget(self.folderEdit, 2, 1, 1, 5)
@@ -150,13 +153,13 @@ class RecordingWidget(QtGui.QFrame):
         recGrid.addWidget(self.specifyFrames, 4, 0, 1, 5)
         recGrid.addWidget(self.currentFrame, 4, 1)
         recGrid.addWidget(self.numExpositionsEdit, 4, 2)
-        recGrid.addWidget(QtGui.QLabel('File size'), 4, 3, 1, 2)
-        recGrid.addWidget(self.filesizeBar, 4, 4, 1, 2)
+#        recGrid.addWidget(QtGui.QLabel('File size'), 4, 3, 1, 2)
+#        recGrid.addWidget(self.filesizeBar, 4, 4, 1, 2)
         recGrid.addWidget(self.specifyTime, 5, 0, 1, 5)
         recGrid.addWidget(self.currentTime, 5, 1)
         recGrid.addWidget(self.timeToRec, 5, 2)
         recGrid.addWidget(self.tRemaining, 5, 3, 1, 2)
-        recGrid.addWidget(self.progressBar, 5, 4, 1, 2)
+#        recGrid.addWidget(self.progressBar, 5, 4, 1, 2)
         recGrid.addWidget(self.untilSTOPbtn, 6, 0, 1, 5)
         recGrid.addWidget(buttonWidget, 7, 0, 1, 0)
 
@@ -424,8 +427,9 @@ class RecordingWidget(QtGui.QFrame):
     def endRecording(self):
         if self.showZgraph.checkState():
             plt.plot(self.worker.z_stack)
-        self.recordingThread.terminate() 
-
+        if self.showZproj.checkState():
+            plt.imshow(self.worker.Z_projection, cmap='gray')
+        self.recordingThread.terminate()
         converterFunction = lambda: guitools.TiffConverterThread(self.savename)
         self.main.exportlastAction.triggered.connect(converterFunction)
         self.main.exportlastAction.setEnabled(True)
@@ -454,6 +458,7 @@ class RecWorker(QtCore.QObject):
         super().__init__(*args, **kwargs)
         self.orcaflash = orcaflash
         self.rec_mode = rec_mode  # 1=frames, 2=time, 3=until stop
+        print(self.rec_mode)
         self.timeorframes = timeorframes #Nr of seconds or frames to record depending om bool_ToF.
         self.shape = shape # Shape of one frame
         self.lvworker = lvworker
@@ -530,6 +535,7 @@ class RecWorker(QtCore.QObject):
         for i in range(0, f_ind):
             self.z_stack.append(np.mean(reshapeddata[i,:,:]))
         
+        self.Z_projection = np.flipud(np.sum(reshapeddata, 0))
         # Saving parameters
         for item in self.attrs:
             if item[1] is not None:
@@ -654,7 +660,8 @@ class LVWorker(QtCore.QObject):
         self.orcaflash = orcaflash
         self.running = False
         self.f_ind = None
-        
+        self.mem = 0  # Memory variable to keep track of if update has been run twice in a row with camera trigger source as internal trigger
+                        # If so the GUI trigger mode should also be set to internal trigger. Happens when using external start tigger.
     def run(self):
         
         self.vtimer = QtCore.QTimer()
@@ -674,7 +681,11 @@ class LVWorker(QtCore.QObject):
             self.main.latest_image = self.image
             trigger_source = self.orcaflash.getPropertyValue('trigger_source')[0]
             if trigger_source == 1:
-                self.main.trigsourceparam.setValue(0)
+                if self.mem == 1:
+                    self.main.trigsourceparam.setValue('Internal trigger')
+                    self.mem = 0
+                else:
+                    self.mem = 1
 
         
     def stop(self):
@@ -690,6 +701,8 @@ class LVWorker(QtCore.QObject):
 
 # The main GUI class.
 
+
+
 class TormentaGUI(QtGui.QMainWindow):
 
     liveviewStarts = QtCore.pyqtSignal()
@@ -702,6 +715,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.orcaflash = orcaflash
         self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_polarity', 2))
         self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_global_exposure', 5)) # 3:DELAYED, 5:GLOBAL RESET
+        self.changeParameter(lambda: self.orcaflash.setPropertyValue('defect_correct_mode', 2)) # 1:OFF, 2:ON
 #        self.orcaflash.setPropertyValue('readout_speed', 1)
 #        self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_mode', 6))
         self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_active', 2)) # 1: EGDE, 2: LEVEL, 3:SYNCHREADOUT
@@ -857,7 +871,13 @@ class TormentaGUI(QtGui.QMainWindow):
         self.viewtimer.timeout.connect(self.updateView)
         
         self.alignmentON = False
-
+        
+        # RESOLFT rec
+        
+        self.resolftRecButton = QtGui.QPushButton('RESOLFT REC')
+        self.resolftRecButton.setStyleSheet("font-size:18px")
+        self.resolftRecButton.clicked.connect(self.resolftRec)
+        
         # viewBox custom Tools
 #        self.gridButton = QtGui.QPushButton('Grid')
 #        self.gridButton.setCheckable(True)
@@ -878,6 +898,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.viewCtrlLayout = QtGui.QGridLayout()
         self.viewCtrl.setLayout(self.viewCtrlLayout)
         self.viewCtrlLayout.addWidget(self.liveviewButton, 0, 0, 1, 3)
+        self.viewCtrlLayout.addWidget( self.resolftRecButton, 1, 0, 1, 3)
 #        self.viewCtrlLayout.addWidget(self.gridButton, 1, 0)
 #        self.viewCtrlLayout.addWidget(self.grid2Button, 1, 1)
 #        self.viewCtrlLayout.addWidget(self.crosshairButton, 1, 2)
@@ -922,8 +943,8 @@ class TormentaGUI(QtGui.QMainWindow):
 #        self.hist.vb.setLimits(yMin=0, yMax=2048)
         imageWidget.addItem(self.hist, row=1, col=2)
         self.ROI = guitools.ROI((0, 0), self.vb, (0, 0),
-                                        handlePos=(1, 0), handleCenter=(0, 1),
-                                scaleSnap=True, translateSnap=True)
+                                handlePos=(1, 0), handleCenter=(0, 1), 
+                                color='y', scaleSnap=True, translateSnap=True)
         self.ROI.sigRegionChangeFinished.connect(self.ROIchanged)
         self.ROI.hide()
         
@@ -960,13 +981,13 @@ class TormentaGUI(QtGui.QMainWindow):
         scanDock.addWidget(self.scanWidget)
         dockArea.addDock(scanDock)
         
-        # Console widget
-        consoleDock = Dock("Console", size=(600, 200))
-        console = ConsoleWidget(namespace={'pg': pg, 'np': np})
-        consoleDock.addWidget(console)
-        dockArea.addDock(consoleDock, 'above', scanDock)
-        
-        # Alignment Tool
+#        # Console widget
+#        consoleDock = Dock("Console", size=(600, 200))
+#        console = ConsoleWidget(namespace={'pg': pg, 'np': np})
+#        consoleDock.addWidget(console)
+#        dockArea.addDock(consoleDock, 'above', scanDock)
+#        
+        # Line Alignment Tool
         alignmentDock = Dock("Alignment Tool", size=(50,50))
         self.alignmentWidget = QtGui.QWidget()
         alignmentDock.addWidget(self.alignmentWidget)
@@ -989,8 +1010,15 @@ class TormentaGUI(QtGui.QMainWindow):
         alignmentLayout.addWidget(self.alignmentLineMakerButton, 1, 0, 1, 1)
         alignmentLayout.addWidget(self.alignmentCheck, 1, 1, 1, 1)
         
+##         Z Align widget
+        alignDock = Dock("Axial Alignment Tool", size=(1, 1))
+        self.alignWidget = align.AlignWidget(self)
+        alignDock.addWidget(self.alignWidget)
+        dockArea.addDock(alignDock, 'above', scanDock)
 
-        # Focus lock widget
+
+
+##         Focus lock widget
 #        focusDock = Dock("Focus Control", size=(1, 1))
 ##        self.focusWidget = FocusWidget(DAQ, scanZ, self.recWidget)
 #        self.focusWidget = focus.FocusWidget(scanZ, self.recWidget)
@@ -1000,7 +1028,7 @@ class TormentaGUI(QtGui.QMainWindow):
 ##        self.focusThread.start()
 #        focusDock.addWidget(self.focusWidget)
 #        dockArea.addDock(focusDock)
-        
+#        
 #        
 #        # Signal generation widget
 #        signalDock = Dock('Signal Generator')
@@ -1461,6 +1489,15 @@ class TormentaGUI(QtGui.QMainWindow):
         self.alignmentLine = pg.InfiniteLine(pen=pen, angle=angle, movable=True)
         self.alignmentON = True
         
+    def resolftRec(self):
+        self.trigsourceparam.setValue('External "frame-trigger"')
+        self.recWidget.untilSTOPbtn.setChecked(True)
+        self.recWidget.untilStop()
+        self.recWidget.recButton.setChecked(True)
+        self.recWidget.startRecording()
+        self.laserWidgets.DigCtrl.DigitalControlButton.setChecked(True)
+        self.laserWidgets.DigCtrl.GlobalDigitalMod()
+
 
     def fpsMath(self):
         now = ptime.time()
@@ -1495,6 +1532,8 @@ class TormentaGUI(QtGui.QMainWindow):
 
         self.nidaq.reset()        
         self.laserWidgets.closeEvent(*args, **kwargs)
+        self.alignWidget.closeEvent(*args, **kwargs)
+        self.scanWidget.closeEvent(*args, **kwargs)
 #        self.focusWidget.closeEvent(*args, **kwargs)
 #        self.signalWidget.closeEvent(*args, **kwargs)
 

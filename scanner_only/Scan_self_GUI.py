@@ -45,7 +45,9 @@ class ScanWidget(QtGui.QMainWindow):
         self.saveScanBtn.clicked.connect(saveScanFcn) 
         self.loadScanBtn = QtGui.QPushButton('Load Scan')
         loadScanFcn = lambda: guitools.loadScan(self)
-        self.loadScanBtn.clicked.connect(loadScanFcn)        
+        self.loadScanBtn.clicked.connect(loadScanFcn)      
+        
+        self.sampleRateEdit = QtGui.QLineEdit()
         
         self.widthPar = QtGui.QLineEdit('10')
         self.widthPar.editingFinished.connect(lambda: self.ScanParameterChanged('width'))
@@ -58,6 +60,7 @@ class ScanWidget(QtGui.QMainWindow):
         self.step_sizePar = QtGui.QLineEdit('0.5')
         self.step_sizePar.editingFinished.connect(lambda: self.ScanParameterChanged('step_size'))
         self.sample_rate = 100000
+#        self.sample_rate = np.float(self.sampleRateEdit.text())
         
         self.Scan_Mode_label= QtGui.QLabel('Scan mode:')        
         self.Scan_Mode = QtGui.QComboBox()
@@ -177,8 +180,10 @@ class ScanWidget(QtGui.QMainWindow):
         self.cwidget = QtGui.QWidget()
         self.setCentralWidget(self.cwidget)
         grid = QtGui.QGridLayout()
-        self.cwidget.setLayout(grid)        
-
+        self.cwidget.setLayout(grid)     
+        
+        
+        
 #        grid.setRowMaximumHeight(0, 20)
 #        grid.setRowMamimumHeight(1, 20)
         grid.addWidget(self.loadScanBtn, 0 , 0)

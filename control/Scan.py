@@ -45,7 +45,9 @@ class ScanWidget(QtGui.QFrame):
         self.saveScanBtn.clicked.connect(saveScanFcn) 
         self.loadScanBtn = QtGui.QPushButton('Load Scan')
         loadScanFcn = lambda: guitools.loadScan(self)
-        self.loadScanBtn.clicked.connect(loadScanFcn)        
+        self.loadScanBtn.clicked.connect(loadScanFcn)      
+        
+        self.sampleRateEdit = QtGui.QLineEdit()
         
         self.widthPar = QtGui.QLineEdit('10')
         self.widthPar.editingFinished.connect(lambda: self.ScanParameterChanged('width'))
@@ -54,9 +56,11 @@ class ScanWidget(QtGui.QFrame):
         self.sequence_timePar = QtGui.QLineEdit('100') # Milliseconds
         self.sequence_timePar.editingFinished.connect(lambda: self.ScanParameterChanged('sequence_time'))
         self.nrFramesPar = QtGui.QLabel()
+        self.scanDuration = QtGui.QLabel()
         self.step_sizePar = QtGui.QLineEdit('0.5')
         self.step_sizePar.editingFinished.connect(lambda: self.ScanParameterChanged('step_size'))
         self.sample_rate = 100000
+#        self.sample_rate = np.float(self.sampleRateEdit.text())
         
         self.Scan_Mode_label= QtGui.QLabel('Scan mode:')        
         self.Scan_Mode = QtGui.QComboBox()
@@ -172,9 +176,10 @@ class ScanWidget(QtGui.QFrame):
         self.ScanButton.clicked.connect(self.ScanOrAbort)
         self.PreviewButton = QtGui.QPushButton('Preview')
         self.PreviewButton.clicked.connect(self.PreviewScan)
+            
         
         grid = QtGui.QGridLayout()
-        self.setLayout(grid)
+        self.setLayout(grid)      
 #        grid.setRowMaximumHeight(0, 20)
 #        grid.setRowMamimumHeight(1, 20)
         grid.addWidget(self.loadScanBtn, 0 , 0)
@@ -191,6 +196,8 @@ class ScanWidget(QtGui.QFrame):
         grid.addWidget(self.sequence_timePar, 4, 1)
         grid.addWidget(QtGui.QLabel('Frames in scan:'), 4, 2)
         grid.addWidget(self.nrFramesPar, 4, 3)
+        grid.addWidget(QtGui.QLabel('Scan duration (s):'), 5, 4)
+        grid.addWidget(self.scanDuration, 5, 5)
         grid.addWidget(QtGui.QLabel('Step size (um):'), 4, 4)
         grid.addWidget(self.step_sizePar, 4, 5)
         grid.addWidget(QtGui.QLabel('Start (ms):'), 6, 1)
@@ -199,7 +206,7 @@ class ScanWidget(QtGui.QFrame):
         grid.addWidget(self.startTISPar, 7, 1)
         grid.addWidget(self.endTISPar, 7, 2)
         grid.addWidget(self.chanTISPar, 7, 3)
-        grid.addWidget(QtGui.QLabel('561:'), 8, 0)
+        grid.addWidget(QtGui.QLabel('488 OFF::'), 8, 0)
         grid.addWidget(self.start355Par, 8, 1)
         grid.addWidget(self.end355Par, 8, 2)
         grid.addWidget(self.chan355Par, 8, 3)
@@ -213,7 +220,7 @@ class ScanWidget(QtGui.QFrame):
         grid.addWidget(self.end405Par, 9, 2)
         grid.addWidget(self.chan405Par, 9, 3)
         grid.addWidget(self.contLaserPulsesRadio, 10, 4, 2, 1)
-        grid.addWidget(QtGui.QLabel('488:'), 10, 0)
+        grid.addWidget(QtGui.QLabel('488 EX:'), 10, 0)
         grid.addWidget(self.start488Par, 10, 1)
         grid.addWidget(self.end488Par, 10, 2)
         grid.addWidget(self.chan488Par, 10, 3)
@@ -223,7 +230,7 @@ class ScanWidget(QtGui.QFrame):
         grid.addWidget(self.chanCAMPar, 11, 3)
         grid.addWidget(self.graph, 12, 0, 1, 6)
         grid.addWidget(self.ScanButton, 13, 3)
-        grid.addWidget(self.PreviewButton, 13, 4)        
+        grid.addWidget(self.PreviewButton, 13, 4)
         
     @property
     def scanOrNot(self):
@@ -289,8 +296,8 @@ class ScanWidget(QtGui.QFrame):
             self.graph.update(self.all_devices)
         self.stage_scan.update_frames(self.scan_par_values)
         self.nrFramesPar.setText(str(self.stage_scan.frames))
+        self.scanDuration.setText(str((1/1000)*self.stage_scan.frames*float(self.sequence_timePar.text())))
                 
-        
     def PixelParameterChanged(self, parameter):
         self.pixel_par_values[parameter] = float(self.pixel_parameters[parameter].text()) / 1000
         device = parameter[-3]+parameter[-2]+parameter[-1]

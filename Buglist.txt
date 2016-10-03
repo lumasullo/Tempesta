@@ -1,2 +1,2 @@
 In the scanner, finalize function assumes that x_sig is on first channel and y_sig is on second channel or something like that. This is not the case if those channels are changed in the gui.
-This should be adressed...
+This should be adressed...might have been adressed already?
