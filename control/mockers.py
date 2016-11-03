@@ -196,7 +196,29 @@ class MockLaser(Driver):
         """To get the laser emission power (mW)
         """
         return 55555 * self.mW
+    
+    def enter_mod_mode(self):
+        
+        pass
 
+    @property
+    def digital_mod(self):
+        """digital modulation enable state
+        """
+        return True
+
+    @digital_mod.setter
+    def digital_mod(self, value):
+        pass
+    
+    def mod_mode(self):
+        """Returns the current operating mode
+        """
+        return 0
+        
+    def query(self, text):
+        
+        return 0
 
 class MockCamera(Driver):
 

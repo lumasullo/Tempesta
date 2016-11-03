@@ -59,7 +59,7 @@ class ScanWidget(QtGui.QFrame):
         self.scanDuration = QtGui.QLabel()
         self.step_sizePar = QtGui.QLineEdit('0.5')
         self.step_sizePar.editingFinished.connect(lambda: self.ScanParameterChanged('step_size'))
-        self.sample_rate = 100000
+        self.sample_rate = 1000
 #        self.sample_rate = np.float(self.sampleRateEdit.text())
         
         self.Scan_Mode_label= QtGui.QLabel('Scan mode:')        

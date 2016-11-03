@@ -21,6 +21,8 @@ import ctypes
 import ctypes.util
 import numpy as np
 
+print('hellooooooooooooooooooooooooooooooooooooooooo')
+
 # Hamamatsu constants.
 DCAMCAP_EVENT_FRAMEREADY = int("0x0002", 0)
 

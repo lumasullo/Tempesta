@@ -4,7 +4,7 @@ Created on Thu Mar 31 11:54:52 2016
 
 @author: testaRES
 """
-
+ 
 from pyqtgraph.Qt import QtGui
 from scanner_only import Scan_self_GUI
 # from control import control

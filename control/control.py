@@ -217,7 +217,7 @@ class RecordingWidget(QtGui.QFrame):
             self.filenameEdit.setEnabled(False)
             self.filenameEdit.setText('Current time')
 
-# Functions for changing between choosing frames or time when recording.
+# Functions for changing between choosing frames or time or "Run until stop" when recording.
             
     def specFrames(self):
         
@@ -459,7 +459,7 @@ class RecWorker(QtCore.QObject):
         self.orcaflash = orcaflash
         self.rec_mode = rec_mode  # 1=frames, 2=time, 3=until stop
         print(self.rec_mode)
-        self.timeorframes = timeorframes #Nr of seconds or frames to record depending om bool_ToF.
+        self.timeorframes = timeorframes #Nr of seconds or frames to record depending on bool_ToF.
         self.shape = shape # Shape of one frame
         self.lvworker = lvworker
         self.t_exp = t_exp
@@ -470,28 +470,29 @@ class RecWorker(QtCore.QObject):
 
 
     def start(self):
-        
+        #Set initial values
         self.timerecorded = 0
         self.frames_recorded = 0
 
         time.sleep(0.1)
-#        print('self.lvworker.f_ind = ', self.lvworker.f_ind)
+        
+        #Find what the index of the first recorded frame will be
         last_f = self.lvworker.f_ind
         if last_f == None:
-            start_f = 0 
-#            print('f_ind was None so set to : ', start_f)
+            start_f = 0 # If camera has not recorded any frames yet, start index will be zero
         else:
             start_f = last_f + 1 # index of first frame is one more then provious frame.
             
         self.starttime = time.time()
-#        print('start_f = ',start_f)        
-        
+     
+        # Main loop for waiting until recording is finished and sending update signal
+        f_ind = start_f
         if self.rec_mode == 1:
             while self.frames_recorded < self.timeorframes and self.pressed:
                 self.frames_recorded = self.lvworker.f_ind - start_f
-                print('frames recorded = ',self.frames_recorded)
                 time.sleep(0.01)
                 self.updateSignal.emit()
+                
         elif self.rec_mode == 2:
             while self.timerecorded < self.timeorframes and self.pressed:
                 self.timerecorded = time.time() - self.starttime
@@ -504,8 +505,9 @@ class RecWorker(QtCore.QObject):
                 self.updateSignal.emit()           
             
         self.orcaflash.stopAcquisition()   # To avoid camera overwriting buffer while saving recording
-        end_f = self.lvworker.f_ind # 
-        if end_f == None:
+        end_f = self.lvworker.f_ind # Get index of the last acquired frame
+        
+        if end_f == None: #If no frames are acquired during recording, 
             end_f = -1
             
         if end_f >= start_f - 1:
@@ -1011,10 +1013,16 @@ class TormentaGUI(QtGui.QMainWindow):
         alignmentLayout.addWidget(self.alignmentCheck, 1, 1, 1, 1)
         
 ##         Z Align widget
-        alignDock = Dock("Axial Alignment Tool", size=(1, 1))
-        self.alignWidget = align.AlignWidget(self)
-        alignDock.addWidget(self.alignWidget)
-        dockArea.addDock(alignDock, 'above', scanDock)
+        ZalignDock = Dock("Axial Alignment Tool", size=(1, 1))
+        self.ZalignWidget = align.AlignWidgetAverage(self)
+        ZalignDock.addWidget(self.ZalignWidget)
+        dockArea.addDock(ZalignDock, 'above', scanDock)
+        
+        ##         Z Align widget
+        RotalignDock = Dock("Rotational Alignment Tool", size=(1, 1))
+        self.RotalignWidget = align.AlignWidgetXYProject(self)
+        RotalignDock.addWidget(self.RotalignWidget)
+        dockArea.addDock(RotalignDock, 'above', ZalignDock)
 
 
 
@@ -1271,8 +1279,8 @@ class TormentaGUI(QtGui.QMainWindow):
 
             
             if frameParam.param('Mode').value() == 'Full Widefield':
-                self.X0par.setValue(650)
-                self.Y0par.setValue(540)
+                self.X0par.setValue(630)
+                self.Y0par.setValue(610)
                 self.Widthpar.setValue(800)
                 self.Heightpar.setValue(800)
                 self.adjustFrame()
@@ -1532,7 +1540,8 @@ class TormentaGUI(QtGui.QMainWindow):
 
         self.nidaq.reset()        
         self.laserWidgets.closeEvent(*args, **kwargs)
-        self.alignWidget.closeEvent(*args, **kwargs)
+        self.ZalignWidget.closeEvent(*args, **kwargs)
+        self.RotalignWidget.closeEvent(*args, **kwargs)        
         self.scanWidget.closeEvent(*args, **kwargs)
 #        self.focusWidget.closeEvent(*args, **kwargs)
 #        self.signalWidget.closeEvent(*args, **kwargs)

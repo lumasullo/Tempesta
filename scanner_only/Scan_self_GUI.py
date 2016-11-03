@@ -639,7 +639,7 @@ class Line_scan():
         size_y = par_values['height'] / 2
         step_size = par_values['step_size'] / 2
         steps_y = int(np.ceil(size_y / step_size))
-        self.frames = steps_y
+        self.frames = steps_y + 1 # +1 because nr of frames per line is one more than nr of steps
         
     def update(self, par_values, prim_scan_dim):
         
@@ -680,7 +680,7 @@ class FOV_Scan():
         size_y = par_values['height'] / 2
         steps_x = int(np.ceil(size_x / step_size))
         steps_y = int(np.ceil(size_y / step_size))
-        self.frames = steps_y*steps_x
+        self.frames = (steps_y+1)*(steps_x+1) # +1 because nr of frames per line is one more than nr of steps
                 
         
     def update(self, par_values, prim_scan_dim):

@@ -94,8 +94,8 @@ class LaserWidget(QtGui.QFrame):
         grid.addWidget(self.blueControl, 0, 0, 4, 1)
         grid.addWidget(self.blue2Control, 0, 1, 4, 1)
         grid.addWidget(self.violetControl, 0, 2, 4, 1)
-        grid.addWidget(self.greenControl, 0, 3, 4, 1)        
-#        grid.addWidget(self.uvControl, 0, 4, 4, 1)
+        grid.addWidget(self.greenControl, 0, 4, 4, 1)        
+        grid.addWidget(self.uvControl, 0, 3, 4, 1)
         grid.addWidget(self.tisacontrol, 4, 0, 1, 1)
         grid.addWidget(self.DigCtrl, 4, 1, 2, 3)
 
@@ -164,9 +164,9 @@ class DigitalControl(QtGui.QFrame):
 #                self.lasers[i].laser.power_sp = float(self.lasers[i].laser.setPointEdit) * self.mW
             
     def GlobalDigitalMod(self):
-        self.digitalPowers = [float(self.blueReadoutPower.text()), 
-                              float(self.blueOffPower.text()), 
-                             float(self.violetOnPower.text())]
+        self.digitalPowers = [float(self.blueReadoutPower.text()),
+                              float(self.blueOffPower.text()),
+                              float(self.violetOnPower.text())]
                        
         if self.DigitalControlButton.isChecked():
             for i in np.arange(len(self.lasers)):
