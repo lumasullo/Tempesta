@@ -14,6 +14,7 @@ import time
 import re
 import ctypes
 import matplotlib.pyplot as plt
+from multiprocessing import Process, Queue, Pipe
 
 from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
@@ -461,6 +462,7 @@ class RecWorker(QtCore.QObject):
         print(self.rec_mode)
         self.timeorframes = timeorframes #Nr of seconds or frames to record depending on bool_ToF.
         self.shape = shape # Shape of one frame
+        self.max_frames = np.floor(5000000000 / self.orcaflash.frame_bytes) #Max frames in 5 GB memory
         self.lvworker = lvworker
         self.t_exp = t_exp
         self.savename = savename
@@ -474,6 +476,11 @@ class RecWorker(QtCore.QObject):
         self.timerecorded = 0
         self.frames_recorded = 0
 
+        # Initiate data-writing process
+        datashape = (self.max_frames, self.shape[1], self.shape[0])
+        self.queue = Queue()
+        self.write_process = Process(target=self.write_data, args=(self.orcaflash, datashape, self.dataname, self.savename, self.queue))
+        self.write_process.start()
         time.sleep(0.1)
         
         #Find what the index of the first recorded frame will be
@@ -545,6 +552,15 @@ class RecWorker(QtCore.QObject):
      
         self.store_file.close()
         self.doneSignal.emit()
+        
+        
+    def write_data(orcaflash, datashape, dataname, savename, queue):
+        
+        store_file = hdf.File(savename, "w")
+        store_file.create_dataset(name=dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
+        
+        
+        
 
 
 class FileWarning(QtGui.QMessageBox):
