@@ -53,6 +53,7 @@ def write_data(datashape, dataname, savename, q):
         store_file.create_dataset(name=dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
         dataset = store_file[dataname]
         
+        pkgs_rec = 0        
         bn = 0
         f_ind = 0
         pkg = None
@@ -63,6 +64,7 @@ def write_data(datashape, dataname, savename, q):
             while not write:
                 try:
                     pkg = q.get(True, 0.01) #Package should be either the string 'Finish' or a frame to be saved
+                    pkgs_rec = pkgs_rec + 1
 #                    print('Recieved pkg')
                 except queue.Empty:
 #                    print('Queue empty')
@@ -80,20 +82,18 @@ def write_data(datashape, dataname, savename, q):
                 else:
                     f_bunch.append(pkg)
                     bn = bn + 1
-                    write = bn > 199
-                    print('bn in process = ', bn)
+                    write = bn > 29
                     
             if bn > 0:
                 bunch_shape = [bn, frame_shape[0], frame_shape[1]]
                 frames = np.reshape(f_bunch, bunch_shape, order='C')
                 dataset[f_ind:f_ind+bn:1, :, :] = frames
                 f_ind = f_ind + bn
-                print('f_ind in process = ', f_ind)
                 bn = 0
             
         dataset.resize((f_ind, frame_shape[0], frame_shape[1]))
         store_file.close()
-        print('File closed')
+        print('File closed, packages recieved (incl. "Finish") = ', pkgs_rec)
 
 #Widget to control image or sequence recording. Recording only possible when liveview active.
 #StartRecording called when "Rec" presset. Creates recording thread with RecWorker, recording is then 
@@ -518,7 +518,7 @@ class RecWorker(QtCore.QObject):
         print(self.rec_mode)
         self.timeorframes = timeorframes #Nr of seconds or frames to record depending on bool_ToF.
         self.shape = shape # Shape of one frame
-        self.max_frames = np.floor(5000000000 / self.orcaflash.frame_bytes) #Max frames in 5 GB memory
+        self.max_frames = np.floor(6000000000 / self.orcaflash.frame_bytes) #Max frames in 5 GB memory
         self.lvworker = lvworker
         self.t_exp = t_exp
         self.savename = savename
@@ -546,7 +546,7 @@ class RecWorker(QtCore.QObject):
         self.starttime = time.time()
      
         # Main loop for waiting until recording is finished and sending update signal
-        f_ind = start_f
+        next_f = start_f
         if self.rec_mode == 1:
             while self.frames_recorded < self.timeorframes and self.pressed:
                 self.frames_recorded = self.lvworker.f_ind - start_f
@@ -559,28 +559,27 @@ class RecWorker(QtCore.QObject):
                 time.sleep(0.01)
                 self.updateSignal.emit()
         else:
+            pkgs_sent = 0
             while self.pressed:
                 self.timerecorded = time.time() - self.starttime
-                print('f_ind = ', f_ind, 'lvworker.f_ind = ', self.lvworker.f_ind)
-                while (self.lvworker.f_ind < f_ind and self.pressed):
+                while ((self.lvworker.f_ind == -1 or self.lvworker.f_ind == np.mod(next_f - 1, buffer_size)) and self.pressed): #True if next_f is one "ahead" of camera f_ind.
                     time.sleep(0.001) #Gives time for liveview thread to access memory and keep liveview responsive (somehow...?)
-                t = time.time()
-                f = self.orcaflash.hcam_data[f_ind].getData()
+                f = self.orcaflash.hcam_data[next_f].getData()
                 self.queue.put(f)
+                pkgs_sent = pkgs_sent + 1
 #                print('Time to get frame and write to queue = ', time.time() - t)
-                f_ind = np.mod(f_ind + 1, buffer_size) # Mod to make it work if image buffer is circled
-                print('New frame index is: ', f_ind)
+                next_f = np.mod(next_f + 1, buffer_size) # Mod to make it work if image buffer is circled
                 self.updateSignal.emit()           
-
+        t = time.time()
         self.orcaflash.stopAcquisition()   # To avoid camera overwriting buffer while saving recording
 
         self.queue.put('Finish')        
         
         self.write_process.join()
-        print('Process joined, first frame index was: ', start_f, 'Last frame index was: ', f_ind - 1)
+        print('Process joined, first frame index was: ', start_f, 'Last frame index was: ', next_f - 1, 'Packages sent was (excl. "Finish"): ',pkgs_sent)
         del self.queue
         self.doneSignal.emit()
-        
+        print('Total time that writing lags behind: ', time.time() - t)
 #        end_f = self.lvworker.f_ind # Get index of the last acquired frame
 #        
 #        if end_f == None: #If no frames are acquired during recording, 
