@@ -14,7 +14,8 @@ import time
 import re
 import ctypes
 import matplotlib.pyplot as plt
-from multiprocessing import Process, Queue, Pipe
+from multiprocessing import Process, Queue
+import queue # Queue.Empty exception is not available in the multiprocessing Queue namespace
 
 from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
@@ -39,7 +40,7 @@ import control.ontime as ontime
 import control.guitools as guitools
 from control import libnidaqmx
 
-def write_data(datashape, dataname, savename, queue):
+def write_data(datashape, dataname, savename, q):
     """Function meant to be run in seperate process that gets frames to save from a queue and saves them
     to a hdf5 file.
     NOTE: since every call to write to the dataset appearently includes some overhead it, the speed of the writing
@@ -54,30 +55,40 @@ def write_data(datashape, dataname, savename, queue):
         
         bn = 0
         f_ind = 0
-        
+        pkg = None
         while running:
             f_bunch = []
 #            print('In beginning of outer loop')
-            while queue.qsize() > 0:
-                pkg = queue.get() #Package should be either the string 'Finish' or a frame to be saved
-#                print('queue.qsize() = ', queue.qsize())
+            write = False
+            while not write:
+                try:
+                    pkg = q.get(True, 0.01) #Package should be either the string 'Finish' or a frame to be saved
+#                    print('Recieved pkg')
+                except queue.Empty:
+#                    print('Queue empty')
+                    pkg = None
+                    write = True
 #                print('Size of pkg = ', np.size(pkg))
 #                print('Pkg is : ', pkg)
-                if not pkg == 'Finish':
+                if pkg == 'Finish':
+                    running = False
+#                    write = True
+                    print('Running set to False, exit loop')
+                elif pkg is None:
+                    pass
+#                    print('Package was None')
+                else:
                     f_bunch.append(pkg)
                     bn = bn + 1
-#                    print('bn in process = ', bn)
-                else:
-                    running = False
-                    print('Running set to False, exit loop')
+                    write = bn > 199
+                    print('bn in process = ', bn)
                     
-            if np.size(f_bunch) > 0:
+            if bn > 0:
                 bunch_shape = [bn, frame_shape[0], frame_shape[1]]
-#                print('Bunch shape: ', bunch_shape)
                 frames = np.reshape(f_bunch, bunch_shape, order='C')
                 dataset[f_ind:f_ind+bn:1, :, :] = frames
                 f_ind = f_ind + bn
-#                print('f_ind in process = ', f_ind)
+                print('f_ind in process = ', f_ind)
                 bn = 0
             
         dataset.resize((f_ind, frame_shape[0], frame_shape[1]))
@@ -530,10 +541,7 @@ class RecWorker(QtCore.QObject):
         
         #Find what the index of the first recorded frame will be
         last_f = self.lvworker.f_ind
-        if last_f == None:
-            start_f = 0 # If camera has not recorded any frames yet, start index will be zero
-        else:
-            start_f = last_f + 1 # index of first frame is one more then provious frame.
+        start_f = last_f + 1 # index of first frame is one more then provious frame.
             
         self.starttime = time.time()
      
@@ -553,6 +561,7 @@ class RecWorker(QtCore.QObject):
         else:
             while self.pressed:
                 self.timerecorded = time.time() - self.starttime
+                print('f_ind = ', f_ind, 'lvworker.f_ind = ', self.lvworker.f_ind)
                 while (self.lvworker.f_ind < f_ind and self.pressed):
                     time.sleep(0.001) #Gives time for liveview thread to access memory and keep liveview responsive (somehow...?)
                 t = time.time()
@@ -560,17 +569,15 @@ class RecWorker(QtCore.QObject):
                 self.queue.put(f)
 #                print('Time to get frame and write to queue = ', time.time() - t)
                 f_ind = np.mod(f_ind + 1, buffer_size) # Mod to make it work if image buffer is circled
-#                print('New frame index is: ', f_ind)
+                print('New frame index is: ', f_ind)
                 self.updateSignal.emit()           
 
         self.orcaflash.stopAcquisition()   # To avoid camera overwriting buffer while saving recording
 
         self.queue.put('Finish')        
-        while self.write_process.is_alive():
-            pass
         
         self.write_process.join()
-        print('Process joined')
+        print('Process joined, first frame index was: ', start_f, 'Last frame index was: ', f_ind - 1)
         del self.queue
         self.doneSignal.emit()
         
@@ -730,7 +737,7 @@ class LVWorker(QtCore.QObject):
         self.main = main
         self.orcaflash = orcaflash
         self.running = False
-        self.f_ind = None
+        self.f_ind = -1
         self.mem = 0  # Memory variable to keep track of if update has been run twice in a row with camera trigger source as internal trigger
                         # If so the GUI trigger mode should also be set to internal trigger. Happens when using external start tigger.
     def run(self):
@@ -738,7 +745,7 @@ class LVWorker(QtCore.QObject):
         self.vtimer = QtCore.QTimer()
         self.vtimer.timeout.connect(self.update)
         self.running = True
-        self.f_ind = None # Should maybe be f_ind
+        self.f_ind = -1
         self.vtimer.start(30)
         print('f_ind when started = ',self.f_ind)
         
@@ -767,7 +774,7 @@ class LVWorker(QtCore.QObject):
             print('Cannot stop when not running (from LVThread)')
             
     def reset(self):
-        self.f_ind = None
+        self.f_ind = -1
         print('LVworker reset, f_ind = ', self.f_ind)
 
 # The main GUI class.
