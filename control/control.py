@@ -39,6 +39,51 @@ import control.ontime as ontime
 import control.guitools as guitools
 from control import libnidaqmx
 
+def write_data(datashape, dataname, savename, queue):
+    """Function meant to be run in seperate process that gets frames to save from a queue and saves them
+    to a hdf5 file.
+    NOTE: since every call to write to the dataset appearently includes some overhead it, the speed of the writing
+    is optimiced by gathering a bunch of frames at a time an writing a whole bunch at a time."""
+    frame_shape = [datashape[1], datashape[2]]        
+    
+    running = True
+    # Initiate file to save to
+    with hdf.File(savename, "w") as store_file:
+        store_file.create_dataset(name=dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
+        dataset = store_file[dataname]
+        
+        bn = 0
+        f_ind = 0
+        
+        while running:
+            f_bunch = []
+#            print('In beginning of outer loop')
+            while queue.qsize() > 0:
+                pkg = queue.get() #Package should be either the string 'Finish' or a frame to be saved
+#                print('queue.qsize() = ', queue.qsize())
+#                print('Size of pkg = ', np.size(pkg))
+#                print('Pkg is : ', pkg)
+                if not pkg == 'Finish':
+                    f_bunch.append(pkg)
+                    bn = bn + 1
+#                    print('bn in process = ', bn)
+                else:
+                    running = False
+                    print('Running set to False, exit loop')
+                    
+            if np.size(f_bunch) > 0:
+                bunch_shape = [bn, frame_shape[0], frame_shape[1]]
+#                print('Bunch shape: ', bunch_shape)
+                frames = np.reshape(f_bunch, bunch_shape, order='C')
+                dataset[f_ind:f_ind+bn:1, :, :] = frames
+                f_ind = f_ind + bn
+#                print('f_ind in process = ', f_ind)
+                bn = 0
+            
+        dataset.resize((f_ind, frame_shape[0], frame_shape[1]))
+        store_file.close()
+        print('File closed')
+
 #Widget to control image or sequence recording. Recording only possible when liveview active.
 #StartRecording called when "Rec" presset. Creates recording thread with RecWorker, recording is then 
 #done in this seperate thread.
@@ -431,9 +476,9 @@ class RecordingWidget(QtGui.QFrame):
         if self.showZproj.checkState():
             plt.imshow(self.worker.Z_projection, cmap='gray')
         self.recordingThread.terminate()
-        converterFunction = lambda: guitools.TiffConverterThread(self.savename)
-        self.main.exportlastAction.triggered.connect(converterFunction)
-        self.main.exportlastAction.setEnabled(True)
+#        converterFunction = lambda: guitools.TiffConverterThread(self.savename)
+#        self.main.exportlastAction.triggered.connect(converterFunction)
+#        self.main.exportlastAction.setEnabled(True)
 
         self.writable = True
         self.readyToRecord = True
@@ -475,13 +520,13 @@ class RecWorker(QtCore.QObject):
         #Set initial values
         self.timerecorded = 0
         self.frames_recorded = 0
+        buffer_size = self.orcaflash.number_image_buffers
 
         # Initiate data-writing process
         datashape = (self.max_frames, self.shape[1], self.shape[0])
         self.queue = Queue()
-        self.write_process = Process(target=self.write_data, args=(self.orcaflash, datashape, self.dataname, self.savename, self.queue))
+        self.write_process = Process(target=write_data, args=(datashape, self.dataname, self.savename, self.queue))
         self.write_process.start()
-        time.sleep(0.1)
         
         #Find what the index of the first recorded frame will be
         last_f = self.lvworker.f_ind
@@ -508,58 +553,66 @@ class RecWorker(QtCore.QObject):
         else:
             while self.pressed:
                 self.timerecorded = time.time() - self.starttime
-                time.sleep(0.01)
+                while (self.lvworker.f_ind < f_ind and self.pressed):
+                    time.sleep(0.001) #Gives time for liveview thread to access memory and keep liveview responsive (somehow...?)
+                t = time.time()
+                f = self.orcaflash.hcam_data[f_ind].getData()
+                self.queue.put(f)
+#                print('Time to get frame and write to queue = ', time.time() - t)
+                f_ind = np.mod(f_ind + 1, buffer_size) # Mod to make it work if image buffer is circled
+#                print('New frame index is: ', f_ind)
                 self.updateSignal.emit()           
-            
+
         self.orcaflash.stopAcquisition()   # To avoid camera overwriting buffer while saving recording
-        end_f = self.lvworker.f_ind # Get index of the last acquired frame
+
+        self.queue.put('Finish')        
+        while self.write_process.is_alive():
+            pass
         
-        if end_f == None: #If no frames are acquired during recording, 
-            end_f = -1
-            
-        if end_f >= start_f - 1:
-            f_range = range(start_f, end_f + 1)
-        else:
-            buffer_size = self.orcaflash.number_image_buffers
-            f_range = np.append(range(start_f, buffer_size), range(0, end_f + 1))
-            
-        print('Start_f = :', start_f)
-        print('End_f = :', end_f)
-        f_ind = len(f_range)
-        data = [];
-        for i in f_range:
-            data.append(self.orcaflash.hcam_data[i].getData())
-
-        datashape = (f_ind, self.shape[1], self.shape[0])     # Adapted for ImageJ data read shape
-
-        print('Savename = ', self.savename)
-        self.store_file = hdf.File(self.savename, "w")
-        self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
-        dataset = self.store_file[self.dataname]
-
-            
-        reshapeddata = np.reshape(data, datashape, order='C')
-        dataset[...] = reshapeddata
-        self.z_stack = []
-        for i in range(0, f_ind):
-            self.z_stack.append(np.mean(reshapeddata[i,:,:]))
-        
-        self.Z_projection = np.flipud(np.sum(reshapeddata, 0))
-        # Saving parameters
-        for item in self.attrs:
-            if item[1] is not None:
-                dataset.attrs[item[0]] = item[1]
-     
-        self.store_file.close()
+        self.write_process.join()
+        print('Process joined')
+        del self.queue
         self.doneSignal.emit()
         
-        
-    def write_data(orcaflash, datashape, dataname, savename, queue):
-        
-        store_file = hdf.File(savename, "w")
-        store_file.create_dataset(name=dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
-        
-        
+#        end_f = self.lvworker.f_ind # Get index of the last acquired frame
+#        
+#        if end_f == None: #If no frames are acquired during recording, 
+#            end_f = -1
+#            
+#        if end_f >= start_f - 1:
+#            f_range = range(start_f, end_f + 1)
+#        else:
+#            f_range = np.append(range(start_f, buffer_size), range(0, end_f + 1))
+#            
+#        print('Start_f = :', start_f)
+#        print('End_f = :', end_f)
+#        f_ind = len(f_range)
+#        data = [];
+#        for i in f_range:
+#            data.append(self.orcaflash.hcam_data[i].getData())
+#
+#        datashape = (f_ind, self.shape[1], self.shape[0])     # Adapted for ImageJ data read shape
+#
+#        print('Savename = ', self.savename)
+#        self.store_file = hdf.File(self.savename, "w")
+#        self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
+#        dataset = self.store_file[self.dataname]
+#
+#            
+#        reshapeddata = np.reshape(data, datashape, order='C')
+#        dataset[...] = reshapeddata
+#        self.z_stack = []
+#        for i in range(0, f_ind):
+#            self.z_stack.append(np.mean(reshapeddata[i,:,:]))
+#        
+#        self.Z_projection = np.flipud(np.sum(reshapeddata, 0))
+#        # Saving parameters
+#        for item in self.attrs:
+#            if item[1] is not None:
+#                dataset.attrs[item[0]] = item[1]
+#     
+#        self.store_file.close()
+#        self.doneSignal.emit()
         
 
 
