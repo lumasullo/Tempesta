@@ -40,7 +40,7 @@ import control.ontime as ontime
 import control.guitools as guitools
 from control import libnidaqmx
 
-def write_data(datashape, dataname, savename, q):
+def write_data(datashape, dataname, savename, attrs, q):
     """Function meant to be run in seperate process that gets frames to save from a queue and saves them
     to a hdf5 file.
     NOTE: since every call to write to the dataset appearently includes some overhead it, the speed of the writing
@@ -85,7 +85,12 @@ def write_data(datashape, dataname, savename, q):
                 dataset[f_ind:f_ind+bn:1, :, :] = frames
                 f_ind = f_ind + bn
                 bn = 0
-            
+        
+        # Saving parameters
+        for item in attrs:
+            if item[1] is not None:
+                dataset.attrs[item[0]] = item[1]        
+        
         dataset.resize((f_ind, frame_shape[0], frame_shape[1]))
         store_file.close()
         print('File closed (from "write_data")')
@@ -527,7 +532,7 @@ class RecWorker(QtCore.QObject):
         # Initiate data-writing process
         datashape = (self.max_frames, self.shape[1], self.shape[0])
         self.queue = Queue()
-        self.write_process = Process(target=write_data, args=(datashape, self.dataname, self.savename, self.queue))
+        self.write_process = Process(target=write_data, args=(datashape, self.dataname, self.savename, self.attrs, self.queue))
         self.write_process.start()
         
         #Find what the index of the first recorded frame will be
