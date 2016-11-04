@@ -531,7 +531,7 @@ class RecWorker(QtCore.QObject):
         #Set initial values
         self.timerecorded = 0
         self.frames_recorded = 0
-        buffer_size = self.orcaflash.number_image_buffers
+        self.buffer_size = self.orcaflash.number_image_buffers
 
         # Initiate data-writing process
         datashape = (self.max_frames, self.shape[1], self.shape[0])
@@ -545,80 +545,46 @@ class RecWorker(QtCore.QObject):
             
         self.starttime = time.time()
      
-        # Main loop for waiting until recording is finished and sending update signal
-        next_f = start_f
+        """ Main loop for waiting until recording is finished and sending update signal
+        self.rec_mode determined how length of recording is set."""
+        self.next_f = start_f
         if self.rec_mode == 1:
+            self.pkgs_sent = 0
             while self.frames_recorded < self.timeorframes and self.pressed:
                 self.frames_recorded = self.lvworker.f_ind - start_f
-                time.sleep(0.01)
-                self.updateSignal.emit()
+                self.send_f_to_process()  
                 
         elif self.rec_mode == 2:
+            self.pkgs_sent = 0
             while self.timerecorded < self.timeorframes and self.pressed:
                 self.timerecorded = time.time() - self.starttime
-                time.sleep(0.01)
-                self.updateSignal.emit()
+                self.send_f_to_process()  
         else:
-            pkgs_sent = 0
+            self.pkgs_sent = 0
             while self.pressed:
                 self.timerecorded = time.time() - self.starttime
-                while ((self.lvworker.f_ind == -1 or self.lvworker.f_ind == np.mod(next_f - 1, buffer_size)) and self.pressed): #True if next_f is one "ahead" of camera f_ind.
-                    time.sleep(0.001) #Gives time for liveview thread to access memory and keep liveview responsive (somehow...?)
-                f = self.orcaflash.hcam_data[next_f].getData()
-                self.queue.put(f)
-                pkgs_sent = pkgs_sent + 1
-#                print('Time to get frame and write to queue = ', time.time() - t)
-                next_f = np.mod(next_f + 1, buffer_size) # Mod to make it work if image buffer is circled
-                self.updateSignal.emit()           
+                self.send_f_to_process()
+                
         t = time.time()
         self.orcaflash.stopAcquisition()   # To avoid camera overwriting buffer while saving recording
 
         self.queue.put('Finish')        
         
         self.write_process.join()
-        print('Process joined, first frame index was: ', start_f, 'Last frame index was: ', next_f - 1, 'Packages sent was (excl. "Finish"): ',pkgs_sent)
+        print('Process joined, first frame index was: ', start_f, 'Last frame index was: ', self.next_f - 1, 'Packages sent was (excl. "Finish"): ', self.pkgs_sent)
         del self.queue
         self.doneSignal.emit()
         print('Total time that writing lags behind: ', time.time() - t)
-#        end_f = self.lvworker.f_ind # Get index of the last acquired frame
-#        
-#        if end_f == None: #If no frames are acquired during recording, 
-#            end_f = -1
-#            
-#        if end_f >= start_f - 1:
-#            f_range = range(start_f, end_f + 1)
-#        else:
-#            f_range = np.append(range(start_f, buffer_size), range(0, end_f + 1))
-#            
-#        print('Start_f = :', start_f)
-#        print('End_f = :', end_f)
-#        f_ind = len(f_range)
-#        data = [];
-#        for i in f_range:
-#            data.append(self.orcaflash.hcam_data[i].getData())
-#
-#        datashape = (f_ind, self.shape[1], self.shape[0])     # Adapted for ImageJ data read shape
-#
-#        print('Savename = ', self.savename)
-#        self.store_file = hdf.File(self.savename, "w")
-#        self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
-#        dataset = self.store_file[self.dataname]
-#
-#            
-#        reshapeddata = np.reshape(data, datashape, order='C')
-#        dataset[...] = reshapeddata
-#        self.z_stack = []
-#        for i in range(0, f_ind):
-#            self.z_stack.append(np.mean(reshapeddata[i,:,:]))
-#        
-#        self.Z_projection = np.flipud(np.sum(reshapeddata, 0))
-#        # Saving parameters
-#        for item in self.attrs:
-#            if item[1] is not None:
-#                dataset.attrs[item[0]] = item[1]
-#     
-#        self.store_file.close()
-#        self.doneSignal.emit()
+        
+    def send_f_to_process(self):
+        while (self.lvworker.f_ind + 1 == np.mod(self.next_f, self.buffer_size) and self.pressed): #True if next_f is one "ahead" of camera f_ind.
+            time.sleep(0.001) #Gives time for liveview thread to access memory and keep liveview responsive (somehow...?)
+        f = self.orcaflash.hcam_data[self.next_f].getData()
+        self.queue.put(f)
+        self.pkgs_sent = self.pkgs_sent + 1
+#                print('Time to get frame and write to queue = ', time.time() - t)
+        self.next_f = np.mod(self.next_f + 1, self.buffer_size) # Mod to make it work if image buffer is circled
+        self.updateSignal.emit() 
         
 
 
