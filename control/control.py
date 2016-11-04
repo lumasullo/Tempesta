@@ -44,41 +44,36 @@ def write_data(datashape, dataname, savename, q):
     """Function meant to be run in seperate process that gets frames to save from a queue and saves them
     to a hdf5 file.
     NOTE: since every call to write to the dataset appearently includes some overhead it, the speed of the writing
-    is optimiced by gathering a bunch of frames at a time an writing a whole bunch at a time."""
-    frame_shape = [datashape[1], datashape[2]]        
-    
+    is optimized by gathering a bunch of frames at a time and writing a whole bunch at a time."""
+    frame_shape = [datashape[1], datashape[2]]   
+     
+    class writer():
+        def __init__(self):
+            a = 1
+        
     running = True
     # Initiate file to save to
     with hdf.File(savename, "w") as store_file:
         store_file.create_dataset(name=dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
         dataset = store_file[dataname]
         
-        pkgs_rec = 0        
         bn = 0
         f_ind = 0
         pkg = None
         while running:
             f_bunch = []
-#            print('In beginning of outer loop')
             write = False
             while not write:
                 try:
                     pkg = q.get(True, 0.01) #Package should be either the string 'Finish' or a frame to be saved
-                    pkgs_rec = pkgs_rec + 1
-#                    print('Recieved pkg')
                 except queue.Empty:
-#                    print('Queue empty')
                     pkg = None
                     write = True
-#                print('Size of pkg = ', np.size(pkg))
-#                print('Pkg is : ', pkg)
                 if pkg == 'Finish':
                     running = False
-#                    write = True
                     print('Running set to False, exit loop')
                 elif pkg is None:
                     pass
-#                    print('Package was None')
                 else:
                     f_bunch.append(pkg)
                     bn = bn + 1
@@ -93,7 +88,7 @@ def write_data(datashape, dataname, savename, q):
             
         dataset.resize((f_ind, frame_shape[0], frame_shape[1]))
         store_file.close()
-        print('File closed, packages recieved (incl. "Finish") = ', pkgs_rec)
+        print('File closed (from "write_data")')
 
 #Widget to control image or sequence recording. Recording only possible when liveview active.
 #StartRecording called when "Rec" presset. Creates recording thread with RecWorker, recording is then 
@@ -487,10 +482,7 @@ class RecordingWidget(QtGui.QFrame):
         if self.showZproj.checkState():
             plt.imshow(self.worker.Z_projection, cmap='gray')
         self.recordingThread.terminate()
-#        converterFunction = lambda: guitools.TiffConverterThread(self.savename)
-#        self.main.exportlastAction.triggered.connect(converterFunction)
-#        self.main.exportlastAction.setEnabled(True)
-
+        
         self.writable = True
         self.readyToRecord = True
         self.recButton.setText('REC')
@@ -499,7 +491,6 @@ class RecordingWidget(QtGui.QFrame):
         self.main.lvworker.reset() # Same as done in Liveviewrun()
         self.main.orcaflash.startAcquisition()
         self.main.liveviewButton.setEnabled(True)
-#        self.main.liveviewStart()
         self.progressBar.setValue(0)
         self.currentTime.setText('0 /')
         self.currentFrame.setText('0 /')
@@ -582,7 +573,6 @@ class RecWorker(QtCore.QObject):
         f = self.orcaflash.hcam_data[self.next_f].getData()
         self.queue.put(f)
         self.pkgs_sent = self.pkgs_sent + 1
-#                print('Time to get frame and write to queue = ', time.time() - t)
         self.next_f = np.mod(self.next_f + 1, self.buffer_size) # Mod to make it work if image buffer is circled
         self.updateSignal.emit() 
         
