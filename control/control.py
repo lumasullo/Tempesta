@@ -12,7 +12,6 @@ import os
 import datetime
 import time
 import re
-import ctypes
 import matplotlib.pyplot as plt
 from multiprocessing import Process, Queue
 import queue # Queue.Empty exception is not available in the multiprocessing Queue namespace
@@ -46,10 +45,6 @@ def write_data(datashape, dataname, savename, attrs, q):
     NOTE: since every call to write to the dataset appearently includes some overhead it, the speed of the writing
     is optimized by gathering a bunch of frames at a time and writing a whole bunch at a time."""
     frame_shape = [datashape[1], datashape[2]]   
-     
-    class writer():
-        def __init__(self):
-            a = 1
         
     running = True
     # Initiate file to save to
@@ -542,7 +537,7 @@ class RecWorker(QtCore.QObject):
         self.starttime = time.time()
      
         """ Main loop for waiting until recording is finished and sending update signal
-        self.rec_mode determined how length of recording is set."""
+        self.rec_mode determins how length of recording is set."""
         self.next_f = start_f
         if self.rec_mode == 1:
             self.pkgs_sent = 0
@@ -577,6 +572,7 @@ class RecWorker(QtCore.QObject):
             time.sleep(0.001) #Gives time for liveview thread to access memory and keep liveview responsive (somehow...?)
         f = self.orcaflash.hcam_data[self.next_f].getData()
         self.queue.put(f)
+        print('Queue size is :', self.queue.qsize(), '....  f_ind = ', self.lvworker.f_ind, '...Next_f = ', self.next_f)
         self.pkgs_sent = self.pkgs_sent + 1
         self.next_f = np.mod(self.next_f + 1, self.buffer_size) # Mod to make it work if image buffer is circled
         self.updateSignal.emit() 
@@ -1315,8 +1311,8 @@ class TormentaGUI(QtGui.QMainWindow):
 
             
             if frameParam.param('Mode').value() == 'Full Widefield':
-                self.X0par.setValue(630)
-                self.Y0par.setValue(610)
+                self.X0par.setValue(678)
+                self.Y0par.setValue(662)  # 7 november 2016
                 self.Widthpar.setValue(800)
                 self.Heightpar.setValue(800)
                 self.adjustFrame()
