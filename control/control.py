@@ -552,7 +552,6 @@ class RecWorker(QtCore.QObject):
                 print('Button pressed?', self.pressed)
                 while self.pressed or (not self.last_saved == self.last_saved):       
                     self.timerecorded = time.time() - self.starttime
-                    self.last_aq = self.lvworker.f_ind  
 #                    time.sleep(1)
                     self.save_frames()
                     print('Last aquired: ', self.last_aq)
@@ -568,33 +567,35 @@ class RecWorker(QtCore.QObject):
             self.doneSignal.emit()
         
     def save_frames(self):
+
+        self.last_aq = self.lvworker.f_ind  
         while (self.last_saved == self.last_aq and self.pressed): #True if next_f is one "ahead" of camera f_ind.
-#            time.sleep(0.1) #Gives time for liveview thread to access memory and keep liveview responsive (somehow...?)
+            time.sleep(0.1) #Gives time for liveview thread to access memory and keep liveview responsive (somehow...?)
             self.last_aq = self.lvworker.f_ind
         
-#        if not self.last_saved == self.last_aq:
-#            print('In saving frames')
-#            if self.last_aq > self.last_saved:
-#                f_range = range(self.last_saved + 1, self.last_aq + 1)
-#            else:
-#                f_range = np.append(range(self.last_saved + 1, self.buffer_size), range(0, self.last_aq + 1))
-#                
-#            f_ind = len(f_range)
-#            print('Frames retrieved: ', f_ind)
-#            new_data = [];
-#            for i in f_range:
-#                new_data.append(self.orcaflash.hcam_data[i].getData())
-#            
-#            bunch_shape = (f_ind, self.shape[1], self.shape[0])
-#            frames = np.reshape(new_data, bunch_shape, order='C')
-#            print('Size of "frames" = ', np.shape(frames))
-#            print('Last saved frame = ', self.last_saved)
-#            print('Last aquired frame = ', self.last_aq)
-#            self.dataset[self.frames_saved:self.frames_saved+f_ind, :, :] = frames
-#            self.frames_saved = self.frames_saved + f_ind
-#            print('Frames saved = ', self.frames_saved)
-#            
-#            self.last_saved = self.last_aq
+        if not self.last_saved == self.last_aq:
+            print('In saving frames')
+            if self.last_aq > self.last_saved:
+                f_range = range(self.last_saved + 1, self.last_aq + 1)
+            else:
+                f_range = np.append(range(self.last_saved + 1, self.buffer_size), range(0, self.last_aq + 1))
+                
+            f_ind = len(f_range)
+            print('Frames retrieved: ', f_ind)
+            new_data = [];
+            for i in f_range:
+                new_data.append(self.orcaflash.hcam_data[i].getData())
+            
+            bunch_shape = (f_ind, self.shape[1], self.shape[0])
+            frames = np.reshape(new_data, bunch_shape, order='C')
+            print('Size of "frames" = ', np.shape(frames))
+            print('Last saved frame = ', self.last_saved)
+            print('Last aquired frame = ', self.last_aq)
+            self.dataset[self.frames_saved:self.frames_saved+f_ind, :, :] = frames
+            self.frames_saved = self.frames_saved + f_ind
+            print('Frames saved = ', self.frames_saved)
+            
+            self.last_saved = self.last_aq
             
         self.updateSignal.emit() 
         
