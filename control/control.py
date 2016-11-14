@@ -13,7 +13,7 @@ import datetime
 import time
 import re
 import matplotlib.pyplot as plt
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Pipe
 import queue # Queue.Empty exception is not available in the multiprocessing Queue namespace
 
 from pyqtgraph.Qt import QtCore, QtGui
@@ -39,8 +39,8 @@ import control.ontime as ontime
 import control.guitools as guitools
 from control import libnidaqmx
 
-def write_data(datashape, dataname, savename, attrs, q):
-    """Function meant to be run in seperate process that gets frames to save from a queue and saves them
+def write_data(datashape, dataname, savename, attrs, p):
+    """Function meant to be run in seperate process that gets frames to save from a pipe and saves them
     to a hdf5 file.
     NOTE: since every call to write to the dataset appearently includes some overhead it, the speed of the writing
     is optimized by gathering a bunch of frames at a time and writing a whole bunch at a time."""
@@ -56,29 +56,24 @@ def write_data(datashape, dataname, savename, attrs, q):
         f_ind = 0
         pkg = None
         while running:
+            p.send('Ready')
             f_bunch = []
-            write = False
-            while not write:
-                try:
-                    pkg = q.get(True, 0.01) #Package should be either the string 'Finish' or a frame to be saved
-                except queue.Empty:
-                    pkg = None
-                    write = True
+            while p.poll(0.01):
+                pkg = p.recv() #Package should be either the string 'Finish' or a frame to be saved
+                p.send('Ready')
                 if pkg == 'Finish':
                     running = False
                     print('Running set to False, exit loop')
-                elif pkg is None:
-                    pass
                 else:
                     f_bunch.append(pkg)
                     bn = bn + 1
-                    write = bn > 29
                     
             if bn > 0:
                 bunch_shape = [bn, frame_shape[0], frame_shape[1]]
                 frames = np.reshape(f_bunch, bunch_shape, order='C')
                 dataset[f_ind:f_ind+bn:1, :, :] = frames
                 f_ind = f_ind + bn
+                print('Written to file, bn = ', bn)
                 bn = 0
         
         # Saving parameters
@@ -473,6 +468,7 @@ class RecordingWidget(QtGui.QFrame):
 
         else:
             self.worker.pressed = False
+            self.main.orcaflash.stopAcquisition()   # To avoid camera overwriting buffer while saving recording
 
 # Function called when recording finishes to reset relevent parameters.
 
@@ -509,7 +505,7 @@ class RecWorker(QtCore.QObject):
         print(self.rec_mode)
         self.timeorframes = timeorframes #Nr of seconds or frames to record depending on bool_ToF.
         self.shape = shape # Shape of one frame
-        self.max_frames = np.floor(6000000000 / self.orcaflash.frame_bytes) #Max frames in 5 GB memory
+        self.max_frames = np.floor(6000000000 / self.orcaflash.frame_bytes) #Max frames in 6 GB memory
         self.lvworker = lvworker
         self.t_exp = t_exp
         self.savename = savename
@@ -527,7 +523,8 @@ class RecWorker(QtCore.QObject):
         # Initiate data-writing process
         datashape = (self.max_frames, self.shape[1], self.shape[0])
         self.queue = Queue()
-        self.write_process = Process(target=write_data, args=(datashape, self.dataname, self.savename, self.attrs, self.queue))
+        pipe_recv, self.pipe_send = Pipe()
+        self.write_process = Process(target=write_data, args=(datashape, self.dataname, self.savename, self.attrs, pipe_recv))
         self.write_process.start()
         
         #Find what the index of the first recorded frame will be
@@ -552,30 +549,35 @@ class RecWorker(QtCore.QObject):
                 self.send_f_to_process()  
         else:
             self.pkgs_sent = 0
-            while self.pressed:
+            while self.pressed or (not self.lvworker.f_ind + 1 == self.next_f):       
                 self.timerecorded = time.time() - self.starttime
+                print('self.pressed = ', self.pressed)
+                print('self.lvworker.f_ind = ', self.lvworker.f_ind)
+                print('self.next_f = ', self.next_f)
                 self.send_f_to_process()
                 
+                
         t = time.time()
-        self.orcaflash.stopAcquisition()   # To avoid camera overwriting buffer while saving recording
-
-        self.queue.put('Finish')        
-        
+        self.pipe_send.send('Finish')        
+        self.pipe_send.recv()
         self.write_process.join()
         print('Process joined, first frame index was: ', start_f, 'Last frame index was: ', self.next_f - 1, 'Packages sent was (excl. "Finish"): ', self.pkgs_sent)
-        del self.queue
+        self.pipe_send.close()
         self.doneSignal.emit()
-        print('Total time that writing lags behind: ', time.time() - t)
         
     def send_f_to_process(self):
-        while (self.lvworker.f_ind + 1 == np.mod(self.next_f, self.buffer_size) and self.pressed): #True if next_f is one "ahead" of camera f_ind.
+        while (self.lvworker.f_ind + 1 == self.next_f and self.pressed): #True if next_f is one "ahead" of camera f_ind.
             time.sleep(0.001) #Gives time for liveview thread to access memory and keep liveview responsive (somehow...?)
-        f = self.orcaflash.hcam_data[self.next_f].getData()
-        self.queue.put(f)
-        print('Queue size is :', self.queue.qsize(), '....  f_ind = ', self.lvworker.f_ind, '...Next_f = ', self.next_f)
-        self.pkgs_sent = self.pkgs_sent + 1
-        self.next_f = np.mod(self.next_f + 1, self.buffer_size) # Mod to make it work if image buffer is circled
-        self.updateSignal.emit() 
+        
+        if not self.lvworker.f_ind + 1 == self.next_f:
+            f = self.orcaflash.hcam_data[self.next_f].getData()
+            self.pipe_send.recv()
+            print('After recieve')
+            self.pipe_send.send(f)
+            print('After send')
+            self.pkgs_sent = self.pkgs_sent + 1
+            self.next_f = np.mod(self.next_f + 1, self.buffer_size) # Mod to make it work if image buffer is circled
+            self.updateSignal.emit() 
         
 
 

@@ -771,11 +771,12 @@ class HamamatsuCameraMR(HamamatsuCamera):
         print(self.frame_bytes)
         #
         # Allocate new image buffers if necessary.
-        # Allocate as many frames as can fit in 2GB of memory.
+        # Allocate as many frames as can fit in X GB of memory.
         #
         if (self.old_frame_bytes != self.frame_bytes):
 
-            n_buffers = int((2.0 * 1024 * 1024 * 1024)/self.frame_bytes)
+            n_buffers = int((2.5 * 1024 * 1024 * 1024)/self.frame_bytes)
+            print('Number of buffers = ', n_buffers)
             self.number_image_buffers = n_buffers
 
             # Allocate new image buffers.
