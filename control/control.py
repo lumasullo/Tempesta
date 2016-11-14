@@ -531,37 +531,40 @@ class RecWorker(QtCore.QObject):
         last_aq = self.lvworker.f_ind
         start_f = last_aq + 1 # index of first frame is one more then provious frame.
             
-        self.starttime = time.time()
-     
-        """ Main loop for waiting until recording is finished and sending update signal
-        self.rec_mode determins how length of recording is set."""
-        self.last_aq = last_aq
-        self.last_saved = start_f - 1
-        if self.rec_mode == 1:
-            self.pkgs_sent = 0
-            while self.frames_recorded < self.timeorframes and self.pressed:
-                self.frames_recorded = self.lvworker.f_ind - start_f
-                self.save_frames()  
-                
-        elif self.rec_mode == 2:
-            self.pkgs_sent = 0
-            while self.timerecorded < self.timeorframes and self.pressed:
-                self.timerecorded = time.time() - self.starttime
-                self.save_frames()  
-        else:
-            self.pkgs_sent = 0
-            while self.pressed or (not self.last_saved == self.last_saved):       
-                self.timerecorded = time.time() - self.starttime
-                self.save_frames()
-                
-                
-        t = time.time()
-        self.pipe_send.send('Finish')        
-        self.pipe_send.recv()
-        self.write_process.join()
-        print('Process joined, first frame index was: ', start_f, 'Last frame index was: ', self.next_f - 1, 'Packages sent was (excl. "Finish"): ', self.pkgs_sent)
-        self.pipe_send.close()
-        self.doneSignal.emit()
+        with hdf.File(savename, "w") as self.store_file:
+            self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
+            self.dataset = self.store_file[self.dataname]
+            self.starttime = time.time()
+         
+            """Main loop for waiting until recording is finished and sending update signal
+            self.rec_mode determins how length of recording is set."""
+            self.last_aq = last_aq
+            self.last_saved = start_f - 1
+            if self.rec_mode == 1:
+                self.pkgs_sent = 0
+                while self.frames_recorded < self.timeorframes and self.pressed:
+                    self.frames_recorded = self.lvworker.f_ind - start_f
+                    self.save_frames()  
+                    
+            elif self.rec_mode == 2:
+                self.pkgs_sent = 0
+                while self.timerecorded < self.timeorframes and self.pressed:
+                    self.timerecorded = time.time() - self.starttime
+                    self.save_frames()  
+            else:
+                self.pkgs_sent = 0
+                while self.pressed or (not self.last_saved == self.last_saved):       
+                    self.timerecorded = time.time() - self.starttime
+                    self.save_frames()
+                    
+                    
+            t = time.time()
+            self.pipe_send.send('Finish')        
+            self.pipe_send.recv()
+            self.write_process.join()
+            print('Process joined, first frame index was: ', start_f, 'Last frame index was: ', self.next_f - 1, 'Packages sent was (excl. "Finish"): ', self.pkgs_sent)
+            self.pipe_send.close()
+            self.doneSignal.emit()
         
     def save_frames(self):
         self.last_aq = self.lvworker.f_ind
@@ -572,18 +575,14 @@ class RecWorker(QtCore.QObject):
             if self.last_aq > self.last_saved:
                 f_range = range(self.last_saved + 1, self.last_aq + 1)
             else:
-                f_range = np.append(range(self.last_saved + 1, buffer_size), range(self.last_aq + 1))
+                f_range = np.append(range(self.last_saved + 1, self.buffer_size), range(self.last_aq + 1))
                 
+            f_ind = len(f_range)
+            data = [];
+            for i in f_range:
+                data.append(self.orcaflash.hcam_data[i].getData())
             
-                        
-            self.orcaflash.hcam_data[self.next_f].getData()
             
-            self.pipe_send.recv()
-            print('After recieve')
-            self.pipe_send.send(f)
-            print('After send')
-            self.pkgs_sent = self.pkgs_sent + 1
-            self.next_f = np.mod(self.next_f + 1, self.buffer_size) # Mod to make it work if image buffer is circled
             self.updateSignal.emit() 
         
 
