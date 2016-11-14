@@ -520,26 +520,21 @@ class RecWorker(QtCore.QObject):
         self.frames_recorded = 0
         self.buffer_size = self.orcaflash.number_image_buffers
 
-        # Initiate data-writing process
         datashape = (self.max_frames, self.shape[1], self.shape[0])
-        self.queue = Queue()
-        pipe_recv, self.pipe_send = Pipe()
-        self.write_process = Process(target=write_data, args=(datashape, self.dataname, self.savename, self.attrs, pipe_recv))
-        self.write_process.start()
         
         #Find what the index of the first recorded frame will be
-        last_aq = self.lvworker.f_ind
-        start_f = last_aq + 1 # index of first frame is one more then provious frame.
+        start_f = self.lvworker.f_ind
+        self.last_aq = self.lvworker.f_ind
+        self.last_saved = self.last_aq
+        self.frames_saved = 0
             
-        with hdf.File(savename, "w") as self.store_file:
+        with hdf.File(self.savename, "w") as self.store_file:
             self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
             self.dataset = self.store_file[self.dataname]
             self.starttime = time.time()
-         
+            print('In recording')
             """Main loop for waiting until recording is finished and sending update signal
             self.rec_mode determins how length of recording is set."""
-            self.last_aq = last_aq
-            self.last_saved = start_f - 1
             if self.rec_mode == 1:
                 self.pkgs_sent = 0
                 while self.frames_recorded < self.timeorframes and self.pressed:
@@ -553,37 +548,55 @@ class RecWorker(QtCore.QObject):
                     self.save_frames()  
             else:
                 self.pkgs_sent = 0
+                print('In recording until stop')
+                print('Button pressed?', self.pressed)
                 while self.pressed or (not self.last_saved == self.last_saved):       
                     self.timerecorded = time.time() - self.starttime
+                    self.last_aq = self.lvworker.f_ind  
+#                    time.sleep(1)
                     self.save_frames()
+                    print('Last aquired: ', self.last_aq)
                     
+            self.dataset.resize((self.frames_saved, self.shape[1], self.shape[0]))
+            
+            # Saving parameters
+            for item in self.attrs:
+                if item[1] is not None:
+                    self.dataset.attrs[item[0]] = item[1]  
                     
-            t = time.time()
-            self.pipe_send.send('Finish')        
-            self.pipe_send.recv()
-            self.write_process.join()
-            print('Process joined, first frame index was: ', start_f, 'Last frame index was: ', self.next_f - 1, 'Packages sent was (excl. "Finish"): ', self.pkgs_sent)
-            self.pipe_send.close()
+            self.store_file.close()
             self.doneSignal.emit()
         
     def save_frames(self):
-        self.last_aq = self.lvworker.f_ind
         while (self.last_saved == self.last_aq and self.pressed): #True if next_f is one "ahead" of camera f_ind.
-            time.sleep(0.001) #Gives time for liveview thread to access memory and keep liveview responsive (somehow...?)
+#            time.sleep(0.1) #Gives time for liveview thread to access memory and keep liveview responsive (somehow...?)
+            self.last_aq = self.lvworker.f_ind
         
-        if not self.last_saved == self.last_aq:
-            if self.last_aq > self.last_saved:
-                f_range = range(self.last_saved + 1, self.last_aq + 1)
-            else:
-                f_range = np.append(range(self.last_saved + 1, self.buffer_size), range(self.last_aq + 1))
-                
-            f_ind = len(f_range)
-            data = [];
-            for i in f_range:
-                data.append(self.orcaflash.hcam_data[i].getData())
+#        if not self.last_saved == self.last_aq:
+#            print('In saving frames')
+#            if self.last_aq > self.last_saved:
+#                f_range = range(self.last_saved + 1, self.last_aq + 1)
+#            else:
+#                f_range = np.append(range(self.last_saved + 1, self.buffer_size), range(0, self.last_aq + 1))
+#                
+#            f_ind = len(f_range)
+#            print('Frames retrieved: ', f_ind)
+#            new_data = [];
+#            for i in f_range:
+#                new_data.append(self.orcaflash.hcam_data[i].getData())
+#            
+#            bunch_shape = (f_ind, self.shape[1], self.shape[0])
+#            frames = np.reshape(new_data, bunch_shape, order='C')
+#            print('Size of "frames" = ', np.shape(frames))
+#            print('Last saved frame = ', self.last_saved)
+#            print('Last aquired frame = ', self.last_aq)
+#            self.dataset[self.frames_saved:self.frames_saved+f_ind, :, :] = frames
+#            self.frames_saved = self.frames_saved + f_ind
+#            print('Frames saved = ', self.frames_saved)
+#            
+#            self.last_saved = self.last_aq
             
-            
-            self.updateSignal.emit() 
+        self.updateSignal.emit() 
         
 
 
@@ -1142,18 +1155,6 @@ class TormentaGUI(QtGui.QMainWindow):
             function()
             self.liveviewRun()
 
-#        status = self.andor.status
-#        if status != ('Camera is idle, waiting for instructions.'):
-#            self.viewtimer.stop()
-#            self.andor.abort_acquisition()
-#
-#        function()
-#
-#        if status != ('Camera is idle, waiting for instructions.'):
-#            self.andor.start_acquisition()
-#            time.sleep(np.min((5 * self.t_exp_real.magnitude, 1)))
-#            self.viewtimer.start(0)
-
 
     def ChangeTriggerSource(self):
         
@@ -1349,18 +1350,6 @@ class TormentaGUI(QtGui.QMainWindow):
                 self.ROI.hide()
 
 
-
-
-#        else:
-#            pass
-#            side = int(frameParam.param('Mode').value().split('x')[0])
-#            self.shape = (side, side)
-#            start = int(0.5*(self.andor.detector_shape[0] - side) + 1)
-#            self.frameStart = (start, start)
-#
-#            self.changeParameter(self.adjustFrame)
-##            self.applyParam.disable()
-
     def ROIchanged(self):
 
         self.X0par.setValue(self.frameStart[0] + int(self.ROI.pos()[0]))
@@ -1415,7 +1404,7 @@ class TormentaGUI(QtGui.QMainWindow):
         else:
             self.liveviewStop()
             
-# Threading below  is done in this way since making LVThread a QThread resulted in QTimer
+# Threading below is done in this way since making LVThread a QThread resulted in QTimer
 # not functioning in the thread. Image is now also saved as latest_image in 
 # TormentaGUI class since setting image in GUI from thread resultet in 
 # issues when interacting with the viewbox from GUI. Maybe due to 
@@ -1423,9 +1412,6 @@ class TormentaGUI(QtGui.QMainWindow):
 
     def liveviewStart(self):
 
-#        self.orcaflash.startAcquisition()
-#        time.sleep(0.3)
-#        time.sleep(np.max((5 * self.t_exp_real.magnitude, 1)))
         self.updateFrame()
         self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
         self.recWidget.readyToRecord = True
@@ -1436,39 +1422,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.lvthread.start()
         self.viewtimer.start(30)
         self.liveviewRun()
-#        self.liveviewStarts.emit()
-#
-#        idle = 'Camera is idle, waiting for instructions.'
-#        if self.andor.status != idle:
-#            self.andor.abort_acquisition()
-#
-#        self.andor.acquisition_mode = 'Run till abort'
-#        self.andor.shutter(0, 1, 0, 0, 0)
-#
-#        self.andor.start_acquisition()
-#        time.sleep(np.max((5 * self.t_exp_real.magnitude, 1)))
-#        self.recWidget.readyToRecord = True
-#        self.recWidget.recButton.setEnabled(True)
-#
-#        # Initial image
-#        rawframes = self.orcaflash.getFrames()
-#        firstframe = rawframes[0][-1].getData() #return A numpy array that contains the camera data. "Circular" indexing makes [-1] return the latest frame
-#        self.image = np.reshape(firstframe, (self.orcaflash.frame_y, self.orcaflash.frame_x), order='C')
-#        print(self.frame)
-#        print(type(self.frame))
-#        self.img.setImage(self.image, autoLevels=False, lut=self.lut) #Autolevels = True gives a stange numpy (?) warning
-#        image = np.transpose(self.andor.most_recent_image16(self.shape))
-#        self.img.setImage(image, autoLevels=False, lut=self.lut)
-#        if update:
-#            self.updateLevels(image)
-#        self.viewtimer.start(0)
-#        while self.liveviewButton.isChecked():
-#            self.updateView()
 
-#        self.moleculeWidget.enableBox.setEnabled(True)
-#        self.gridButton.setEnabled(True)
-#        self.grid2Button.setEnabled(True)
-#        self.crosshairButton.setEnabled(True)
 
     def liveviewStop(self):
         self.lvworker.stop()
@@ -1481,31 +1435,14 @@ class TormentaGUI(QtGui.QMainWindow):
         self.img.setImage(np.zeros(self.shape), autoLevels=False)
         del self.lvthread
 
-#        self.liveviewEnds.emit()
-
-#    def updateinThread(self):
-#        
-#        self.recordingThread = QtCore.QThread()
-#        self.worker.moveToThread(self.recordingThread)
-#        self.recordingThread.started.connect(self.worker.start)
-#        self.recordingThread.start()
-#        
-#        self.updateThread = QtCore.QThread()
-#        self.
 
     def liveviewRun(self):
 #       
         self.lvworker.reset() # Needed if parameter is changed during liveview since that causes camera to start writing to buffer place zero again.      
         self.orcaflash.startAcquisition()
-#        time.sleep(0.3)
-#        self.viewtimer.start(0)
-#        self.lvthread.run()
-#        self.lvthread.start()
     
     def liveviewPause(self):
-        
-#        self.lvworker.stop()
-#        self.viewtimer.stop()
+
         self.orcaflash.stopAcquisition()
 
     def updateView(self):
