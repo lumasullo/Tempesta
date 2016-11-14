@@ -569,10 +569,15 @@ class RecWorker(QtCore.QObject):
             time.sleep(0.001) #Gives time for liveview thread to access memory and keep liveview responsive (somehow...?)
         
         if not self.last_saved == self.last_aq:
-            if self.last_aq < self.last_saved
-                frames = self.orcaflash.hcam_data[self.next_f].getData()
+            if self.last_aq > self.last_saved:
+                f_range = range(self.last_saved + 1, self.last_aq + 1)
+            else:
+                f_range = np.append(range(self.last_saved + 1, buffer_size), range(self.last_aq + 1))
                 
-                
+            
+                        
+            self.orcaflash.hcam_data[self.next_f].getData()
+            
             self.pipe_send.recv()
             print('After recieve')
             self.pipe_send.send(f)
