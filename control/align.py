@@ -178,7 +178,7 @@ class AlignWidgetXYProject(QtGui.QFrame):
         self.alignTimer.start(self.alignTime)
         
         self.latest_values = np.zeros(2) # 2 zeros because it has to have the attribute "len"
-        self.s_fac = 0.5
+        self.s_fac = 0.3
         
     def resetGraph(self):
         self.graph.resetData()
