@@ -194,9 +194,9 @@ class AlignWidgetXYProject(QtGui.QFrame):
     def updateValue(self):
         
         if (self.main.liveviewButton.isChecked() and self.roiButton.isChecked()):
-            self.selected = self.ROI.getArrayRegion(self.main.latest_image, self.main.img)
+            self.selected = self.ROI.getArrayRegion(self.main.latest_images[0], self.main.img)
         else:
-            self.selected = self.main.latest_image
+            self.selected = self.main.latest_images[self.main.curr_cam_ind]
             
         if self.Xradio.isChecked():
             values = np.mean(self.selected, 0)

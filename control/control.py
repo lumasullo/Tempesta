@@ -680,9 +680,10 @@ class CamParamTree(ParameterTree):
 
 class LVWorker(QtCore.QObject):
     
-    def __init__(self, main, orcaflash, *args, **kwargs):
+    def __init__(self, main, ind, orcaflash, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.main = main
+        self.ind = ind
         self.orcaflash = orcaflash
         self.running = False
         self.f_ind = None
@@ -704,7 +705,7 @@ class LVWorker(QtCore.QObject):
 #            print('f_ind = :', self.f_ind)
             frame = self.orcaflash.hcam_data[self.f_ind].getData()
             self.image = np.reshape(frame, (self.orcaflash.frame_x, self.orcaflash.frame_y), 'F')
-            self.main.latest_image = self.image
+            self.main.latest_images[self.ind] = self.image
             trigger_source = self.orcaflash.getPropertyValue('trigger_source')[0]
             if trigger_source == 1:
                 if self.mem == 1:
@@ -738,25 +739,27 @@ class TormentaGUI(QtGui.QMainWindow):
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        self.orcaflashV2 = orcaflashV2
-        self.orcaflashV3 = orcaflashV3        
+        self.cameras = [orcaflashV2, orcaflashV3]        
         
         self.orcaflash = orcaflashV2
-        self.changeParameter(lambda: self.orcaflashV2.setPropertyValue('trigger_polarity', 2))
-        self.changeParameter(lambda: self.orcaflashV3.setPropertyValue('trigger_polarity', 2))
-        self.changeParameter(lambda: self.orcaflashV2.setPropertyValue('trigger_global_exposure', 5)) # 3:DELAYED, 5:GLOBAL RESET
-        self.changeParameter(lambda: self.orcaflashV3.setPropertyValue('trigger_global_exposure', 5)) # 3:DELAYED, 5:GLOBAL RESET
+        self.changeParameter(lambda: self.cameras[0].setPropertyValue('trigger_polarity', 2))
+        self.changeParameter(lambda: self.cameras[1].setPropertyValue('trigger_polarity', 2))
+        self.changeParameter(lambda: self.cameras[0].setPropertyValue('trigger_global_exposure', 5)) # 3:DELAYED, 5:GLOBAL RESET
+        self.changeParameter(lambda: self.cameras[1].setPropertyValue('trigger_global_exposure', 5)) # 3:DELAYED, 5:GLOBAL RESET
 #        self.changeParameter(lambda: self.orcaflash.setPropertyValue('defect_correct_mode', 2)) # 1:OFF, 2:ON
 #        self.orcaflash.setPropertyValue('readout_speed', 1)
 #        self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_mode', 6))
-        self.changeParameter(lambda: self.orcaflashV2.setPropertyValue('trigger_active', 2)) # 1: EGDE, 2: LEVEL, 3:SYNCHREADOUT
-        self.changeParameter(lambda: self.orcaflashV3.setPropertyValue('trigger_active', 2)) # 1: EGDE, 2: LEVEL, 3:SYNCHREADOUT        
+        self.changeParameter(lambda: self.cameras[0].setPropertyValue('trigger_active', 2)) # 1: EGDE, 2: LEVEL, 3:SYNCHREADOUT
+        self.changeParameter(lambda: self.cameras[1].setPropertyValue('trigger_active', 2)) # 1: EGDE, 2: LEVEL, 3:SYNCHREADOUT        
         self.shape = (self.orcaflash.getPropertyValue('image_height')[0], self.orcaflash.getPropertyValue('image_width')[0])
         self.frameStart = (0, 0)
         self.scanZ = scanZ
         self.daq = daq
         self.nidaq = libnidaqmx.Device('Dev1')
-        self.latest_image = np.zeros(self.shape)
+        self.lvworkers = [None, None]
+        self.lvthreads = [None, None]
+        self.curr_cam_ind = 0
+        self.latest_images = [np.zeros(self.shape), np.zeros(self.shape)]
         
         self.filewarning = FileWarning()
 
@@ -1113,16 +1116,17 @@ class TormentaGUI(QtGui.QMainWindow):
         pass
     
     def toggle_camera(self):
-        self.liveviewStop()
-        if self.orcaflash == self.orcaflashV3:
-            self.orcaflash = self.orcaflashV2
+
+        if self.orcaflash == self.cameras[1]:
+            self.orcaflash = self.cameras[0]
             self.CamLabel.setText('OrcaFlash V2')
         else:
-            self.orcaflash = self.orcaflashV3
+            self.orcaflash = self.cameras[1]
             self.CamLabel.setText('OrcaFlash V3')
         
+        self.curr_cam_ind = np.mod(self.curr_cam_ind + 1, 2)        
         self.shape = (self.orcaflash.getPropertyValue('image_height')[0], self.orcaflash.getPropertyValue('image_width')[0])
-        self.liveviewStart()
+
         
     def applyfcn(self):
         print('Apply pressed')
@@ -1436,77 +1440,43 @@ class TormentaGUI(QtGui.QMainWindow):
 #        self.orcaflash.startAcquisition()
 #        time.sleep(0.3)
 #        time.sleep(np.max((5 * self.t_exp_real.magnitude, 1)))
+
         self.updateFrame()
         self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
         self.recWidget.readyToRecord = True
-        self.lvworker = LVWorker(self, self.orcaflash)
-        self.lvthread = QtCore.QThread()
-        self.lvworker.moveToThread(self.lvthread)
-        self.lvthread.started.connect(self.lvworker.run)
-        self.lvthread.start()
-        self.viewtimer.start(30)
+        
+        for i in range(0,2):
+            self.lvworkers[i] = LVWorker(self, i, self.cameras[i])
+            self.lvthreads[i] = QtCore.QThread()
+            self.lvworkers[i].moveToThread(self.lvthreads[i])
+            self.lvthreads[i].started.connect(self.lvworkers[i].run)
+            self.lvthreads[i].start()
+            self.viewtimer.start(30)
+            
         self.liveviewRun()
-#        self.liveviewStarts.emit()
-#
-#        idle = 'Camera is idle, waiting for instructions.'
-#        if self.andor.status != idle:
-#            self.andor.abort_acquisition()
-#
-#        self.andor.acquisition_mode = 'Run till abort'
-#        self.andor.shutter(0, 1, 0, 0, 0)
-#
-#        self.andor.start_acquisition()
-#        time.sleep(np.max((5 * self.t_exp_real.magnitude, 1)))
-#        self.recWidget.readyToRecord = True
-#        self.recWidget.recButton.setEnabled(True)
-#
-#        # Initial image
-#        rawframes = self.orcaflash.getFrames()
-#        firstframe = rawframes[0][-1].getData() #return A numpy array that contains the camera data. "Circular" indexing makes [-1] return the latest frame
-#        self.image = np.reshape(firstframe, (self.orcaflash.frame_y, self.orcaflash.frame_x), order='C')
-#        print(self.frame)
-#        print(type(self.frame))
-#        self.img.setImage(self.image, autoLevels=False, lut=self.lut) #Autolevels = True gives a stange numpy (?) warning
-#        image = np.transpose(self.andor.most_recent_image16(self.shape))
-#        self.img.setImage(image, autoLevels=False, lut=self.lut)
-#        if update:
-#            self.updateLevels(image)
-#        self.viewtimer.start(0)
-#        while self.liveviewButton.isChecked():
-#            self.updateView()
 
-#        self.moleculeWidget.enableBox.setEnabled(True)
-#        self.gridButton.setEnabled(True)
-#        self.grid2Button.setEnabled(True)
-#        self.crosshairButton.setEnabled(True)
 
     def liveviewStop(self):
-        self.lvworker.stop()
-        self.lvthread.terminate()
+        
+        for i in range(0,2):
+
+            self.lvworkers[i].stop()
+            self.lvthreads[i].terminate()
+            # Turn off camera, close shutter
+            self.cameras[i].stopAcquisition()
+            
         self.viewtimer.stop()
         self.recWidget.readyToRecord = False
 
-        # Turn off camera, close shutter
-        self.orcaflash.stopAcquisition()
         self.img.setImage(np.zeros(self.shape), autoLevels=False)
-        del self.lvthread
+            
 
-#        self.liveviewEnds.emit()
-
-#    def updateinThread(self):
-#        
-#        self.recordingThread = QtCore.QThread()
-#        self.worker.moveToThread(self.recordingThread)
-#        self.recordingThread.started.connect(self.worker.start)
-#        self.recordingThread.start()
-#        
-#        self.updateThread = QtCore.QThread()
-#        self.
 
     def liveviewRun(self):
 #       
-        self.lvworker.reset() # Needed if parameter is changed during liveview since that causes camera to start writing to buffer place zero again.      
-        self.orcaflash.startAcquisition()
+        for i in range(0,2):
+            self.lvworkers[i].reset() # Needed if parameter is changed during liveview since that causes camera to start writing to buffer place zero again.      
+            self.cameras[i].startAcquisition()
 #        time.sleep(0.3)
 #        self.viewtimer.start(0)
 #        self.lvthread.run()
@@ -1514,15 +1484,14 @@ class TormentaGUI(QtGui.QMainWindow):
     
     def liveviewPause(self):
         
-#        self.lvworker.stop()
-#        self.viewtimer.stop()
-        self.orcaflash.stopAcquisition()
+        for i in range(0,2):
+            self.cameras[i].stopAcquisition()
 
     def updateView(self):
         """ Image update while in Liveview mode
         """
 
-        self.img.setImage(self.latest_image, autoLevels=False, autoDownsample = False) 
+        self.img.setImage(self.latest_images[self.curr_cam_ind], autoLevels=False, autoDownsample = False) 
         
         if self.alignmentON == True:
             if self.alignmentCheck.isChecked(): 
@@ -1575,7 +1544,8 @@ class TormentaGUI(QtGui.QMainWindow):
 #        self.stabilizer.timer.stop()
 #        self.stabilizerThread.terminate()
         try:
-            self.lvthread.terminate()
+            self.lvthreads[0].terminate()
+            self.lvthreads[1].terminate()
         except:
             pass
             
@@ -1583,7 +1553,8 @@ class TormentaGUI(QtGui.QMainWindow):
 #        if self.andor.status != 'Camera is idle, waiting for instructions.':
 #            self.andor.abort_acquisition()
 #        self.andor.shutter(0, 2, 0, 0, 0)
-        self.orcaflash.shutdown()
+        self.cameras[0].shutdown()
+        self.cameras[1].shutdown()
         self.daq.flipper = True
 #        if self.signalWidget.running:
 #            self.signalWidget.StartStop()
