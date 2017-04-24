@@ -50,7 +50,7 @@ class RecordingWidget(QtGui.QFrame):
         self.main = main
         self.dataname = 'data'      # In case I need a QLineEdit for this
 
-        startdir = r'E:\Tempesta\DefaultDataFolder\%s'
+        startdir = r'F:\Tempesta\DefaultDataFolderSSD\%s'
         newfolderpath =  startdir % time.strftime('%Y-%m-%d')
         if not os.path.exists(newfolderpath):
             os.mkdir(newfolderpath)
@@ -80,8 +80,9 @@ class RecordingWidget(QtGui.QFrame):
         self.filenameEdit = QtGui.QLineEdit('Current_time')
 
         # Snap and recording buttons
-        self.showZgraph = QtGui.QCheckBox('Show Z-graph after rec')
-        self.showZproj = QtGui.QCheckBox('Show Z-projection after rec')
+        self.showZgraph = QtGui.QCheckBox('Show Z-graph')
+        self.showZproj = QtGui.QCheckBox('Show Z-projection')
+        self.showBead_scan = QtGui.QCheckBox('Show bead scan')
         self.snapTIFFButton = QtGui.QPushButton('Snap')
         self.snapTIFFButton.setStyleSheet("font-size:16px")
         self.snapTIFFButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
@@ -144,7 +145,8 @@ class RecordingWidget(QtGui.QFrame):
         recGrid.addWidget(recTitle, 0, 0, 1, 3)
         recGrid.addWidget(QtGui.QLabel('Folder'), 2, 0)
         recGrid.addWidget(self.showZgraph, 1, 0)
-        recGrid.addWidget(self.showZproj, 1, 4)
+        recGrid.addWidget(self.showZproj, 1, 2)
+        recGrid.addWidget(self.showBead_scan, 1, 4)
 #        recGrid.addWidget(loadFolderButton, 1, 5)
 #        recGrid.addWidget(openFolderButton, 1, 4)
         recGrid.addWidget(self.folderEdit, 2, 1, 1, 5)
@@ -425,15 +427,30 @@ class RecordingWidget(QtGui.QFrame):
 # Function called when recording finishes to reset relevent parameters.
 
     def endRecording(self):
+        print('In endRecording')
         if self.showZgraph.checkState():
             plt.plot(self.worker.z_stack)
         if self.showZproj.checkState():
             plt.imshow(self.worker.Z_projection, cmap='gray')
+        if self.showBead_scan.checkState():
+            try:
+                data = self.worker.z_stack
+                data[0] = data[1]
+                data = np.append(data, data[-1])
+                imside = int(np.sqrt(np.size(data)))
+                print('Imside = ', imside)
+                data = np.reshape(data, [imside, imside])
+                data[::2] = np.fliplr(data[::2])
+                plt.figure()
+                plt.imshow(data, interpolation = 'none', cmap=plt.get_cmap('afmhot'))
+            except:
+                pass
+            
         self.recordingThread.terminate()
-        converterFunction = lambda: guitools.TiffConverterThread(self.savename)
-        self.main.exportlastAction.triggered.connect(converterFunction)
-        self.main.exportlastAction.setEnabled(True)
-
+#        converterFunction = lambda: guitools.TiffConverterThread(self.savename)
+#        self.main.exportlastAction.triggered.connect(converterFunction)
+#        self.main.exportlastAction.setEnabled(True)
+        print('After terminating recording thread')
         self.writable = True
         self.readyToRecord = True
         self.recButton.setText('REC')
@@ -527,12 +544,17 @@ class RecWorker(QtCore.QObject):
 
         print('Savename = ', self.savename)
         self.store_file = hdf.File(self.savename, "w")
+        print('File opened')
         self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
+        print('Created dataset')
         dataset = self.store_file[self.dataname]
 
             
         reshapeddata = np.reshape(data, datashape, order='C')
+        t = time.time()
         dataset[...] = reshapeddata
+        elapsed = time.time() - t
+        print('Data written, time to write: ', elapsed)
         self.z_stack = []
         for i in range(0, f_ind):
             self.z_stack.append(np.mean(reshapeddata[i,:,:]))
@@ -542,8 +564,10 @@ class RecWorker(QtCore.QObject):
         for item in self.attrs:
             if item[1] is not None:
                 dataset.attrs[item[0]] = item[1]
+                
+        print('Before closing')
      
-        self.store_file.close()
+        self.store_file.close() 
         self.doneSignal.emit()
 
 
@@ -710,17 +734,23 @@ class TormentaGUI(QtGui.QMainWindow):
     liveviewStarts = QtCore.pyqtSignal()
     liveviewEnds = QtCore.pyqtSignal()
 
-    def __init__(self, bluelaser, bluelaser2, greenlaser, violetlaser, uvlaser, scanZ, daq, orcaflash,
+    def __init__(self, bluelaser, bluelaser2, greenlaser, violetlaser, uvlaser, scanZ, daq, orcaflashV2, orcaflashV3,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        self.orcaflash = orcaflash
-        self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_polarity', 2))
-        self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_global_exposure', 5)) # 3:DELAYED, 5:GLOBAL RESET
-        self.changeParameter(lambda: self.orcaflash.setPropertyValue('defect_correct_mode', 2)) # 1:OFF, 2:ON
+        
+        self.orcaflashV2 = orcaflashV2
+        self.orcaflashV3 = orcaflashV3        
+        
+        self.orcaflash = orcaflashV2
+        self.changeParameter(lambda: self.orcaflashV2.setPropertyValue('trigger_polarity', 2))
+        self.changeParameter(lambda: self.orcaflashV3.setPropertyValue('trigger_polarity', 2))
+        self.changeParameter(lambda: self.orcaflashV2.setPropertyValue('trigger_global_exposure', 5)) # 3:DELAYED, 5:GLOBAL RESET
+        self.changeParameter(lambda: self.orcaflashV3.setPropertyValue('trigger_global_exposure', 5)) # 3:DELAYED, 5:GLOBAL RESET
+#        self.changeParameter(lambda: self.orcaflash.setPropertyValue('defect_correct_mode', 2)) # 1:OFF, 2:ON
 #        self.orcaflash.setPropertyValue('readout_speed', 1)
 #        self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_mode', 6))
-        self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_active', 2)) # 1: EGDE, 2: LEVEL, 3:SYNCHREADOUT
+        self.changeParameter(lambda: self.orcaflashV2.setPropertyValue('trigger_active', 2)) # 1: EGDE, 2: LEVEL, 3:SYNCHREADOUT
+        self.changeParameter(lambda: self.orcaflashV3.setPropertyValue('trigger_active', 2)) # 1: EGDE, 2: LEVEL, 3:SYNCHREADOUT        
         self.shape = (self.orcaflash.getPropertyValue('image_height')[0], self.orcaflash.getPropertyValue('image_width')[0])
         self.frameStart = (0, 0)
         self.scanZ = scanZ
@@ -803,7 +833,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.binPar = self.framePar.param('Binning')
         self.binPar.sigValueChanged.connect(self.setBinning)
         self.FrameMode = self.framePar.param('Mode')
-        self.FrameMode.sigValueChanged.connect(self.testfunction)
+        self.FrameMode.sigValueChanged.connect(self.updateFrame)
         self.X0par= self.framePar.param('X0')
         self.Y0par= self.framePar.param('Y0')
         self.Widthpar= self.framePar.param('Width')
@@ -880,6 +910,12 @@ class TormentaGUI(QtGui.QMainWindow):
         self.resolftRecButton.setStyleSheet("font-size:18px")
         self.resolftRecButton.clicked.connect(self.resolftRec)
         
+        self.ToggleCamButton = QtGui.QPushButton('Toggle camera')
+        self.ToggleCamButton.setStyleSheet("font-size:18px")
+        self.ToggleCamButton.clicked.connect(self.toggle_camera)
+        self.CamLabel = QtGui.QLabel('OrcaFlash V2')
+        self.CamLabel.setStyleSheet("font-size:18px")
+        
         # viewBox custom Tools
 #        self.gridButton = QtGui.QPushButton('Grid')
 #        self.gridButton.setCheckable(True)
@@ -901,6 +937,8 @@ class TormentaGUI(QtGui.QMainWindow):
         self.viewCtrl.setLayout(self.viewCtrlLayout)
         self.viewCtrlLayout.addWidget(self.liveviewButton, 0, 0, 1, 3)
         self.viewCtrlLayout.addWidget( self.resolftRecButton, 1, 0, 1, 3)
+        self.viewCtrlLayout.addWidget( self.ToggleCamButton, 2, 0, 1, 2)
+        self.viewCtrlLayout.addWidget( self.CamLabel, 2, 2, 1, 1)
 #        self.viewCtrlLayout.addWidget(self.gridButton, 1, 0)
 #        self.viewCtrlLayout.addWidget(self.grid2Button, 1, 1)
 #        self.viewCtrlLayout.addWidget(self.crosshairButton, 1, 2)
@@ -1072,8 +1110,19 @@ class TormentaGUI(QtGui.QMainWindow):
         
         
     def testfunction(self):
-        print('In testfunction ie called from frame mode changed signal')
-        self.updateFrame()
+        pass
+    
+    def toggle_camera(self):
+        self.liveviewStop()
+        if self.orcaflash == self.orcaflashV3:
+            self.orcaflash = self.orcaflashV2
+            self.CamLabel.setText('OrcaFlash V2')
+        else:
+            self.orcaflash = self.orcaflashV3
+            self.CamLabel.setText('OrcaFlash V3')
+        
+        self.shape = (self.orcaflash.getPropertyValue('image_height')[0], self.orcaflash.getPropertyValue('image_width')[0])
+        self.liveviewStart()
         
     def applyfcn(self):
         print('Apply pressed')
@@ -1216,9 +1265,10 @@ class TormentaGUI(QtGui.QMainWindow):
  
         vpos = int(4*np.ceil(vpos/4))
         hpos = int(4*np.ceil(hpos/4))
-        vsize = int(min(2048 - vpos, 4*np.ceil(vsize/4)))
-        hsize = int(min(2048 - hpos, 4*np.ceil(hsize/4)))
+        vsize = int(min(2048 - vpos, 128*np.ceil(vsize/128)))
+        hsize = int(min(2048 - hpos, 128*np.ceil(hsize/128))) # V3 camera seems to only be able to take multiples of 128.
 
+        
         self.orcaflash.setPropertyValue('subarray_vsize', vsize)
         self.orcaflash.setPropertyValue('subarray_hsize', hsize)
         self.orcaflash.setPropertyValue('subarray_vpos', vpos)

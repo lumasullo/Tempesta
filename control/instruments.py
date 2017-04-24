@@ -124,11 +124,11 @@ class Camera(object):
     called alot or environments that are used alot."""
 
 
-    def __new__(cls, *args):
-
+    def __new__(cls, id, *args, **kwargs):
+        
         try:     
             import lantz.drivers.hamamatsu.hamamatsu_camera as hm
-            orcaflash = hm.HamamatsuCameraMR(0)
+            orcaflash = hm.HamamatsuCameraMR(id)
             print('Initializing Hamamatsu Camera Object, model: ', orcaflash.camera_model)
             return orcaflash
 

@@ -17,16 +17,17 @@ def main():
 
 #    with instruments.Camera('hamamatsu.hamamatsu_camera.HamamatsuCameraMR') as orcaflash, \
     with instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM12') as bluelaser, \
-         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM13') as bluelaser2, \
+         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM9') as bluelaser2, \
          instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM5') as greenlaser, \
-         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM7') as violetlaser, \
+         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM11') as violetlaser, \
          instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM10') as uvlaser, \
          instruments.DAQ() as daq, instruments.ScanZ(12) as scanZ:
         #instruments.Camera('andor.ccd.CCD') as andor, \
 
          
 #for now, bluelaser is the 488nm laser, greenlaser is the 405nm laser and redlaser is the 355nm laser
-        orcaflash = instruments.Camera()
+        orcaflashV3 = instruments.Camera(0)
+        orcaflashV2 = instruments.Camera(1)
         print(bluelaser.idn)
         print(bluelaser2.idn)
         print(greenlaser.idn)        
@@ -36,7 +37,7 @@ def main():
         print('Prior Z stage')
 
         win = control.TormentaGUI(bluelaser, bluelaser2, greenlaser, violetlaser, uvlaser,
-                                  scanZ, daq, orcaflash)
+                                  scanZ, daq, orcaflashV2, orcaflashV3)
         win.show()
 
         app.exec_()
