@@ -1281,7 +1281,7 @@ class TormentaGUI(QtGui.QMainWindow):
         """Method to crop the frame read out by Orcaflash """
 #       Round to closest "divisable by 4" value.
         t1 = time.time()
-        print('time in beginning of cropOrca = ', t1)
+        print('cropping camera' + str(self.curr_cam_ind))
         self.cameras[self.curr_cam_ind].setPropertyValue('subarray_vpos', 0)
         self.cameras[self.curr_cam_ind].setPropertyValue('subarray_hpos', 0)
         self.cameras[self.curr_cam_ind].setPropertyValue('subarray_vsize', 2048)

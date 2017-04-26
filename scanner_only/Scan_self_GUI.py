@@ -49,22 +49,26 @@ class ScanWidget(QtGui.QMainWindow):
         
         self.sampleRateEdit = QtGui.QLineEdit()
         
-        self.widthPar = QtGui.QLineEdit('10')
-        self.widthPar.editingFinished.connect(lambda: self.ScanParameterChanged('width'))
-        self.heightPar = QtGui.QLineEdit('10')
-        self.heightPar.editingFinished.connect(lambda: self.ScanParameterChanged('height'))
+        self.size_xPar = QtGui.QLineEdit('10')
+        self.size_xPar.editingFinished.connect(lambda: self.ScanParameterChanged('size_x'))
+        self.size_yPar = QtGui.QLineEdit('10')
+        self.size_yPar.editingFinished.connect(lambda: self.ScanParameterChanged('size_y'))
+        self.size_zPar = QtGui.QLineEdit('10')
+        self.size_zPar.editingFinished.connect(lambda: self.ScanParameterChanged('size_z'))
         self.sequence_timePar = QtGui.QLineEdit('100') # Milliseconds
         self.sequence_timePar.editingFinished.connect(lambda: self.ScanParameterChanged('sequence_time'))
         self.nrFramesPar = QtGui.QLabel()
         self.scanDuration = QtGui.QLabel()
-        self.step_sizePar = QtGui.QLineEdit('0.5')
-        self.step_sizePar.editingFinished.connect(lambda: self.ScanParameterChanged('step_size'))
+        self.step_sizeXYPar = QtGui.QLineEdit('0.5')
+        self.step_sizeXYPar.editingFinished.connect(lambda: self.ScanParameterChanged('step_sizeXY'))
+        self.step_sizeZPar = QtGui.QLineEdit('0.5')
+        self.step_sizeZPar.editingFinished.connect(lambda: self.ScanParameterChanged('step_sizeZ'))
         self.sample_rate = 100000
 #        self.sample_rate = np.float(self.sampleRateEdit.text())
         
         self.Scan_Mode_label= QtGui.QLabel('Scan mode:')        
         self.Scan_Mode = QtGui.QComboBox()
-        self.scan_modes = ['FOV scan', 'Line scan']
+        self.scan_modes = ['FOV scan', 'VOL Scan', 'Line scan']
         self.Scan_Mode.addItems(self.scan_modes)
         self.Scan_Mode.currentIndexChanged.connect(lambda: self.setScanMode(self.Scan_Mode.currentText()))
         
@@ -74,15 +78,19 @@ class ScanWidget(QtGui.QMainWindow):
         self.prim_scan_dim.addItems(self.scan_dims)
         self.prim_scan_dim.currentIndexChanged.connect(lambda: self.setPrimScanDim(self.prim_scan_dim.currentText()))
         
-        self.scan_parameters = {'width': self.widthPar, 
-                                'height': self.heightPar,
+        self.scan_parameters = {'size_x': self.size_xPar, 
+                                'size_y': self.size_yPar,
+                                'size_z': self.size_zPar,
                                 'sequence_time': self.sequence_timePar,
-                                'step_size': self.step_sizePar}
+                                'step_sizeXY': self.step_sizeXYPar,
+                                'step_sizeZ': self.step_sizeZPar}
 
-        self.scan_par_values = {'width': float(self.widthPar.text()),
-                           'height': float(self.heightPar.text()),
+        self.scan_par_values = {'size_x': float(self.size_xPar.text()),
+                           'size_y': float(self.size_yPar.text()),
+                           'size_z': float(self.size_zPar.text()),
                            'sequence_time': float(self.sequence_timePar.text())/1000,
-                           'step_size': float(self.step_sizePar.text())}
+                           'step_sizeXY': float(self.step_sizeXYPar.text()), 
+                           'step_sizeZ': float(self.step_sizeZPar.text())}
                            
         self.start488Par = QtGui.QLineEdit('0')
         self.start488Par.editingFinished.connect(lambda: self.PixelParameterChanged('start488'))
@@ -132,7 +140,7 @@ class ScanWidget(QtGui.QMainWindow):
                                  'endCAM': float(self.endCAMPar.text())/1000}
         
         self.current_dochannels = {'TIS': 0, '355': 1, '405': 2, '488': 3, 'CAM': 4}
-        self.current_aochannels = {'x': 0, 'y': 1}
+        self.current_aochannels = {'x': 0, 'y': 2, 'z': 1}
         self.XchanPar = QtGui.QComboBox()
         self.XchanPar.addItems(self.aochannels)
         self.XchanPar.currentIndexChanged.connect(self.AOchannelsChanged)
@@ -188,53 +196,57 @@ class ScanWidget(QtGui.QMainWindow):
 #        grid.setRowMamimumHeight(1, 20)
         grid.addWidget(self.loadScanBtn, 0 , 0)
         grid.addWidget(self.saveScanBtn, 0 , 1)
-        grid.addWidget(QtGui.QLabel('X channel'), 1, 4)
-        grid.addWidget(self.XchanPar, 1, 5)
-        grid.addWidget(QtGui.QLabel('Width (um):'), 2, 0, 2, 1)
-        grid.addWidget(self.widthPar, 2, 1, 2, 1)
-        grid.addWidget(QtGui.QLabel('Height (um):'), 2, 2, 2, 1)
-        grid.addWidget(self.heightPar, 2, 3, 2, 1)
-        grid.addWidget(QtGui.QLabel('Y channel'), 2, 4)
-        grid.addWidget(self.YchanPar, 2, 5)
-        grid.addWidget(QtGui.QLabel('Sequence Time (ms):'),4, 0)
+#        grid.addWidget(QtGui.QLabel('X channel'), 1, 6)
+#        grid.addWidget(self.XchanPar, 1, 5)
+        grid.addWidget(QtGui.QLabel('Size X (um):'), 2, 0, 1, 1)
+        grid.addWidget(self.size_xPar, 2, 1, 2, 1)
+        grid.addWidget(QtGui.QLabel('Size Y (um):'), 2, 2, 1, 1)
+        grid.addWidget(self.size_yPar, 2, 3, 2, 1)
+        grid.addWidget(QtGui.QLabel('Size Z (um):'), 2, 4, 1, 1)
+        grid.addWidget(self.size_zPar, 2, 5, 2, 1)
+#        grid.addWidget(QtGui.QLabel('Y channel'), 2, 6)
+#        grid.addWidget(self.YchanPar, 2, 5)
+        grid.addWidget(QtGui.QLabel('Sequence Time (ms):'), 4, 0)
         grid.addWidget(self.sequence_timePar, 4, 1)
         grid.addWidget(QtGui.QLabel('Frames in scan:'), 4, 2)
         grid.addWidget(self.nrFramesPar, 4, 3)
-        grid.addWidget(QtGui.QLabel('Scan duration (s):'), 5, 4)
-        grid.addWidget(self.scanDuration, 5, 5)
-        grid.addWidget(QtGui.QLabel('Step size (um):'), 4, 4)
-        grid.addWidget(self.step_sizePar, 4, 5)
-        grid.addWidget(QtGui.QLabel('Start (ms):'), 6, 1)
-        grid.addWidget(QtGui.QLabel('End (ms):'), 6, 2)
-        grid.addWidget(QtGui.QLabel('TIS:'), 7, 0)
-        grid.addWidget(self.startTISPar, 7, 1)
-        grid.addWidget(self.endTISPar, 7, 2)
-        grid.addWidget(self.chanTISPar, 7, 3)
-        grid.addWidget(QtGui.QLabel('488 OFF::'), 8, 0)
-        grid.addWidget(self.start355Par, 8, 1)
-        grid.addWidget(self.end355Par, 8, 2)
-        grid.addWidget(self.chan355Par, 8, 3)
-        grid.addWidget(self.scanRadio, 8, 4, 2, 1)
-        grid.addWidget(self.Scan_Mode_label, 7, 5)
-        grid.addWidget(self.Scan_Mode, 8, 5)
-        grid.addWidget(self.prim_scan_dim_label, 9, 5)
-        grid.addWidget(self.prim_scan_dim, 10, 5)
-        grid.addWidget(QtGui.QLabel('405:'), 9, 0)
-        grid.addWidget(self.start405Par, 9, 1)
-        grid.addWidget(self.end405Par, 9, 2)
-        grid.addWidget(self.chan405Par, 9, 3)
-        grid.addWidget(self.contLaserPulsesRadio, 10, 4, 2, 1)
-        grid.addWidget(QtGui.QLabel('488 EX:'), 10, 0)
-        grid.addWidget(self.start488Par, 10, 1)
-        grid.addWidget(self.end488Par, 10, 2)
-        grid.addWidget(self.chan488Par, 10, 3)
-        grid.addWidget(QtGui.QLabel('CAM:'), 11, 0)
-        grid.addWidget(self.startCAMPar, 11, 1)
-        grid.addWidget(self.endCAMPar, 11, 2)
-        grid.addWidget(self.chanCAMPar, 11, 3)
-        grid.addWidget(self.graph, 12, 0, 1, 6)
-        grid.addWidget(self.ScanButton, 13, 3)
-        grid.addWidget(self.PreviewButton, 13, 4)
+        grid.addWidget(QtGui.QLabel('Step size XY (um):'), 4, 4)
+        grid.addWidget(self.step_sizeXYPar, 4, 5)
+        grid.addWidget(QtGui.QLabel('Step size Z (um):'), 5, 4)
+        grid.addWidget(self.step_sizeZPar, 5, 5)
+        grid.addWidget(QtGui.QLabel('Scan duration (s):'), 6, 4)
+        grid.addWidget(self.scanDuration, 6, 5)
+        grid.addWidget(QtGui.QLabel('Start (ms):'), 7, 1)
+        grid.addWidget(QtGui.QLabel('End (ms):'), 7, 2)
+        grid.addWidget(QtGui.QLabel('TIS:'), 8, 0)
+        grid.addWidget(self.startTISPar, 8, 1)
+        grid.addWidget(self.endTISPar, 8, 2)
+        grid.addWidget(self.chanTISPar, 8, 3)
+        grid.addWidget(QtGui.QLabel('488 OFF::'), 9, 0)
+        grid.addWidget(self.start355Par, 9, 1)
+        grid.addWidget(self.end355Par, 9, 2)
+        grid.addWidget(self.chan355Par, 9, 3)
+        grid.addWidget(self.scanRadio, 9, 4, 2, 1)
+        grid.addWidget(self.Scan_Mode_label, 8, 5)
+        grid.addWidget(self.Scan_Mode, 9, 5)
+        grid.addWidget(self.prim_scan_dim_label, 10, 5)
+        grid.addWidget(self.prim_scan_dim, 11, 5)
+        grid.addWidget(QtGui.QLabel('405:'), 10, 0)
+        grid.addWidget(self.start405Par, 10, 1)
+        grid.addWidget(self.end405Par, 10, 2)
+        grid.addWidget(self.chan405Par, 10, 3)
+        grid.addWidget(self.contLaserPulsesRadio,11, 4, 2, 1)
+        grid.addWidget(QtGui.QLabel('488 EX:'), 11, 0)
+        grid.addWidget(self.start488Par, 11, 1)
+        grid.addWidget(self.end488Par, 11, 2)
+        grid.addWidget(self.chan488Par, 11, 3)
+        grid.addWidget(QtGui.QLabel('CAM:'), 12, 0)
+        grid.addWidget(self.startCAMPar, 12, 1)
+        grid.addWidget(self.endCAMPar, 12, 2)
+        grid.addWidget(self.chanCAMPar, 12, 3)
+        grid.addWidget(self.graph, 13, 0, 1, 6)
+        grid.addWidget(self.ScanButton, 14, 3)
+        grid.addWidget(self.PreviewButton, 14, 4)
         
     @property
     def scanOrNot(self):
@@ -246,9 +258,9 @@ class ScanWidget(QtGui.QMainWindow):
         self.ScanButton.setCheckable(not value)
         
     def EnableScanPars(self, value):
-        self.widthPar.setEnabled(value)
-        self.heightPar.setEnabled(value)
-        self.step_sizePar.setEnabled(value)
+        self.size_xPar.setEnabled(value)
+        self.size_yPar.setEnabled(value)
+        self.step_sizeXYPar.setEnabled(value)
         self.Scan_Mode.setEnabled(value)
         self.prim_scan_dim.setEnabled(value)
         if value:
@@ -269,15 +281,16 @@ class ScanWidget(QtGui.QMainWindow):
         self.stage_scan.set_prim_scan_dim(dim)
         self.ScanParameterChanged('prim_scan_dim')
         
-    def AOchannelsChanged (self):
         
-        Xchan = self.XchanPar.currentIndex()
-        Ychan = self.YchanPar.currentIndex()
-        if Xchan == Ychan:
-            Ychan = (Ychan + 1)%4
-            self.YchanPar.setCurrentIndex(Ychan)
-        self.current_aochannels['x'] = Xchan
-        self.current_aochannels['y'] = Ychan
+    def AOchannelsChanged (self):
+        """Function is obsolete since we never change channels this way, Z-channel not implemented"""
+#        Xchan = self.XchanPar.currentIndex()
+#        Ychan = self.YchanPar.currentIndex()
+#        if Xchan == Ychan:
+#            Ychan = (Ychan + 1)%4
+#            self.YchanPar.setCurrentIndex(Ychan)
+#        self.current_aochannels['x'] = Xchan
+#        self.current_aochannels['y'] = Ychan
         
     def DOchannelsChanged(self, sig, new_index):
         
@@ -314,7 +327,7 @@ class ScanWidget(QtGui.QMainWindow):
         x_sig = self.stage_scan.sig_dict['x_sig']
         y_sig = self.stage_scan.sig_dict['y_sig']
         plt.plot(x_sig, y_sig)
-        plt.axis([-0.2,self.scan_par_values['width']+0.2, -0.2, self.scan_par_values['height']+0.2])
+        plt.axis([-0.2,self.scan_par_values['size_x']+0.2, -0.2, self.scan_par_values['size_y']+0.2])
         
     def ScanOrAbort(self):
         if not self.scanning:
@@ -417,17 +430,18 @@ class Scanner(QtCore.QObject):
         self.waiter.waitdoneSignal.disconnect(self.finalize) #Apparently important, otherwise finalize is called again when next waiting finishes.
         self.waiter.waitdoneSignal.connect(self.done)
         written_samps = self.aotask.get_samples_per_channel_generated()
-        final_x = self.stage_scan.sig_dict['x_sig'][written_samps - 1]
-        final_y = self.stage_scan.sig_dict['y_sig'][written_samps - 1]
-        final_samps = [final_x, final_y]
         
-#        Following code should correct channels mentioned in Buglist.
-        final_samps = [0, 0]
-        final_samps[self.current_aochannels['x']] = final_x
-        final_samps[self.current_aochannels['y']] = final_y        
+#        Following code should correct channels mentioned in Buglist. Not correct though, assumes channels are 0, 1 and 2.
+        final_samps = [0, 0, 0]
+        temp_aochannels = copy.copy(self.current_aochannels)
+        for i in range(0,3):
+            dim = min(temp_aochannels, key = temp_aochannels.get)   # dim = dimension ('x', 'y' or 'z') containing smallest channel nr. 
+            final_samps[i] = self.stage_scan.sig_dict[dim+'_sig'][written_samps - 1]
+            temp_aochannels.pop(dim)
+                 
         
         return_ramps = np.array([])
-        for i in range(0,2):
+        for i in range(0,3):
             ramp_and_k = make_ramp(final_samps[i], 0, self.stage_scan.sample_rate)
             return_ramps = np.append(return_ramps, ramp_and_k[0])
         
@@ -472,14 +486,12 @@ class Scanner(QtCore.QObject):
            
         # Following loop creates the voltage channels in smallest to largest order and places signals in same order.
         
-        for i in range(0,2):
+        for i in range(0,3):
             dim = min(temp_aochannels, key = temp_aochannels.get)   # dim = dimension ('x' or 'y') containing smallest channel nr. 
             chanstring = 'Dev1/ao%s'%temp_aochannels[dim]
             self.aotask.create_voltage_channel(phys_channel = chanstring, channel_name = 'chan%s'%dim, min_val = min_ao, max_val = max_ao)
             temp_aochannels.pop(dim)
             signal = self.stage_scan.sig_dict[dim+'_sig']
-            if i == 1 and len(full_ao_signal) != len(signal):
-                print('Length of signals are not equal (printed from RunScan()')
             full_ao_signal = np.append(full_ao_signal, signal)
 #            final_samps = np.append(final_samps, signal[-1])
 
@@ -599,12 +611,13 @@ class StageScan():
     def __init__(self, sample_rate):
         self.scan_mode = 'FOV scan'
         self.prim_scan_dim = 'x'
-        self.sig_dict = {'x_sig': [], 'y_sig': []}
+        self.sig_dict = {'x_sig': [], 'y_sig': [], 'z_sig': []}
         self.sample_rate = sample_rate
         self.sequence_samples = None
         self.FOV_scan = FOV_Scan(self.sample_rate)
+        self.VOL_scan = VOL_Scan(self.sample_rate)
         self.line_scan = Line_scan(self.sample_rate)
-        self.scans = {'FOV scan': self.FOV_scan, 'Line scan': self.line_scan}
+        self.scans = {'FOV scan': self.FOV_scan, 'VOL scan': self.VOL_scan, 'Line scan': self.line_scan}
         self.frames = 0
         
     def set_scan_mode(self, mode):
@@ -629,15 +642,15 @@ class StageScan():
 class Line_scan():
         
     def __init__(self, sample_rate):
-        self.sig_dict = {'x_sig': [], 'y_sig': []}
+        self.sig_dict = {'x_sig': [], 'y_sig': [], 'z_sig': []}
         self.sample_rate = sample_rate
         self.corr_step_size = None
         self.sequence_samples = None
         self.frames = 0
         
     def update_frames(self, par_values):
-        size_y = par_values['height'] / 2
-        step_size = par_values['step_size'] / 2
+        size_y = par_values['size_y'] / 2
+        step_size = par_values['step_sizeXY'] / 2
         steps_y = int(np.ceil(size_y / step_size))
         self.frames = steps_y + 1 # +1 because nr of frames per line is one more than nr of steps
         
@@ -646,9 +659,9 @@ class Line_scan():
         # Create signals
         start_x = 0
         start_y = 0
-        size_y = par_values['height'] / 2
+        size_y = par_values['size_y'] / 2
         sequence_samples = np.round(self.sample_rate * par_values['sequence_time'])
-        step_size = par_values['step_size'] / 2
+        step_size = par_values['step_sizeXY'] / 2
         self.steps_y = int(np.ceil(size_y / step_size))
         self.corr_step_size = size_y/self.steps_y # Step size compatible with width
         self.sequence_samples = int(sequence_samples)
@@ -657,12 +670,16 @@ class Line_scan():
         ramp = ramp_and_k[0]
         
         self.sig_dict[prim_scan_dim+'_sig'] = 1.14 * ramp
-        self.sig_dict[chr(121-(ord(prim_scan_dim)%2))+'_sig'] = np.zeros(len(ramp))
+        print(ramp)
+        for key in self.sig_dict:
+            if not key[0] == prim_scan_dim:
+                self.sig_dict[key] = np.zeros(len(ramp))
+                
         
 class FOV_Scan():
     
     def __init__(self, sample_rate):
-        self.sig_dict = {'x_sig': [], 'y_sig': []}
+        self.sig_dict = {'x_sig': [], 'y_sig': [], 'z_sig': []}
         self.sample_rate = sample_rate
         self.corr_step_size = None
         self.sequence_samples = None
@@ -675,9 +692,9 @@ class FOV_Scan():
         # Maybe not a problem ???
         
     def update_frames(self, par_values):
-        step_size = par_values['step_size'] / 2
-        size_x = par_values['width'] / 2
-        size_y = par_values['height'] / 2
+        step_size = par_values['step_sizeXY'] / 2
+        size_x = par_values['size_x'] / 2
+        size_y = par_values['size_y'] / 2
         steps_x = int(np.ceil(size_x / step_size))
         steps_y = int(np.ceil(size_y / step_size))
         self.frames = (steps_y+1)*(steps_x+1) # +1 because nr of frames per line is one more than nr of steps
@@ -688,9 +705,9 @@ class FOV_Scan():
         # Create signals
         start_x = 0
         start_y = 0
-        size_x = par_values['width'] / 2
-        size_y = par_values['height'] / 2
-        step_size = par_values['step_size'] / 2
+        size_x = par_values['size_x'] / 2
+        size_y = par_values['size_y'] / 2
+        step_size = par_values['step_sizeXY'] / 2
         self.sequence_samples = int(np.round(self.sample_rate * par_values['sequence_time'])) #WARNING: Correct for units of the time, now seconds!!!!
         self.steps_x = int(np.ceil(size_x / step_size))
         self.steps_y = int(np.ceil(size_y / step_size))
@@ -732,10 +749,24 @@ class FOV_Scan():
             prim_dim_sig = np.concatenate((prim_dim_sig, rtl_ramp))  
         sec_dim_sig = np.concatenate((sec_dim_sig, new_value*np.ones(row_samples)))
 
-        # Assign x_sig
+        # Assign primary scan dir
         self.sig_dict[prim_scan_dim+'_sig'] = 1.14 * prim_dim_sig
-        # Assign y_sig
-        self.sig_dict[chr(121-(ord(prim_scan_dim)%2))+'_sig'] = 1.14 * sec_dim_sig
+        # Assign second and third dim
+        for key in self.sig_dict:
+            if not key[0] == prim_scan_dim and not key[0] == 'z':
+                self.sig_dict[key] = 1.14 * sec_dim_sig
+            elif not key[0] == prim_scan_dim:
+                self.sig_dict[key] = np.zeros(len(sec_dim_sig))
+        
+        
+class VOL_Scan():
+    
+    def __init__(self, sample_rate):
+        self.sig_dict = {'x_sig': [], 'y_sig': [], 'z_sig': []}
+        self.sample_rate = sample_rate
+        self.corr_step_size = None
+        self.sequence_samples = None
+        self.frames = 0        
         
 # The follwing class contains the digital signals for the pixel cycle. The update function takes a parameter_values
 # dict and updates the signal accordingly.         
