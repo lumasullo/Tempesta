@@ -369,7 +369,7 @@ def change_V_in_process(value, aochannel):
     
     aotask_tisa = libnidaqmx.AnalogOutputTask('aotask')
     
-    aotask_tisa.create_voltage_channel('Dev1/ao%s'%aochannel, min_val = 0,  max_val = 10)
+    aotask_tisa.create_voltage_channel('Dev1/ao%s'%aochannel, min_val = 0,  max_val = 1)
     
     aotask_tisa.start()
     

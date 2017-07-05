@@ -71,7 +71,7 @@ class AlignWidgetAverage(QtGui.QFrame):
     def updateValue(self):
         
         if self.main.liveviewButton.isChecked():
-            self.selected = self.ROI.getArrayRegion(self.main.latest_image, self.main.img)
+            self.selected = self.ROI.getArrayRegion(self.main.latest_images[self.main.curr_cam_ind], self.main.img)
             value = np.mean(self.selected)
             self.graph.updateGraph(value)
         else:

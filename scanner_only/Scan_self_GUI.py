@@ -68,7 +68,7 @@ class ScanWidget(QtGui.QMainWindow):
         
         self.Scan_Mode_label= QtGui.QLabel('Scan mode:')        
         self.Scan_Mode = QtGui.QComboBox()
-        self.scan_modes = ['FOV scan', 'VOL Scan', 'Line scan']
+        self.scan_modes = ['FOV scan', 'VOL scan', 'Line scan']
         self.Scan_Mode.addItems(self.scan_modes)
         self.Scan_Mode.currentIndexChanged.connect(lambda: self.setScanMode(self.Scan_Mode.currentText()))
         
@@ -140,7 +140,7 @@ class ScanWidget(QtGui.QMainWindow):
                                  'endCAM': float(self.endCAMPar.text())/1000}
         
         self.current_dochannels = {'TIS': 0, '355': 1, '405': 2, '488': 3, 'CAM': 4}
-        self.current_aochannels = {'x': 0, 'y': 2, 'z': 1}
+        self.current_aochannels = {'x': 0, 'y': 1, 'z': 2}
         self.XchanPar = QtGui.QComboBox()
         self.XchanPar.addItems(self.aochannels)
         self.XchanPar.currentIndexChanged.connect(self.AOchannelsChanged)
@@ -701,7 +701,7 @@ class FOV_Scan():
                 
         
     def update(self, par_values, prim_scan_dim):
-        
+        """Changed recently to remove the "smooth" curves. I don't think they're necessary"""
         # Create signals
         start_x = 0
         start_y = 0
@@ -724,6 +724,7 @@ class FOV_Scan():
         max_turn = np.max(turn_rtl)
         adjustor = 1 - self.sequence_samples%2
         
+        # Make smooth y-shift
         first_part =  max_turn - turn_rtl[range(int(np.ceil(self.sequence_samples/2)), self.sequence_samples)] # Create first and last part by flipping and turnign the turn_rtl array
         last_part = max_turn + turn_rtl[range(0, int(np.floor(self.sequence_samples/2) - adjustor + 1))]
         y_ramp_smooth = np.append(first_part, last_part)
@@ -736,21 +737,21 @@ class FOV_Scan():
         new_value = start_y
         for i in range(0,self.steps_y):
             if i%2==0:               
-                prim_dim_sig = np.concatenate((prim_dim_sig, ltr_ramp, turn_rtl))
+                prim_dim_sig = np.concatenate((prim_dim_sig, ltr_ramp))#, turn_rtl))
             else:
-                prim_dim_sig = np.concatenate((prim_dim_sig, rtl_ramp, turn_ltr))
-            sec_dim_sig = np.concatenate((sec_dim_sig, new_value*np.ones(row_samples), new_value+y_ramp_smooth))
+                prim_dim_sig = np.concatenate((prim_dim_sig, rtl_ramp))#, turn_ltr))
+            sec_dim_sig = np.concatenate((sec_dim_sig, new_value*np.ones(row_samples)))#, new_value+y_ramp_smooth))
             new_value = new_value + self.corr_step_size
             
-        i = i + 1
-        if i%2 == 0:
-            prim_dim_sig = np.concatenate((prim_dim_sig, ltr_ramp))
-        else:
-            prim_dim_sig = np.concatenate((prim_dim_sig, rtl_ramp))  
-        sec_dim_sig = np.concatenate((sec_dim_sig, new_value*np.ones(row_samples)))
+#        i = i + 1
+#        if i%2 == 0:
+#            prim_dim_sig = np.concatenate((prim_dim_sig, ltr_ramp))
+#        else:
+#            prim_dim_sig = np.concatenate((prim_dim_sig, rtl_ramp))  
+#        sec_dim_sig = np.concatenate((sec_dim_sig, new_value*np.ones(row_samples)))
 
         # Assign primary scan dir
-        self.sig_dict[prim_scan_dim+'_sig'] = 1.14 * prim_dim_sig
+        self.sig_dict[prim_scan_dim+'_sig'] = 1.14 * prim_dim_sig #1.14 is emperically measured correction factor
         # Assign second and third dim
         for key in self.sig_dict:
             if not key[0] == prim_scan_dim and not key[0] == 'z':
@@ -764,9 +765,73 @@ class VOL_Scan():
     def __init__(self, sample_rate):
         self.sig_dict = {'x_sig': [], 'y_sig': [], 'z_sig': []}
         self.sample_rate = sample_rate
-        self.corr_step_size = None
+        self.corr_step_sizeXY = None
+        self.corr_step_sizeZ = None        
         self.sequence_samples = None
         self.frames = 0        
+        
+    def update_frames(self, par_values):
+        pass
+    
+    def update(self, par_values, prim_scan_dim):
+        print('Updating VOL scan')
+        # Create signals
+        start_x = 0
+        start_y = 0
+        start_z = 0
+        size_x = par_values['size_x'] / 2
+        size_y = par_values['size_y'] / 2
+        size_z = par_values['size_z'] / 2
+        step_sizeXY = par_values['step_sizeXY'] / 2
+        step_sizeZ = par_values['step_sizeZ'] / 2        
+        self.sequence_samples = int(np.round(self.sample_rate * par_values['sequence_time'])) #WARNING: Correct for units of the time, now seconds!!!!
+        self.steps_x = int(np.ceil(size_x / step_sizeXY))
+        self.steps_y = int(np.ceil(size_y / step_sizeXY))
+        self.steps_z = int(np.ceil(size_z / step_sizeZ))
+        self.corr_step_sizeXY = size_x/self.steps_x # Step size compatible with width
+        self.corr_step_sizeZ = size_z/self.steps_z # Step size compatible with range
+        row_samples = self.steps_x * self.sequence_samples
+        
+        ramp_and_k = make_ramp(start_x, size_x, row_samples) # ramp_and_k contains [ramp, k]
+        k = ramp_and_k[1]
+        ltr_ramp = ramp_and_k[0]
+        rtl_ramp = ltr_ramp[::-1]  # rtl_ramp contains only ramp, no k since same k = -k        
+        
+        prim_dim_sig = []
+        sec_dim_sig = []
+        new_value = start_y
+        for i in range(0,self.steps_y):
+            if i%2==0:               
+                prim_dim_sig = np.concatenate((prim_dim_sig, ltr_ramp))
+            else:
+                prim_dim_sig = np.concatenate((prim_dim_sig, rtl_ramp))
+            sec_dim_sig = np.concatenate((sec_dim_sig, new_value*np.ones(row_samples)))
+            new_value = new_value + self.corr_step_sizeXY
+        
+        fullZ_prim_dim_sig = []
+        fullZ_sec_dim_sig = []
+        fullZ_third_dim_sig = []
+        new_value = start_z
+        for i in range(0,self.steps_z):
+            fullZ_prim_dim_sig = np.concatenate((fullZ_prim_dim_sig, prim_dim_sig))
+            fullZ_sec_dim_sig = np.concatenate((fullZ_sec_dim_sig, sec_dim_sig))
+            fullZ_third_dim_sig = np.concatenate((fullZ_third_dim_sig, new_value*np.ones(len(prim_dim_sig))))
+            new_value = new_value + self.corr_step_sizeZ
+            
+        # Assign primary scan dir
+        self.sig_dict[prim_scan_dim+'_sig'] = 1.14 * fullZ_prim_dim_sig #1.14 is emperically measured correction factor
+        # Assign second and third dim
+        for key in self.sig_dict:
+            if not key[0] == prim_scan_dim and not key[0] == 'z':
+                self.sig_dict[key] = 1.14 * fullZ_sec_dim_sig
+            elif not key[0] == prim_scan_dim:
+                self.sig_dict[key] = 1.14 * fullZ_third_dim_sig
+                
+        print('Final X: '+str(fullZ_prim_dim_sig[-1]))
+        print('Final Y: '+str(fullZ_sec_dim_sig[-1]))
+        print('Final Z: '+str(fullZ_third_dim_sig[-1]))
+        
+        
         
 # The follwing class contains the digital signals for the pixel cycle. The update function takes a parameter_values
 # dict and updates the signal accordingly.         

@@ -454,16 +454,20 @@ class RecordingWidget(QtGui.QFrame):
             print('In first endRecordig "skip me" if')
         else:
             print('In endRecording')
+            print('Show bead scan state is: ', self.showBead_scan.checkState())
             ind = self.main.curr_cam_ind
             if self.showZgraph.checkState():
-                plt.plot(self.recworker[ind].z_stack)
+                plt.figure()
+                plt.plot(self.recworkers[ind].z_stack)
             if self.showZproj.checkState():
-                plt.imshow(self.recworker[ind].Z_projection, cmap='gray')
+                plt.imshow(self.recworkers[ind].Z_projection, cmap='gray')
             if self.showBead_scan.checkState():
+                data = self.recworkers[ind].z_stack
+                print('Length of data = ', len(data))
                 try:
-                    data = self.recworker[ind].z_stack
-                    data[0] = data[1]
-                    data = np.append(data, data[-1])
+                    data = self.recworkers[ind].z_stack
+                    if not np.floor(np.sqrt(len(data))) == np.sqrt(len(data)):
+                        del data[0]
                     imside = int(np.sqrt(np.size(data)))
                     print('Imside = ', imside)
                     data = np.reshape(data, [imside, imside])
@@ -622,7 +626,7 @@ class CamParamTree(ParameterTree):
                   {'name': 'Image frame', 'type': 'group', 'children': [
                       {'name': 'Binning', 'type': 'list', 
                                   'values': [1, 2, 4], 'tip': BinTip},
-{'name': 'Mode', 'type': 'list', 'values': ['Full Widefield', 'Full chip', 'Minimal line', 'Custom']},
+{'name': 'Mode', 'type': 'list', 'values': ['Full Widefield', 'Full chip', 'Minimal line', 'Microlenses', 'Fast ROI', 'Fast ROI only v2', 'Custom']},
 {'name': 'X0', 'type': 'int', 'value': 0, 'limits': (0, 2044)},
 {'name': 'Y0', 'type': 'int', 'value': 0, 'limits': (0, 2044)},
 {'name': 'Width', 'type': 'int', 'value': 2048, 'limits': (1, 2048)},
@@ -717,7 +721,7 @@ class LVWorker(QtCore.QObject):
         self.orcaflash = orcaflash
         self.running = False
         self.f_ind = None
-        self.mem = 0  # Memory variable to keep track of if update has been run twice in a row with camera trigger source as internal trigger
+        self.mem = 0  # Memory variable to keep track of if update has been run many times in a row with camera trigger source as internal trigger
                         # If so the GUI trigger mode should also be set to internal trigger. Happens when using external start tigger.
     def run(self):
         
@@ -736,13 +740,16 @@ class LVWorker(QtCore.QObject):
             frame = self.orcaflash.hcam_data[self.f_ind].getData()
             self.image = np.reshape(frame, (self.orcaflash.frame_x, self.orcaflash.frame_y), 'F')
             self.main.latest_images[self.ind] = self.image
-            trigger_source = self.orcaflash.getPropertyValue('trigger_source')[0]
-            if trigger_source == 1:
-                if self.mem == 1:
-                    self.main.trigsourceparam.setValue('Internal trigger')
-                    self.mem = 0
-                else:
-                    self.mem = 1
+            
+            """Following is causing problems with two cameras..."""
+#            trigger_source = self.orcaflash.getPropertyValue('trigger_source')[0]
+#            print('Trigger source = ', trigger_source)
+#            if trigger_source == 1:
+#                if self.mem == 3:
+#                    self.main.trigsourceparam.setValue('Internal trigger')
+#                    self.mem = 0
+#                else:
+#                    self.mem = self.mem + 1
 
         
     def stop(self):
@@ -1190,25 +1197,25 @@ class TormentaGUI(QtGui.QMainWindow):
 
 
     def ChangeTriggerSource(self):
-        
+        print('In ChangeTriggerSource with parameter value: ', self.trigsourceparam.value())
         if self.trigsourceparam.value() == 'Internal trigger':
             print('Changing to internal trigger')
-            self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_source', 1))
+            self.changeParameter(lambda: self.cameras[self.curr_cam_ind].setPropertyValue('trigger_source', 1))
 #            self.RealExpPar.Enable(True)
 #            self.EffFRPar.Enable(True)
             
         elif self.trigsourceparam.value() == 'External "Start-trigger"':
             print('Changing to external start trigger')
-            self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_source', 2))
-            self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_mode', 6))
-            print(self.orcaflash.getPropertyValue('trigger_mode'))
+            self.changeParameter(lambda: self.cameras[self.curr_cam_ind].setPropertyValue('trigger_source', 2))
+            self.changeParameter(lambda: self.cameras[self.curr_cam_ind].setPropertyValue('trigger_mode', 6))
+            print(self.cameras[self.curr_cam_ind].getPropertyValue('trigger_mode'))
 #            self.RealExpPar.Enable(False)
 #            self.EffFRPar.Enable(False)
         
         elif self.trigsourceparam.value() == 'External "frame-trigger"':
             print('Changing to external trigger')
-            self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_source', 2))
-            self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_mode', 1))
+            self.changeParameter(lambda: self.cameras[self.curr_cam_ind].setPropertyValue('trigger_source', 2))
+            self.changeParameter(lambda: self.cameras[self.curr_cam_ind].setPropertyValue('trigger_mode', 1))
             
         else:
             pass
@@ -1362,7 +1369,6 @@ class TormentaGUI(QtGui.QMainWindow):
 
                 self.ROI.hide()
 
-
             elif frameParam.param('Mode').value() == 'Full chip':
                 print('Full chip')
                 self.X0par.setValue(0)
@@ -1372,6 +1378,38 @@ class TormentaGUI(QtGui.QMainWindow):
                 self.adjustFrame()
 
                 self.ROI.hide()
+
+            elif frameParam.param('Mode').value() == 'Microlenses':
+                print('Full chip')
+                self.X0par.setValue(595)
+                self.Y0par.setValue(685)
+                self.Widthpar.setValue(600)
+                self.Heightpar.setValue(600)
+                self.adjustFrame()
+
+                self.ROI.hide()
+                
+                
+            elif frameParam.param('Mode').value() == 'Fast ROI':
+                print('Full chip')
+                self.X0par.setValue(595)
+                self.Y0par.setValue(960)
+                self.Widthpar.setValue(600)
+                self.Heightpar.setValue(128)
+                self.adjustFrame()
+
+                self.ROI.hide()
+                
+            elif frameParam.param('Mode').value() == 'Fast ROI only v2':
+                print('Full chip')
+                self.X0par.setValue(595)
+                self.Y0par.setValue(1000)
+                self.Widthpar.setValue(600)
+                self.Heightpar.setValue(50)
+                self.adjustFrame()
+
+                self.ROI.hide()
+                
                 
             elif frameParam.param('Mode').value() == 'Minimal line':
                 print('Full chip')
