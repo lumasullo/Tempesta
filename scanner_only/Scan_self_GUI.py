@@ -11,6 +11,7 @@ except:
     from control import libnidaqmx
     
 import numpy as np
+from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 import copy
 import time
@@ -505,7 +506,14 @@ class Scanner(QtCore.QObject):
             chanstring = 'Dev1/port0/line%s'%temp_dochannels[dev]
             self.dotask.create_channel(lines = chanstring, name = 'chan%s'%dev)
             temp_dochannels.pop(dev)
-            signal = self.pixel_cycle.sig_dict[dev+'sig']
+            
+            if self.stage_scan.scan_mode == 'VOL_scan':
+                
+                
+                
+            else:
+                signal = self.pixel_cycle.sig_dict[dev+'sig']
+            
             if len(full_ao_signal)%len(signal) != 0 and len(full_do_signal)%len(signal) != 0:
                 print('Signal lengths does not match (printed from run)')
             full_do_signal = np.append(full_do_signal, signal)
@@ -761,7 +769,8 @@ class FOV_Scan():
         
         
 class VOL_Scan():
-    
+    """VOL_scan is the class representing the scanning movement for a volumetric 
+    scan i.e. multiple conscutive XY-planes with a certain delta z distance."""
     def __init__(self, sample_rate):
         self.sig_dict = {'x_sig': [], 'y_sig': [], 'z_sig': []}
         self.sample_rate = sample_rate
@@ -779,7 +788,7 @@ class VOL_Scan():
         start_x = 0
         start_y = 0
         start_z = 0
-        size_x = par_values['size_x'] / 2
+        size_x = par_values['size_x'] / 2 #Division by 2 to convert from distance to voltage
         size_y = par_values['size_y'] / 2
         size_z = par_values['size_z'] / 2
         step_sizeXY = par_values['step_sizeXY'] / 2
@@ -807,19 +816,35 @@ class VOL_Scan():
                 prim_dim_sig = np.concatenate((prim_dim_sig, rtl_ramp))
             sec_dim_sig = np.concatenate((sec_dim_sig, new_value*np.ones(row_samples)))
             new_value = new_value + self.corr_step_sizeXY
+            
+        samples_p_slice = len(prim_dim_sig) #Used in Scanner->runScan
+        self.cycles_p_slice = samples_p_slice / self.sequence_samples
+        """Below we make the concatenation along the third dimension, between the "slices"
+        we add a smooth transition to avoid too rapid motion that seems to cause strange movent.
+        This needs to be syncronized with the pixel cycle signal"""
+        fullZ_prim_dim_sig = prim_dim_sig
+        fullZ_sec_dim_sig = sec_dim_sig
+        fullZ_third_dim_sig = start_z*np.ones(len(prim_dim_sig))
+        new_value = start_z + 1
+        prim_dim_transition = make_smooth_step(prim_dim_sig[-1], prim_dim_sig[0], self.sequence_samples)
+        sec_dim_transition = make_smooth_step(sec_dim_sig[-1], sec_dim_sig[0], self.sequence_samples)
+        third_dim_transition = make_smooth_step(0, self.corr_step_sizeZ, self.sequence_samples)
         
-        fullZ_prim_dim_sig = []
-        fullZ_sec_dim_sig = []
-        fullZ_third_dim_sig = []
-        new_value = start_z
-        for i in range(0,self.steps_z):
+        for i in range(1,self.steps_z-1):
+            fullZ_prim_dim_sig = np.concatenate((fullZ_prim_dim_sig, prim_dim_transition))
+            fullZ_sec_dim_sig = np.concatenate((fullZ_sec_dim_sig, sec_dim_transition))
+            fullZ_third_dim_sig = np.concatenate((fullZ_third_dim_sig, new_value + third_dim_transition))
+            
             fullZ_prim_dim_sig = np.concatenate((fullZ_prim_dim_sig, prim_dim_sig))
             fullZ_sec_dim_sig = np.concatenate((fullZ_sec_dim_sig, sec_dim_sig))
             fullZ_third_dim_sig = np.concatenate((fullZ_third_dim_sig, new_value*np.ones(len(prim_dim_sig))))
             new_value = new_value + self.corr_step_sizeZ
             
+        fullZ_prim_dim_sig = np.concatenate((fullZ_prim_dim_sig, prim_dim_sig))
+        fullZ_sec_dim_sig = np.concatenate((fullZ_sec_dim_sig, sec_dim_sig))
+        fullZ_third_dim_sig = np.concatenate((fullZ_third_dim_sig, new_value*np.ones(len(prim_dim_sig))))    
         # Assign primary scan dir
-        self.sig_dict[prim_scan_dim+'_sig'] = 1.14 * fullZ_prim_dim_sig #1.14 is emperically measured correction factor
+        self.sig_dict[prim_scan_dim+'_sig'] = 1.14 * fullZ_prim_dim_sig #1.14 is an emperically measured correction factor
         # Assign second and third dim
         for key in self.sig_dict:
             if not key[0] == prim_scan_dim and not key[0] == 'z':
@@ -888,14 +913,18 @@ class GraphFrame(pg.GraphicsWindow):
         
 def make_ramp(start, end, samples):
 
-    ramp = []
-    k  = (end - start) / (samples - 1)
-    for i in range(0, samples):
-        ramp.append(start + k * i)
-        
-    return np.array([np.asarray(ramp), k])
+    return np.linspace(start, end, num=samples)
     
     
+def make_smooth_step(start, end, samples):
+
+    x = np.linspace(start,end, num = samples, endpoint=True)
+    x = 0.5 - 0.5*np.cos(x*np.pi)
+    
+    signal = start + (end-start)*x
+    
+    return signal
+
 def distance_to_voltage_Y(D_signal):
     a1 = 0.6524
     a2 = -0.0175
@@ -912,6 +941,7 @@ def distance_to_voltage_Y(D_signal):
     elapsed = time.time() - now
     print('Elapsed time: ', elapsed)
     return V_signal
+
         
 def distance_to_voltage_X(D_signal):
     a1 = 0.6149
