@@ -508,14 +508,13 @@ class Scanner(QtCore.QObject):
             temp_dochannels.pop(dev)
             
             if self.stage_scan.scan_mode == 'VOL_scan':
-                
-                
-                
+                signal = np.tile(self.pixel_cycle.sig_dict[dev+'sig'], self.stage_scan.VOL_scan.cycles_p_slice)
+                signal = np.concatenate((signal, np.zeros(self.stage_scan.sequence_samples)))
             else:
                 signal = self.pixel_cycle.sig_dict[dev+'sig']
             
-            if len(full_ao_signal)%len(signal) != 0 and len(full_do_signal)%len(signal) != 0:
-                print('Signal lengths does not match (printed from run)')
+#            if len(full_ao_signal)%len(signal) != 0 and len(full_do_signal)%len(signal) != 0:
+#                print('Signal lengths does not match (printed from run)')
             full_do_signal = np.append(full_do_signal, signal)
         
         
