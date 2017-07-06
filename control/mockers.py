@@ -5,21 +5,8 @@ Created on Tue Aug 12 20:02:08 2014
 @author: Federico Barabas
 """
 
-# -*- coding: utf-8 -*-
-"""
-    lantz.simulators.fungen
-    ~~~~~~~~~~~~~~~~~~~~~~~
-
-    A simulated function generator.
-    See specification in the Lantz documentation.
-
-    :copyright: 2012 by The Lantz Authors
-    :license: BSD, see LICENSE for more details.
-"""
-
 import logging
 import numpy as np
-import pygame
 
 from lantz import Driver
 from lantz import Q_
@@ -32,23 +19,6 @@ class constants:
 
     def __init__(self):
         self.GND = 0
-
-
-class MockWebcam(object):
-
-    def __init__(self):
-        super(MockWebcam).__init__()
-        print('Simulated Webcam')
-
-    def start(self):
-        pass
-
-    def get_image(self):
-        arr = (100 * np.random.rand(480, 640)).astype(np.float)
-        return pygame.surfarray.make_surface(arr)
-
-    def stop(self):
-        pass
 
 
 class MockDAQ(Driver):
@@ -196,9 +166,9 @@ class MockLaser(Driver):
         """To get the laser emission power (mW)
         """
         return 55555 * self.mW
-    
+
     def enter_mod_mode(self):
-        
+
         pass
 
     @property
@@ -210,14 +180,14 @@ class MockLaser(Driver):
     @digital_mod.setter
     def digital_mod(self, value):
         pass
-    
+
     def mod_mode(self):
         """Returns the current operating mode
         """
         return 0
-        
+
     def query(self, text):
-        
+
         return 0
 
 class MockCamera(Driver):
@@ -292,7 +262,7 @@ class MockCamera(Driver):
     def cooler_on(self, value):
         self.cooler_on_state = value
 
- 
+
 
     @property
     def acquisition_mode(self):

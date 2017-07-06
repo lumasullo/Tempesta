@@ -62,7 +62,7 @@ def _find_library_linux():
     libname = 'nidaqmx'
     libfile = ctypes.util.find_library(libname)
     return header_name, libname, libfile
-        
+
 def _find_library_nt():
     import winreg as winreg # pylint: disable=import-error
     regpath = r'SOFTWARE\National Instruments\NI-DAQmx\CurrentVersion'
@@ -76,13 +76,14 @@ def _find_library_nt():
             regkey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, regpath)
         except WindowsError: # pylint: disable=undefined-variable
             print('You need to install NI-DAQmx first.', file=sys.stderr)
+            return None, libname, None
     nidaqmx_install = winreg.QueryValueEx(regkey, 'Path')[0]
     header_name = os.path.join(nidaqmx_install, r'include\NIDAQmx.h')
     if not os.path.isfile(header_name): # from Issue 23
-        header_name = os.path.join(nidaqmx_install, 
-                                   r'DAQmx ANSI C Dev\include\NIDAQmx.h')        
+        header_name = os.path.join(nidaqmx_install,
+                                   r'DAQmx ANSI C Dev\include\NIDAQmx.h')
     if not os.path.isfile(header_name): # from Issue 32
-        header_name = os.path.join(nidaqmx_install, 
+        header_name = os.path.join(nidaqmx_install,
                                    r'National Instruments\Shared\CVI\Include\NIDAQmx.h')
 
     ansi_c_dev = os.path.join(nidaqmx_install,
@@ -171,7 +172,7 @@ def _convert_header(header_name, header_module_name):
 
         # DAQmxSuccess is not renamed, because it's unused and I'm lazy.
         _d = {k.replace("DAQmx_", ""): v for k,v in list(d.items())}
-                 
+
     try:
         path = os.path.dirname(os.path.abspath (__file__))
     except NameError:
@@ -196,7 +197,7 @@ def _load_header(header_name):
     version = get_nidaqmx_version()
     mod_name = 'nidaqmx_h_%s' % (version.replace ('.', '_'))
     pkg_name = "nidaqmx."
-    
+
     try:
         mod = __import__(pkg_name + mod_name, fromlist=[mod_name])
     except ImportError:
@@ -296,7 +297,7 @@ def make_pattern(paths, _main=True):
                 if word[i].isdigit():
                     break
                 i += 1
-            
+
             splitted = [word[:i], word[i:]]
         l = patterns.get(splitted[0], None)
         if l is None:
@@ -420,7 +421,7 @@ class Device(str):
         buf = ctypes.create_string_buffer(b'\000' * buf_size)
         CALL ('GetDevAIPhysicalChans', self, ctypes.byref (buf), buf_size)
         names = [n.strip() for n in buf.value.decode('utf-8').split(',') if n.strip()]
-        return names        
+        return names
 
     def get_analog_output_channels(self, buf_size=None):
         """
@@ -443,7 +444,7 @@ class Device(str):
         buf = ctypes.create_string_buffer(b'\000' * buf_size)
         CALL('GetDevAOPhysicalChans', self, ctypes.byref (buf), buf_size)
         names = [n.strip() for n in buf.value.decode('utf-8').split(',') if n.strip()]
-        return names        
+        return names
 
     def get_digital_input_lines(self, buf_size=None):
         """
@@ -466,7 +467,7 @@ class Device(str):
         buf = ctypes.create_string_buffer(b'\000' * buf_size)
         CALL ('GetDevDILines', self, ctypes.byref (buf), buf_size)
         names = [n.strip() for n in buf.value.split(',') if n.strip()]
-        return names        
+        return names
 
     def get_digital_input_ports(self, buf_size=None):
         """
@@ -489,7 +490,7 @@ class Device(str):
         buf = ctypes.create_string_buffer(b'\000' * buf_size)
         CALL ('GetDevDIPorts', self, ctypes.byref (buf), buf_size)
         names = [n.strip() for n in buf.value.split(',') if n.strip()]
-        return names        
+        return names
 
     def get_digital_output_lines(self, buf_size=None):
         """
@@ -512,7 +513,7 @@ class Device(str):
         buf = ctypes.create_string_buffer(b'\000' * buf_size)
         CALL ('GetDevDOLines', self, ctypes.byref (buf), buf_size)
         names = [n.strip() for n in buf.value.decode('utf-8').split(',') if n.strip()]
-        return names        
+        return names
 
     def get_digital_output_ports(self, buf_size=None):
         """
@@ -535,7 +536,7 @@ class Device(str):
         buf = ctypes.create_string_buffer(b'\000' * buf_size)
         CALL ('GetDevDOPorts', self, ctypes.byref (buf), buf_size)
         names = [n.strip() for n in buf.value.decode('utf-8').split(',') if n.strip()]
-        return names        
+        return names
 
     def get_counter_input_channels (self, buf_size=None):
         """
@@ -558,7 +559,7 @@ class Device(str):
         buf = ctypes.create_string_buffer(b'\000' * buf_size)
         CALL ('GetDevCIPhysicalChans', self, ctypes.byref (buf), buf_size)
         names = [n.strip() for n in buf.value.split(',') if n.strip()]
-        return names        
+        return names
 
     def get_counter_output_channels (self, buf_size=None):
         """
@@ -581,7 +582,7 @@ class Device(str):
         buf = ctypes.create_string_buffer(b'\000' * buf_size)
         CALL ('GetDevCOPhysicalChans', self, ctypes.byref (buf), buf_size)
         names = [n.strip() for n in buf.value.decode('utf-8').split(',') if n.strip()]
-        return names        
+        return names
 
     def get_bus_type(self):
         """
@@ -929,8 +930,8 @@ class Task(uInt32):
                 samples_per_channel = data.shape[-1]
 
         return data, samples_per_channel
-    
-    
+
+
     def get_number_of_channels(self):
         """
         Indicates the number of virtual channels in the task.
@@ -938,7 +939,7 @@ class Task(uInt32):
         d = uInt32(0)
         CALL('GetTaskNumChans', self, ctypes.byref(d))
         return d.value
-        
+
     def get_names_of_channels (self, buf_size=None):
         """
         Indicates the names of all virtual channels in the task.
@@ -959,7 +960,7 @@ class Task(uInt32):
         buf = ctypes.create_string_buffer(b'\000' * buf_size)
         CALL('GetTaskChannels', self, ctypes.byref(buf), buf_size)
         names = [n.strip() for n in buf.value.decode('utf-8').split(',') if n.strip()]
-        
+
         n = self.get_number_of_channels()
         assert len(names)==n,repr((names, n))
         return names
@@ -1040,7 +1041,7 @@ class Task(uInt32):
 
     _register_every_n_samples_event_cache = None
 
-    def register_every_n_samples_event(self, func, 
+    def register_every_n_samples_event(self, func,
                                        samples = 1,
                                        options = 0,
                                        cb_data = None
@@ -1094,7 +1095,7 @@ class Task(uInt32):
 
         register_signal_event, register_done_event
         """
-        event_type_map = dict(input=DAQmx.Val_Acquired_Into_Buffer, 
+        event_type_map = dict(input=DAQmx.Val_Acquired_Into_Buffer,
                               output=DAQmx.Val_Transferred_From_Buffer)
         event_type = event_type_map[self.channel_io_type]
 
@@ -1112,7 +1113,7 @@ class Task(uInt32):
                 raise ValueError("Function signature should be like f(task, event_type, samples, cb_data) -> 0.")
             # TODO: use wrapper function that converts cb_data argument to given Python object
             c_func = EveryNSamplesEventCallback_map[self.channel_type](func)
-        
+
         self._register_every_n_samples_event_cache = c_func
 
         return CALL('RegisterEveryNSamplesEvent', self, event_type, uInt32(samples), uInt32 (options), c_func, cb_data)==0
@@ -1131,7 +1132,7 @@ class Task(uInt32):
         ----------
 
         func : function
-        
+
           The function that you want DAQmx to call when the event
           occurs.  The function you pass in this parameter must have
           the following prototype::
@@ -1156,13 +1157,13 @@ class Task(uInt32):
           combine flags with the bitwise-OR operator ('|') to set
           multiple options. Pass a value of zero if no options need to
           be set.
-          
+
           'sync' - The callback function is called in the thread which
           registered the event. In order for the callback to occur,
           you must be processing messages. If you do not set this
           flag, the callback function is called in a DAQmx thread by
           default.
-            
+
           Note: If you are receiving synchronous events faster than
           you are processing them, then the user interface of your
           application might become unresponsive.
@@ -1199,7 +1200,7 @@ class Task(uInt32):
         self._register_done_event_cache = c_func
 
         return CALL('RegisterDoneEvent', self, uInt32 (options), c_func, cb_data)==0
-   
+
     _register_signal_event_cache = None
 
     def register_signal_event(self, func, signal, options=0, cb_data = None):
@@ -1234,7 +1235,7 @@ class Task(uInt32):
         signal : {'sample_clock', 'sample_complete', 'change_detection', 'counter_output'}
 
           The signal for which you want to receive results:
-        
+
           'sample_clock' - Sample clock
           'sample_complete' - Sample complete event
           'change_detection' - Change detection event
@@ -1293,7 +1294,7 @@ class Task(uInt32):
     def configure_timing_change_detection(self,
                                           rising_edge_channel = '',
                                           falling_edge_channel = '',
-                                          sample_mode = 'continuous', 
+                                          sample_mode = 'continuous',
                                           samples_per_channel = 1000):
         """
         Configures the task to acquire samples on the rising and/or
@@ -1316,7 +1317,7 @@ class Task(uInt32):
 
 
     def configure_timing_handshaking(self,
-                                     sample_mode = 'continuous', 
+                                     sample_mode = 'continuous',
                                      samples_per_channel = 1000):
         """
         Determines the number of digital samples to acquire or
@@ -1338,7 +1339,7 @@ class Task(uInt32):
         return r==0
 
     def configure_timing_implicit(self,
-                                  sample_mode = 'continuous', 
+                                  sample_mode = 'continuous',
                                   samples_per_channel = 1000):
         """
         Sets only the number of samples to acquire or generate without
@@ -1361,11 +1362,11 @@ class Task(uInt32):
         r = CALL('CfgImplicitTiming', self, sample_mode_val, uInt64(samples_per_channel))
         return r==0
 
-    def configure_timing_sample_clock(self, 
-                                      source = 'OnboardClock', 
+    def configure_timing_sample_clock(self,
+                                      source = 'OnboardClock',
                                       rate = 1, # Hz
-                                      active_edge = 'rising', 
-                                      sample_mode = 'continuous', 
+                                      active_edge = 'rising',
+                                      sample_mode = 'continuous',
                                       samples_per_channel = 1000):
         """
         Sets the source of the Sample Clock, the rate of the Sample
@@ -1396,15 +1397,15 @@ class Task(uInt32):
 
               'falling' - Acquire or generate samples on the falling
               edges of the Sample Clock.
-  
+
           sample_mode : {'finite', 'continuous', 'hwtimed'}
 
             Specifies whether the task acquires or
             generates samples continuously or if it acquires or
             generates a finite number of samples:
-            
+
               'finite' - Acquire or generate a finite number of samples.
-            
+
               'continuous' - Acquire or generate samples until you stop the task.
 
               'hwtimed' - Acquire or generate samples continuously
@@ -1434,7 +1435,7 @@ class Task(uInt32):
         sample_mode_val = self._get_map_value('sample_mode', sample_mode_map, sample_mode)
         self.samples_per_channel = samples_per_channel
         self.sample_mode = sample_mode
-        r = CALL('CfgSampClkTiming', self, source, float64(rate), active_edge_val, sample_mode_val, 
+        r = CALL('CfgSampClkTiming', self, source, float64(rate), active_edge_val, sample_mode_val,
                     uInt64(samples_per_channel))
         return r==0
 
@@ -1455,12 +1456,12 @@ class Task(uInt32):
           E Series devices is PFI0.
 
         slope : {'rising', 'falling'}
-        
+
           Specifies on which slope of the signal to start acquiring or
           generating samples when the signal crosses trigger level:
 
             'rising' - Trigger on the rising slope of the signal.
- 
+
             'falling' - Trigger on the falling slope of the signal.
 
         level : float
@@ -2004,7 +2005,7 @@ class Task(uInt32):
         return CALL ('ResetSampClkRate', self)==0
 
     def get_convert_clock_rate(self):
-        """ 
+        """
         Returns convert clock rate.
 
         See also
@@ -2384,7 +2385,7 @@ class Task(uInt32):
         ----------
 
         trigger_type:
-        
+
           'digital_edge' - Trigger on a rising or falling edge of a digital signal.
           None - Disable the trigger.
 
@@ -2532,7 +2533,7 @@ class Task(uInt32):
 
         Specifies whether the task pauses while the signal is high or
         low.
-        
+
         See also
         --------
         get_pause_trigger_when, reset_pause_trigger_when
@@ -2675,7 +2676,7 @@ class Task(uInt32):
           measurement or generation to complete. The function returns
           an error if the time elapses before the measurement or
           generation is complete.
-        
+
           A value of -1 (DAQmx_Val_WaitInfinitely) means to wait
           indefinitely.
 
@@ -2975,7 +2976,7 @@ class AnalogInputTask(Task):
         return d.value
 
     def create_voltage_channel(self, phys_channel, channel_name="", terminal='default',
-                               min_val = -1, max_val = 1, 
+                               min_val = -1, max_val = 1,
                                units = 'volts', custom_scale_name = None):
         """
         Creates channel(s) to measure voltage and adds the channel(s)
@@ -3021,9 +3022,9 @@ class AnalogInputTask(Task):
 
             'diff'
               Differential mode
-          
+
             'pseudodiff'
-              Pseudodifferential mode 
+              Pseudodifferential mode
 
         min_val :
           The minimum value, in units, that you expect to measure.
@@ -3128,12 +3129,12 @@ class AnalogInputTask(Task):
 
             'group_by_scan_number'
               Group by scan number (interleaved)::
-              
+
                 ch0:s1, ch1:s1, ch2:s1, ch0:s2, ch1:s2, ch2:s2,...
 
         Returns
         -------
-        
+
         data :
           The array to read samples into, organized according to `fill_mode`.
         """
@@ -3170,7 +3171,7 @@ class AnalogInputTask(Task):
 
         Parameters
         ----------
-        
+
         timeout : float
           The amount of time, in seconds, to wait for the function to
           read the sample(s). The default value is 10.0 seconds. To
@@ -3188,7 +3189,7 @@ class AnalogInputTask(Task):
         data : float
           The sample read from the task.
         """
-        
+
         data = float64(0)
         CALL('ReadAnalogScalarF64', self,
              float64(timeout), ctypes.byref(data), None)
@@ -3202,7 +3203,7 @@ class AnalogOutputTask (Task):
     channel_type = 'AO'
 
     def create_voltage_channel(self, phys_channel, channel_name="",
-                               min_val = -1, max_val = 1, 
+                               min_val = -1, max_val = 1,
                                units = 'volts', custom_scale_name = None):
         """
         Creates channel(s) to generate voltage and adds the channel(s)
@@ -3235,7 +3236,7 @@ class AnalogOutputTask (Task):
         r = CALL('CreateAOVoltageChan', self, phys_channel, channel_name,
                  float64(min_val), float64(max_val), units_val, custom_scale_name)
         self._set_channel_type(self.get_channel_type(channel_name))
-        r==0    
+        r==0
 
     def write(self, data,
               auto_start=True, timeout=10.0, layout='group_by_scan_number'):
@@ -3293,7 +3294,7 @@ class AnalogOutputTask (Task):
         -------
 
         samples_written : int
-        
+
           The actual number of samples per channel successfully
           written to the buffer. Applies iff data is array.
 
@@ -3379,7 +3380,7 @@ class DigitalTask (Task):
           Specifies whether or not the samples are interleaved:
 
             'group_by_channel' - Group by channel (non-interleaved).
-  
+
             'group_by_scan_number' - Group by scan number (interleaved).
 
         Returns
@@ -3423,12 +3424,12 @@ class DigitalTask (Task):
         else:
             data = np.zeros((number_of_channels, samples_per_channel),dtype=dtype)
         # pylint: enable=no-member
-        
+
         samples_read = int32(0)
         bytes_per_sample = int32(0)
 
         CALL ('ReadDigitalLines', self, samples_per_channel, float64 (timeout),
-              fill_mode_val, data.ctypes.data, uInt32 (data.size * c), 
+              fill_mode_val, data.ctypes.data, uInt32 (data.size * c),
               ctypes.byref (samples_read), ctypes.byref (bytes_per_sample),
               None
               )
@@ -3447,7 +3448,7 @@ class DigitalInputTask(DigitalTask):
     def __init__(self, name=""):
         super(DigitalInputTask, self).__init__(name)
         self.one_channel_for_all_lines = None
-    
+
     channel_type = 'DI'
 
     def create_channel(self, lines, name='', grouping='per_line'):
@@ -3463,7 +3464,7 @@ class DigitalInputTask(DigitalTask):
 
         Parameters
         ----------
-        
+
         lines : str
 
           The names of the digital lines used to create a virtual
@@ -3479,7 +3480,7 @@ class DigitalInputTask(DigitalTask):
           names for name, you must use the names when you refer to
           these channels in other NI-DAQmx functions.
 
-        grouping : {'per_line', 'for_all_lines'} 
+        grouping : {'per_line', 'for_all_lines'}
 
           Specifies whether to group digital lines into one or more
           virtual channels. If you specify one or more entire ports in
@@ -3525,7 +3526,7 @@ class DigitalOutputTask(DigitalTask):
 
         Parameters
         ----------
-        
+
         lines : str
 
           The names of the digital lines used to create a virtual
@@ -3563,8 +3564,8 @@ class DigitalOutputTask(DigitalTask):
         self.one_channel_for_all_lines =  grouping_val==DAQmx.Val_ChanForAllLines
         return CALL('CreateDOChan', self, lines, name, grouping_val)==0
 
-    def write(self, data, 
-              auto_start=True, timeout=10.0, 
+    def write(self, data,
+              auto_start=True, timeout=10.0,
               layout='group_by_channel'):
         """
         Writes multiple samples to each digital line in a task. When
@@ -3582,7 +3583,7 @@ class DigitalOutputTask(DigitalTask):
 
         Parameters
         ----------
-        
+
         data : array
 
           The samples to write to the task.
@@ -3629,11 +3630,11 @@ class DigitalOutputTask(DigitalTask):
         else:
             data = np.asarray(data, dtype = np.uint8)
         # pylint: enable=no-member
-        
+
         data, samples_per_channel = self._reshape_data(data, layout)
-        CALL('WriteDigitalLines', self, int32(samples_per_channel), 
+        CALL('WriteDigitalLines', self, int32(samples_per_channel),
              bool32(auto_start),
-             float64(timeout), layout_val, 
+             float64(timeout), layout_val,
              data.ctypes.data, ctypes.byref(samples_written), None)
 
         return samples_written.value
@@ -3686,7 +3687,7 @@ class CounterInputTask(Task):
           virtual channels you create, NI-DAQmx automatically assigns
           names to the virtual channels.
 
-        edge : {'rising', 'falling'} 
+        edge : {'rising', 'falling'}
 
           Specifies on which edges of the input signal to increment or
           decrement the count, rising or falling edge(s).
@@ -3766,7 +3767,7 @@ class CounterInputTask(Task):
           virtual channels you create, NI-DAQmx automatically assigns
           names to the virtual channels.
 
-        decodingType : {'X1', 'X2', 'X4', 'TwoPulseCounting'} 
+        decodingType : {'X1', 'X2', 'X4', 'TwoPulseCounting'}
 
           Specifies how to count and interpret the pulses that the encoder
           generates on signal A and signal B. X1, X2, and X4 are valid for
@@ -3807,7 +3808,7 @@ class CounterInputTask(Task):
 
           The distance measured for each pulse the encoder generates. Specify this
           value in units.
-        
+
         init : float
 
           The position of the encoder when the measurement begins. This value is
@@ -3818,7 +3819,7 @@ class CounterInputTask(Task):
           The name of a custom scale to apply to the channel. To use this parameter,
           you must set units to DAQmx.Val_FromCustomScale. If you do not set units
           to FromCustomScale, you must set customScaleName to NULL.
-          
+
         Returns
         -------
 
@@ -3902,8 +3903,8 @@ class CounterInputTask(Task):
           'hertz' - Hertz, cycles per second
           'ticks' - timebase ticks
           'custom' - use custom_scale_name to specify units
-          
-        edge : {'rising', 'falling'} 
+
+        edge : {'rising', 'falling'}
           Specifies which edges to measure the frequency or period of the signal.
 
         meas_method : {'low_freq', 'high_freq', 'large_range'}
@@ -3976,12 +3977,12 @@ class CounterInputTask(Task):
             raise ValueError('Must specify custom_scale_name for custom scale.')
         if custom_scale_name is not None:
             custom_scale_name = str(custom_scale_name)
-        
+
         return CALL('CreateCIFreqChan', self, counter, name,
                     min_val, max_val,
                     units_val, edge_val, meas_meth_val,
-                    meas_time, divisor, custom_scale_name) == 0 
-    
+                    meas_time, divisor, custom_scale_name) == 0
+
     def set_terminal_count_edges(self, channel, terminal):
         """
         Specifies the input terminal of the signal to measure.
@@ -4133,7 +4134,7 @@ class CounterInputTask(Task):
 
         Returns
         -------
-        
+
         data :
           The array to read samples into, organized according to `fill_mode`.
         """
@@ -4144,10 +4145,10 @@ class CounterInputTask(Task):
         data = np.zeros((samples_per_channel,),dtype=np.int32) # pylint: disable=no-member
         samples_read = int32(0)
 
-        
+
         CALL('ReadCounterU32', self, samples_per_channel, float64(timeout),
              data.ctypes.data, data.size, ctypes.byref(samples_read), None)
-        
+
         return data[:samples_read.value]
 
     def read_scalar(self, timeout=10.0):
@@ -4182,12 +4183,12 @@ class CounterInputTask(Task):
              timeout, ctypes.byref(data), None)
         #assert ret == 0
         return data.value
-        
+
 class CounterOutputTask(Task):
 
     """Exposes NI-DAQmx counter output task to Python.
     """
-    
+
     channel_type = 'CO'
 
     def create_channel_frequency(self, counter, name="", units='hertz', idle_state='low',
@@ -4206,7 +4207,7 @@ class CounterOutputTask(Task):
           channels. You can specify a list or range of physical
           channels.
 
-        name : str 
+        name : str
 
           The name(s) to assign to the created virtual channel(s). If
           you do not specify a name, NI-DAQmx uses the physical
@@ -4221,7 +4222,7 @@ class CounterOutputTask(Task):
           virtual channels you create, NI-DAQmx automatically assigns
           names to the virtual channels.
 
-        units : {'hertz'} 
+        units : {'hertz'}
 
           The units in which to specify freq:
 
@@ -4299,7 +4300,7 @@ class CounterOutputTask(Task):
           The terminal to which you connect an external timebase. You
           also can specify a source terminal by using a terminal name.
 
-        idle_state : {'low', 'high'} 
+        idle_state : {'low', 'high'}
 
           The resting state of the output terminal.
 
@@ -4308,7 +4309,7 @@ class CounterOutputTask(Task):
           The number of timebase ticks to wait before generating the
           first pulse.
 
-        low_ticks : int 
+        low_ticks : int
 
           The number of timebase ticks that the pulse is low.
 
@@ -4534,7 +4535,7 @@ def main():
     g.stop()
 #    print(t.get_info_str(global_info=True))
 #    print(g.get_info_str())
-    
+
 #if __name__=='__main__':
 #    main()
 

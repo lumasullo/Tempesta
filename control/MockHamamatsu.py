@@ -8,7 +8,6 @@ import ctypes
 import ctypes.util
 import logging
 import numpy as np
-import pygame
 
 from lantz import Driver
 from lantz import Q_
@@ -74,7 +73,7 @@ class MockHamamatsu(Driver):
         self.properties = {}
         self.max_backlog = 0
         self.number_image_buffers = 0
-        
+
         self.s = Q_(1, 's')
 
         # Open the camera.
@@ -87,10 +86,10 @@ class MockHamamatsu(Driver):
         self.properties = {'Name': 'MOCK Hamamatsu',
         'exposure_time': 9999 * self.s,
         'accumulation_time': 99999 * self.s,
-        'image_width': 2048, 
-        'image_height': 2048, 
-        'image_framebytes': 8, 
-        'subarray_hsize': 2048, 
+        'image_width': 2048,
+        'image_height': 2048,
+        'image_framebytes': 8,
+        'subarray_hsize': 2048,
         'subarray_vsize': 2048,
         'subarray_mode': 'OFF',
         'timing_readout_time': 9999,
@@ -100,8 +99,8 @@ class MockHamamatsu(Driver):
         # Get camera max width, height.
         self.max_width = self.getPropertyValue("image_width")[0]
         self.max_height = self.getPropertyValue("image_height")[0]
-        
-        
+
+
 
     ## captureSetup
     #
@@ -137,24 +136,24 @@ class MockHamamatsu(Driver):
     #
     # Gets all of the available frames.
     #
-    # This will block waiting for new frames even if 
+    # This will block waiting for new frames even if
     # there new frames available when it is called.
     #
     # @return [frames, [frame x size, frame y size]]
     #
     def getFrames(self):
-        
+
         frames = []
 
         for i in range(2):
         # Create storage
             hc_data = HMockCamData(self.frame_x*self.frame_y)
-    
-    
+
+
             frames.append(hc_data)
 
         return [frames, [self.frame_x, self.frame_y]]
-        
+
     ## getModelInfo
     #
     # Returns the model of the camera
@@ -254,7 +253,7 @@ class MockHamamatsu(Driver):
     #
     # Return a list of the ids of all the new frames since the last check.
     #
-    # This will block waiting for at least one new frame. 
+    # This will block waiting for at least one new frame.
     #
     # @return [id of the first frame, .. , id of the last frame]
     #
@@ -279,7 +278,7 @@ class MockHamamatsu(Driver):
             print(" unknown property name:", property_name)
             return False
 
-        # If the value is text, figure out what the 
+        # If the value is text, figure out what the
         # corresponding numerical property value is.
 
         self.properties[property_name] = property_value
@@ -288,7 +287,7 @@ class MockHamamatsu(Driver):
 #                property_value = float(text_values[property_value])
 #            else:
 #                print(" unknown property text value:", property_value, "for", property_name)
-#                return False  
+#                return False
         return property_value
 
     ## setSubArrayMode
@@ -323,7 +322,7 @@ class MockHamamatsu(Driver):
         for i in range(1,2):
             hc_data = HMockCamData(self.frame_x*self.frame_y)
             self.hcam_data.append(hc_data)
-        
+
         print('size of hcam_data = ', np.size(self.hcam_data))
 
 
