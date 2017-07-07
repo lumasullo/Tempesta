@@ -7,9 +7,8 @@ Created on Tue Aug 12 11:51:21 2014
 
 from PyQt4 import QtGui, QtCore
 from lantz import Q_
-from control import libnidaqmx
+# from control import libnidaqmx
 import numpy as np
-from multiprocessing import Process
 
 
 def mWtomV(x):
@@ -51,6 +50,7 @@ class LaserWidget(QtGui.QFrame):
         self.violetControl = LaserControl(self.violetlaser, '<h3>405<h3>',
                                           color=(130, 0, 200), prange=(0, 200),
                                           tickInterval=5, singleStep=0.1)
+        self.violetlaser.autostart = False
 
         self.excControl = LaserControl(self.exclaser, '<h3>473<h3>',
                                        color=(0, 183, 255), prange=(0, 200),
@@ -61,6 +61,7 @@ class LaserWidget(QtGui.QFrame):
                                        color=(0, 247, 255), prange=(0, 200),
                                        tickInterval=100, singleStep=10,
                                        daq=self.daq, port=0)
+        self.offlaser.autostart = False
 
         self.controls = (self.violetControl, self.excControl, self.offControl)
 

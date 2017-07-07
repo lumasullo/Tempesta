@@ -12,4 +12,5 @@ Measurement control and analysis for optical microscopy. Adaption of Fede Baraba
   - http://www.lfd.uci.edu/~gohlke/pythonlibs/#vlfd
  - lantz
   - https://github.com/hgrecco/lantz
- - pygame
+ - nidaqmx
+  - https://github.com/ni/nidaqmx-python/

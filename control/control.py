@@ -12,7 +12,7 @@ import os
 import datetime
 import time
 import re
-import ctypes
+import nidaqmx
 import matplotlib.pyplot as plt
 
 from pyqtgraph.Qt import QtCore, QtGui
@@ -29,15 +29,14 @@ from lantz import Q_
 
 import control.lasercontrol as lasercontrol
 # import control.Scan as Scan
+import control.Scan_self_GUI as scanWidget
 import control.align as align
 import control.guitools as guitools
-# from control import libnidaqmx
+
 
 # Widget to control image or sequence recording. Recording only possible when
 # liveview active. StartRecording called when "Rec" presset. Creates recording
 # thread with RecWorker, recording is then done in this seperate thread.
-
-
 class RecordingWidget(QtGui.QFrame):
 
     def __init__(self, main, *args, **kwargs):
@@ -45,6 +44,8 @@ class RecordingWidget(QtGui.QFrame):
 
         self.main = main
         self.dataname = 'data'      # In case I need a QLineEdit for this
+
+        self.nidaq = nidaqmx.Device('Dev1')
 
         self.z_stack = []
         self.rec_mode = 1
@@ -98,7 +99,7 @@ class RecordingWidget(QtGui.QFrame):
         self.timeToRec.textChanged.connect(self.filesizeupdate)
         self.currentTime = QtGui.QLabel('0 /')
         self.currentTime.setAlignment((QtCore.Qt.AlignRight |
-                                        QtCore.Qt.AlignVCenter))
+                                       QtCore.Qt.AlignVCenter))
         self.currentFrame = QtGui.QLabel('0 /')
         self.currentFrame.setAlignment((QtCore.Qt.AlignRight |
                                         QtCore.Qt.AlignVCenter))
@@ -131,8 +132,8 @@ class RecordingWidget(QtGui.QFrame):
         recGrid = QtGui.QGridLayout()
         self.setLayout(recGrid)
 
-# Graphically adding the labels and fields etc to the gui. Four numbers specify row, column, rowspan
-# and columnspan.
+        # Graphically adding the labels and fields etc to the gui.
+        # Four numbers specify row, column, rowspan and columnspan.
         recGrid.addWidget(recTitle, 0, 0, 1, 3)
         recGrid.addWidget(QtGui.QLabel('Folder'), 2, 0)
         recGrid.addWidget(self.showZgraph, 1, 0)
@@ -158,7 +159,7 @@ class RecordingWidget(QtGui.QFrame):
         recGrid.setColumnMinimumWidth(0, 70)
         recGrid.setRowMinimumHeight(6, 40)
 
-# Initial condition of fields and checkboxes.
+        # Initial condition of fields and checkboxes.
         self.writable = True
         self.readyToRecord = False
         self.filenameEdit.setEnabled(False)
@@ -173,7 +174,6 @@ class RecordingWidget(QtGui.QFrame):
     @readyToRecord.setter
     def readyToRecord(self, value):
         self.snapTIFFButton.setEnabled(value)
-#        self.snapHDFButton.setEnabled(value)
         self.recButton.setEnabled(value)
         self._readyToRecord = value
 
@@ -181,9 +181,8 @@ class RecordingWidget(QtGui.QFrame):
     def writable(self):
         return self._writable
 
-# Setter for the writable property. If Nr of frame is checked only the frames field is
-# set active and vice versa.
-
+    # Setter for the writable property. If Nr of frame is checked only the
+    # frames field is set active and vice versa.
     @writable.setter
     def writable(self, value):
         if value:
@@ -209,8 +208,8 @@ class RecordingWidget(QtGui.QFrame):
             self.filenameEdit.setEnabled(False)
             self.filenameEdit.setText('Current time')
 
-# Functions for changing between choosing frames or time or "Run until stop" when recording.
-
+    # Functions for changing between choosing frames or time or "Run until
+    # stop" when recording.
     def specFrames(self):
 
         self.numExpositionsEdit.setEnabled(True)
@@ -235,8 +234,8 @@ class RecordingWidget(QtGui.QFrame):
         self.progressBar.setEnabled(False)
         self.rec_mode = 3
 
-# For updating the appriximated file size of and eventual recording. Called when frame dimensions
-# or frames to record is changed.
+    # For updating the appriximated file size of and eventual recording.
+    # Called when frame dimensions or frames to record is changed.
 
     def filesizeupdate(self):
         if self.specifyFrames.isChecked():
@@ -245,7 +244,8 @@ class RecordingWidget(QtGui.QFrame):
             frames = int(self.timeToRec.text()) / self.main.RealExpPar.value()
 
         self.filesize = 2 * frames * self.main.shape[0] * self.main.shape[1]
-        self.filesizeBar.setValue(min(2000000000, self.filesize)) #Percentage of 2 GB
+        # Percentage of 2 GB
+        self.filesizeBar.setValue(min(2000000000, self.filesize))
         self.filesizeBar.setFormat(str(self.filesize/1000))
 
     def n(self):
@@ -255,8 +255,8 @@ class RecordingWidget(QtGui.QFrame):
         else:
             return int(text)
 
-# Function that returns the time to record in order to record the correct number of frames.
-
+    # Function that returns the time to record in order to record the correct
+    # number of frames.
     def getTimeOrFrames(self):
 
         if self.specifyFrames.isChecked():
@@ -296,8 +296,10 @@ class RecordingWidget(QtGui.QFrame):
         for key in self.main.scanWidget.scan_par_values:
             attrs.append((key, self.main.scanWidget.scan_par_values[key]))
 
-        attrs.append(('Scan mode', self.main.scanWidget.Scan_Mode.currentText()))
-        attrs.append(('True_if_scanning', self.main.scanWidget.scanRadio.isChecked()))
+        attrs.append(('Scan mode',
+                      self.main.scanWidget.Scan_Mode.currentText()))
+        attrs.append(('True_if_scanning',
+                      self.main.scanWidget.scanRadio.isChecked()))
 
         for key in self.main.scanWidget.pixel_par_values:
             attrs.append((key, self.main.scanWidget.pixel_par_values[key]))
@@ -342,13 +344,10 @@ class RecordingWidget(QtGui.QFrame):
         folder = self.folderEdit.text()
         if os.path.exists(folder):
 
-#            image = self.main.andor.most_recent_image16(self.main.shape)
             time.sleep(0.01)
             savename = (os.path.join(folder, self.getFileName()) +
                         '_snap.tiff')
             savename = guitools.getUniqueName(savename)
-#            tiff.imsave(savename, np.flipud(image.astype(np.uint16)),
-#                        description=self.dataname, software='Tormenta')
             tiff.imsave(savename, self.main.latest_image.astype(np.uint16),
                         description=self.dataname, software='Tormenta')
             guitools.attrsToTxt(os.path.splitext(savename)[0], self.getAttrs())
@@ -374,8 +373,7 @@ class RecordingWidget(QtGui.QFrame):
         self.progressBar.setValue(100*(1 - rSecs / (eSecs + rSecs)))
 #        self.main.img.setImage(self.worker.liveImage, autoLevels=False)
 
-# This funciton is called when "Rec" button is pressed.
-
+    # This funciton is called when "Rec" button is pressed.
     def startRecording(self):
         if self.recButton.isChecked():
 
@@ -383,31 +381,42 @@ class RecordingWidget(QtGui.QFrame):
                 os.mkdir(self.newfolderpath)
 
             ret = QtGui.QMessageBox.Yes
-            if self.filesize > 1500000000:  # Checks if estimated file size is dangourusly large, > 1,5GB-.
+            if self.filesize > 1500000000:  # Checks if estimated file size is
+                                            # dangourusly large, > 1,5GB-.
                 ret = self.filesizewar.exec_()
 
             folder = self.folderEdit.text()
             if os.path.exists(folder) and ret == QtGui.QMessageBox.Yes:
 
-                self.writable = False # Sets Recording widget to not be writable during recording.
+                self.writable = False
                 self.readyToRecord = False
                 self.recButton.setEnabled(True)
                 self.recButton.setText('STOP')
-                self.main.tree.writable = False # Sets camera parameters to not be writable during recording.
+                self.main.tree.writable = False
                 self.main.liveviewButton.setEnabled(False)
 #                self.main.liveviewStop() # Stops liveview from updating
 
-                self.savename = (os.path.join(folder, self.getFileName()) + '_rec.hdf5') # Sets name for final output file
-                self.savename = guitools.getUniqueName(self.savename) # If same  filename exists it is appended by (1) or (2) etc.
-                self.startTime = ptime.time() # Saves the time when started to calculate remaining time.
+                # Sets name for final output file
+                self.savename = (os.path.join(folder, self.getFileName()) +
+                                 '_rec.hdf5')
+                # If same  filename exists it is appended by (1) or (2) etc.
+                self.savename = guitools.getUniqueName(self.savename)
+                # Saves the time when started to calculate remaining time.
+                self.startTime = ptime.time()
 
-                self.worker = RecWorker(self.main.orcaflash, self.rec_mode, self.getTimeOrFrames(), self.main.shape, self.main.lvworker,  #Creates an instance of RecWorker class.
+                self.worker = RecWorker(self.main.orcaflash, self.rec_mode,
+                                        self.getTimeOrFrames(),
+                                        self.main.shape, self.main.lvworker,
                                         self.main.RealExpPar, self.savename,
                                         self.dataname, self.getAttrs())
-                self.worker.updateSignal.connect(self.updateGUI)    # Connects the updatesignal that is continously emitted from recworker to updateGUI function.
-                self.worker.doneSignal.connect(self.endRecording) # Connects the donesignal emitted from recworker to endrecording function.
-                self.recordingThread = QtCore.QThread() # Creates a new thread
-                self.worker.moveToThread(self.recordingThread) # moves the worker object to this thread.
+                # Connects the updatesignal that is continously emitted from
+                # recworker to updateGUI function.
+                self.worker.updateSignal.connect(self.updateGUI)
+                # Connects the donesignal emitted from recworker to
+                # endrecording function.
+                self.worker.doneSignal.connect(self.endRecording)
+                self.recordingThread = QtCore.QThread()
+                self.worker.moveToThread(self.recordingThread)
                 self.recordingThread.started.connect(self.worker.start)
                 self.recordingThread.start()
 
@@ -426,7 +435,9 @@ class RecordingWidget(QtGui.QFrame):
         if self.showZproj.checkState():
             plt.imshow(self.worker.Z_projection, cmap='gray')
         self.recordingThread.terminate()
-        converterFunction = lambda: guitools.TiffConverterThread(self.savename)
+
+        def converterFunction():
+            return guitools.TiffConverterThread(self.savename)
         self.main.exportlastAction.triggered.connect(converterFunction)
         self.main.exportlastAction.setEnabled(True)
 
@@ -435,7 +446,7 @@ class RecordingWidget(QtGui.QFrame):
         self.recButton.setText('REC')
         self.recButton.setChecked(False)
         self.main.tree.writable = True
-        self.main.lvworker.reset() # Same as done in Liveviewrun()
+        self.main.lvworker.reset()  # Same as done in Liveviewrun()
         self.main.orcaflash.startAcquisition()
         self.main.liveviewButton.setEnabled(True)
 #        self.main.liveviewStart()
@@ -449,14 +460,16 @@ class RecWorker(QtCore.QObject):
     updateSignal = QtCore.pyqtSignal()
     doneSignal = QtCore.pyqtSignal()
 
-    def __init__(self, orcaflash, rec_mode, timeorframes, shape, lvworker, t_exp, savename, dataname, attrs,
-                 *args, **kwargs):
+    def __init__(self, orcaflash, rec_mode, timeorframes, shape, lvworker,
+                 t_exp, savename, dataname, attrs, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         self.orcaflash = orcaflash
         self.rec_mode = rec_mode  # 1=frames, 2=time, 3=until stop
         print(self.rec_mode)
-        self.timeorframes = timeorframes #Nr of seconds or frames to record depending on bool_ToF.
-        self.shape = shape # Shape of one frame
+        # Nr of seconds or frames to record depending on bool_ToF.
+        self.timeorframes = timeorframes
+        self.shape = shape  # Shape of one frame
         self.lvworker = lvworker
         self.t_exp = t_exp
         self.savename = savename
@@ -464,24 +477,27 @@ class RecWorker(QtCore.QObject):
         self.attrs = attrs
         self.pressed = True
 
-
     def start(self):
-        #Set initial values
+        # Set initial values
         self.timerecorded = 0
         self.frames_recorded = 0
 
         time.sleep(0.1)
 
-        #Find what the index of the first recorded frame will be
+        # Find what the index of the first recorded frame will be
         last_f = self.lvworker.f_ind
-        if last_f == None:
-            start_f = 0 # If camera has not recorded any frames yet, start index will be zero
+        if last_f is None:
+            # If camera has not recorded any frames yet, start index will be
+            # zero
+            start_f = 0
         else:
-            start_f = last_f + 1 # index of first frame is one more then provious frame.
+            # index of first frame is one more then provious frame.
+            start_f = last_f + 1
 
         self.starttime = time.time()
 
-        # Main loop for waiting until recording is finished and sending update signal
+        # Main loop for waiting until recording is finished and sending update
+        # signal
         f_ind = start_f
         if self.rec_mode == 1:
             while self.frames_recorded < self.timeorframes and self.pressed:
@@ -500,38 +516,41 @@ class RecWorker(QtCore.QObject):
                 time.sleep(0.01)
                 self.updateSignal.emit()
 
-        self.orcaflash.stopAcquisition()   # To avoid camera overwriting buffer while saving recording
-        end_f = self.lvworker.f_ind # Get index of the last acquired frame
+        # To avoid camera overwriting buffer while saving recording
+        self.orcaflash.stopAcquisition()
+        end_f = self.lvworker.f_ind  # Get index of the last acquired frame
 
-        if end_f == None: #If no frames are acquired during recording,
+        if end_f is None:  # If no frames are acquired during recording,
             end_f = -1
 
         if end_f >= start_f - 1:
             f_range = range(start_f, end_f + 1)
         else:
             buffer_size = self.orcaflash.number_image_buffers
-            f_range = np.append(range(start_f, buffer_size), range(0, end_f + 1))
+            f_range = np.append(range(start_f, buffer_size),
+                                range(0, end_f + 1))
 
         print('Start_f = :', start_f)
         print('End_f = :', end_f)
         f_ind = len(f_range)
-        data = [];
+        data = []
         for i in f_range:
             data.append(self.orcaflash.hcam_data[i].getData())
 
-        datashape = (f_ind, self.shape[1], self.shape[0])     # Adapted for ImageJ data read shape
+        # Adapted for ImageJ data read shape
+        datashape = (f_ind, self.shape[1], self.shape[0])
 
         print('Savename = ', self.savename)
         self.store_file = hdf.File(self.savename, "w")
-        self.store_file.create_dataset(name=self.dataname, shape=datashape, maxshape=datashape, dtype=np.uint16)
+        self.store_file.create_dataset(name=self.dataname, shape=datashape,
+                                       maxshape=datashape, dtype=np.uint16)
         dataset = self.store_file[self.dataname]
-
 
         reshapeddata = np.reshape(data, datashape, order='C')
         dataset[...] = reshapeddata
         self.z_stack = []
         for i in range(0, f_ind):
-            self.z_stack.append(np.mean(reshapeddata[i,:,:]))
+            self.z_stack.append(np.mean(reshapeddata[i, :, :]))
 
         self.Z_projection = np.flipud(np.sum(reshapeddata, 0))
         # Saving parameters
@@ -547,6 +566,7 @@ class FileWarning(QtGui.QMessageBox):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+
 class CamParamTree(ParameterTree):
     """ Making the ParameterTree for configuration of the camera during imaging
     """
@@ -554,27 +574,34 @@ class CamParamTree(ParameterTree):
     def __init__(self, orcaflash, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        BinTip = ("Sets binning mode. Binning mode specifies if and how many \n"
-                    "pixels are to be read out and interpreted as a single pixel value.")
-
+        BinTip = ("Sets binning mode. Binning mode specifies if and how \n"
+                  "many pixels are to be read out and interpreted as a \n"
+                  "single pixel value.")
 
         # Parameter tree for the camera configuration
         params = [{'name': 'Camera', 'type': 'str',
                    'value': orcaflash.camera_id},
                   {'name': 'Image frame', 'type': 'group', 'children': [
-                      {'name': 'Binning', 'type': 'list',
-                                  'values': [1, 2, 4], 'tip': BinTip},
-{'name': 'Mode', 'type': 'list', 'values': ['Full Widefield', 'Full chip', 'Minimal line', 'Custom']},
-{'name': 'X0', 'type': 'int', 'value': 0, 'limits': (0, 2044)},
-{'name': 'Y0', 'type': 'int', 'value': 0, 'limits': (0, 2044)},
-{'name': 'Width', 'type': 'int', 'value': 2048, 'limits': (1, 2048)},
-{'name': 'Height', 'type': 'int', 'value': 2048, 'limits': (1, 2048)},
-                                  {'name': 'Apply', 'type': 'action'},
-{'name': 'New ROI', 'type': 'action'}, {'name': 'Abort ROI', 'type': 'action', 'align': 'right'}]},
+                      {'name': 'Binning', 'type': 'list', 'values': [1, 2, 4],
+                       'tip': BinTip},
+                      {'name': 'Mode', 'type': 'list', 'values':
+                          ['Full Widefield', 'Full chip', 'Minimal line',
+                           'Custom']},
+                      {'name': 'X0', 'type': 'int', 'value': 0,
+                       'limits': (0, 2044)},
+                      {'name': 'Y0', 'type': 'int', 'value': 0,
+                       'limits': (0, 2044)},
+                      {'name': 'Width', 'type': 'int', 'value': 2048,
+                       'limits': (1, 2048)},
+                      {'name': 'Height', 'type': 'int', 'value': 2048,
+                       'limits': (1, 2048)},
+                      {'name': 'Apply', 'type': 'action'},
+                      {'name': 'New ROI', 'type': 'action'},
+                      {'name': 'Abort ROI', 'type': 'action',
+                       'align': 'right'}]},
                   {'name': 'Timings', 'type': 'group', 'children': [
                       {'name': 'Set exposure time', 'type': 'float',
-                       'value': 0.03, 'limits': (0,
-                                                9999),
+                       'value': 0.03, 'limits': (0, 9999),
                        'siPrefix': True, 'suffix': 's'},
                       {'name': 'Real exposure time', 'type': 'float',
                        'value': 0, 'readonly': True, 'siPrefix': True,
@@ -588,9 +615,11 @@ class CamParamTree(ParameterTree):
                       {'name': 'Internal frame rate', 'type': 'float',
                        'value': 0, 'readonly': True, 'siPrefix': False,
                        'suffix': ' fps'}]},
-                       {'name': 'Acquisition mode', 'type': 'group', 'children': [
-                      {'name': 'Trigger source', 'type': 'list',
-                       'values': ['Internal trigger', 'External "Start-trigger"', 'External "frame-trigger"'],
+                  {'name': 'Acquisition mode', 'type': 'group', 'children':
+                      [{'name': 'Trigger source', 'type': 'list',
+                        'values': ['Internal trigger',
+                                   'External "Start-trigger"',
+                                   'External "frame-trigger"'],
                        'siPrefix': True, 'suffix': 's'}]}]
 
         self.p = Parameter.create(name='params', type='group', children=params)
@@ -624,8 +653,9 @@ class CamParamTree(ParameterTree):
         framePar.param('Y0').setWritable(value)
         framePar.param('Width').setWritable(value)
         framePar.param('Height').setWritable(value)
-#       WARNING: If Apply and New ROI button are included here they will emit status changed signal
-        # and their respective functions will be called... -> problems.
+        # WARNING: If Apply and New ROI button are included here they will
+        # emit status changed signal and their respective functions will be
+        # called... -> problems.
 
         timingPar = self.p.param('Timings')
         timingPar.param('Set exposure time').setWritable(value)
@@ -658,16 +688,20 @@ class LVWorker(QtCore.QObject):
         self.orcaflash = orcaflash
         self.running = False
         self.f_ind = None
-        self.mem = 0  # Memory variable to keep track of if update has been run twice in a row with camera trigger source as internal trigger
-                        # If so the GUI trigger mode should also be set to internal trigger. Happens when using external start tigger.
+        # Memory variable to keep track of if update has been run twice in a
+        # row with camera trigger source as internal trigger. If so the GUI
+        # trigger mode should also be set to internal trigger. Happens when
+        # using external start tigger.
+        self.mem = 0
+
     def run(self):
 
         self.vtimer = QtCore.QTimer()
         self.vtimer.timeout.connect(self.update)
         self.running = True
-        self.f_ind = None # Should maybe be f_ind
+        self.f_ind = None  # Should maybe be f_ind
         self.vtimer.start(30)
-        print('f_ind when started = ',self.f_ind)
+        print('f_ind when started = ', self.f_ind)
 
     def update(self):
 
@@ -675,7 +709,8 @@ class LVWorker(QtCore.QObject):
             self.f_ind = self.orcaflash.newFrames()[-1]
 #            print('f_ind = :', self.f_ind)
             frame = self.orcaflash.hcam_data[self.f_ind].getData()
-            self.image = np.reshape(frame, (self.orcaflash.frame_x, self.orcaflash.frame_y), 'F')
+            self.image = np.reshape(frame, (self.orcaflash.frame_x,
+                                            self.orcaflash.frame_y), 'F')
             self.main.latest_image = self.image
             trigger_source = self.orcaflash.getPropertyValue('trigger_source')[0]
             if trigger_source == 1:
@@ -684,7 +719,6 @@ class LVWorker(QtCore.QObject):
                     self.mem = 0
                 else:
                     self.mem = 1
-
 
     def stop(self):
         if self.running:
@@ -703,7 +737,7 @@ class TormentaGUI(QtGui.QMainWindow):
     liveviewStarts = QtCore.pyqtSignal()
     liveviewEnds = QtCore.pyqtSignal()
 
-    def __init__(self, violetlaser, exclaser, offlaser, scanZ, daq, orcaflash,
+    def __init__(self, violetlaser, exclaser, offlaser, orcaflash,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -714,10 +748,9 @@ class TormentaGUI(QtGui.QMainWindow):
 #        self.orcaflash.setPropertyValue('readout_speed', 1)
 #        self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_mode', 6))
         self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_active', 2)) # 1: EGDE, 2: LEVEL, 3:SYNCHREADOUT
-        self.shape = (self.orcaflash.getPropertyValue('image_height')[0], self.orcaflash.getPropertyValue('image_width')[0])
+        self.shape = (self.orcaflash.getPropertyValue('image_height')[0],
+                      self.orcaflash.getPropertyValue('image_width')[0])
         self.frameStart = (0, 0)
-        self.scanZ = scanZ
-        self.daq = daq
 #        self.nidaq = libnidaqmx.Device('Dev1')
         self.latest_image = np.zeros(self.shape)
 
@@ -743,7 +776,9 @@ class TormentaGUI(QtGui.QMainWindow):
         self.savePresetAction = QtGui.QAction('Save configuration...', self)
         self.savePresetAction.setShortcut('Ctrl+S')
         self.savePresetAction.setStatusTip('Save camera & recording settings')
-        savePresetFunction = lambda: guitools.savePreset(self)
+
+        def savePresetFunction():
+            return guitools.savePreset(self)
         self.savePresetAction.triggered.connect(savePresetFunction)
         fileMenu.addAction(self.savePresetAction)
         fileMenu.addSeparator()
@@ -789,22 +824,26 @@ class TormentaGUI(QtGui.QMainWindow):
         self.customFrameLoaded = False
         self.cropLoaded = False
 
-        # Camera binning signals. Defines seperate variables for each parameter and connects the signal
-        # emitted when they've been changed to a function that actually changes the parameters on the camera
+        # Camera binning signals. Defines seperate variables for each parameter
+        # and connects the signal emitted when they've been changed to a
+        # function that actually changes the parameters on the camera
         # or other appropriate action.
         self.framePar = self.tree.p.param('Image frame')
         self.binPar = self.framePar.param('Binning')
         self.binPar.sigValueChanged.connect(self.setBinning)
         self.FrameMode = self.framePar.param('Mode')
         self.FrameMode.sigValueChanged.connect(self.testfunction)
-        self.X0par= self.framePar.param('X0')
-        self.Y0par= self.framePar.param('Y0')
-        self.Widthpar= self.framePar.param('Width')
-        self.Heightpar= self.framePar.param('Height')
+        self.X0par = self.framePar.param('X0')
+        self.Y0par = self.framePar.param('Y0')
+        self.Widthpar = self.framePar.param('Width')
+        self.Heightpar = self.framePar.param('Height')
         self.applyParam = self.framePar.param('Apply')
         self.NewROIParam = self.framePar.param('New ROI')
         self.AbortROIParam = self.framePar.param('Abort ROI')
-        self.applyParam.sigStateChanged.connect(self.applyfcn)  #WARNING: This signal is emitted whenever anything about the status of the parameter changes eg is set writable or not.
+
+        # WARNING: This signal is emitted whenever anything about the status of
+        # the parameter changes eg is set writable or not.
+        self.applyParam.sigStateChanged.connect(self.applyfcn)
         self.NewROIParam.sigStateChanged.connect(self.updateFrame)
         self.AbortROIParam.sigStateChanged.connect(self.AbortROI)
 
@@ -849,7 +888,9 @@ class TormentaGUI(QtGui.QMainWindow):
         for preset in os.listdir(self.presetDir):
             self.presetsMenu.addItem(preset)
         self.loadPresetButton = QtGui.QPushButton('Load preset')
-        loadPresetFunction = lambda: guitools.loadPreset(self)
+
+        def loadPresetFunction():
+            return guitools.loadPreset(self)
         self.loadPresetButton.pressed.connect(loadPresetFunction)
 
         # Liveview functionality
@@ -858,7 +899,8 @@ class TormentaGUI(QtGui.QMainWindow):
         self.liveviewButton.setCheckable(True)
         self.liveviewButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
                                           QtGui.QSizePolicy.Expanding)
-        self.liveviewButton.clicked.connect(self.liveview)      #Link button click to funciton liveview
+        # Link button click to funciton liveview
+        self.liveviewButton.clicked.connect(self.liveview)
         self.liveviewButton.setEnabled(True)
         self.viewtimer = QtCore.QTimer()
         self.viewtimer.timeout.connect(self.updateView)
@@ -890,7 +932,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.viewCtrlLayout = QtGui.QGridLayout()
         self.viewCtrl.setLayout(self.viewCtrlLayout)
         self.viewCtrlLayout.addWidget(self.liveviewButton, 0, 0, 1, 3)
-        self.viewCtrlLayout.addWidget( self.resolftRecButton, 1, 0, 1, 3)
+        self.viewCtrlLayout.addWidget(self.resolftRecButton, 1, 0, 1, 3)
 #        self.viewCtrlLayout.addWidget(self.gridButton, 1, 0)
 #        self.viewCtrlLayout.addWidget(self.grid2Button, 1, 1)
 #        self.viewCtrlLayout.addWidget(self.crosshairButton, 1, 2)
@@ -964,7 +1006,7 @@ class TormentaGUI(QtGui.QMainWindow):
 
         laserDock = Dock("Laser Control", size=(1, 1))
         self.lasers = (violetlaser, exclaser, offlaser)
-        self.laserWidgets = lasercontrol.LaserWidget(self.lasers, self.daq)
+        self.laserWidgets = lasercontrol.LaserWidget(self.lasers)
         laserDock.addWidget(self.laserWidgets)
         dockArea.addDock(laserDock)
 
@@ -1002,41 +1044,32 @@ class TormentaGUI(QtGui.QMainWindow):
         alignmentLayout.addWidget(self.alignmentLineMakerButton, 1, 0, 1, 1)
         alignmentLayout.addWidget(self.alignmentCheck, 1, 1, 1, 1)
 
-#         Z Align widget
+        # Z Align widget
         ZalignDock = Dock("Axial Alignment Tool", size=(1, 1))
         self.ZalignWidget = align.AlignWidgetAverage(self)
         ZalignDock.addWidget(self.ZalignWidget)
         dockArea.addDock(ZalignDock)  # , 'above', scanDock)
 
-        #         Z Align widget
+        # Z Align widget
         RotalignDock = Dock("Rotational Alignment Tool", size=(1, 1))
         self.RotalignWidget = align.AlignWidgetXYProject(self)
         RotalignDock.addWidget(self.RotalignWidget)
         dockArea.addDock(RotalignDock, 'above', ZalignDock)
 
+        # Scan Widget
+        self.scanxyWidget = scanWidget.ScanWidget(self.nidaq, self)
 
+        self.scanImageDock = Dock("Image from scanning", size=(300, 300))
+        self.scanImageDock.addWidget(self.scanxyWidget.display)
+        dockArea.addDock(self.scanImageDock)
 
-##         Focus lock widget
-#        focusDock = Dock("Focus Control", size=(1, 1))
-##        self.focusWidget = FocusWidget(DAQ, scanZ, self.recWidget)
-#        self.focusWidget = focus.FocusWidget(scanZ, self.recWidget)
-##        self.focusThread = QtCore.QThread()
-##        self.focusWidget.moveToThread(self.focusThread)
-##        self.focusThread.started.connect(self.focusWidget)
-##        self.focusThread.start()
-#        focusDock.addWidget(self.focusWidget)
-#        dockArea.addDock(focusDock)
-#
-#
 #        # Signal generation widget
 #        signalDock = Dock('Signal Generator')
 #        self.signalWidget = SignalGen.SigGenWidget(self.nidaq)
 #        signalDock.addWidget(self.signalWidget)
 #        dockArea.addDock(signalDock, 'above', laserDock)
 
-
-
-        self.setWindowTitle('Tempesta')
+        self.setWindowTitle('TempestaDev')
         self.cwidget = QtGui.QWidget()
         self.setCentralWidget(self.cwidget)
 
@@ -1060,7 +1093,6 @@ class TormentaGUI(QtGui.QMainWindow):
         layout.setRowMinimumHeight(2, 40)
         layout.setColumnMinimumWidth(2, 1000)
 
-
     def testfunction(self):
         print('In testfunction ie called from frame mode changed signal')
         self.updateFrame()
@@ -1079,7 +1111,6 @@ class TormentaGUI(QtGui.QMainWindow):
         pass
 #        self.flipperButton.setChecked(not(value))
 #        self.daq.flipper = value
-
 
     def changeParameter(self, function):
         """ This method is used to change those camera properties that need
@@ -1104,7 +1135,6 @@ class TormentaGUI(QtGui.QMainWindow):
 #            time.sleep(np.min((5 * self.t_exp_real.magnitude, 1)))
 #            self.viewtimer.start(0)
 
-
     def ChangeTriggerSource(self):
 
         if self.trigsourceparam.value() == 'Internal trigger':
@@ -1126,10 +1156,6 @@ class TormentaGUI(QtGui.QMainWindow):
             self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_source', 2))
             self.changeParameter(lambda: self.orcaflash.setPropertyValue('trigger_mode', 1))
 
-        else:
-            pass
-
-
     def updateLevels(self, image):
         std = np.std(image)
         self.hist.setLevels(np.min(image) - std, np.max(image) + std)
@@ -1146,9 +1172,6 @@ class TormentaGUI(QtGui.QMainWindow):
 
         self.changeParameter(lambda: self.orcaflash.setPropertyValue('binning', coded))
 
-
-
-
 #    def setNrrows(self):
 #
 #        """Method to change the number of rows of the captured frame"""
@@ -1159,38 +1182,12 @@ class TormentaGUI(QtGui.QMainWindow):
 #        """Method to change the number of rows of the captured frame"""
 #        self.changeParameter(lambda: self.orcaflash.setPropertyValue('subarray_hsize', self.nrcolPar.value()))
 
-    def setGain(self):
-        """ Method to change the pre-amp gain and main gain of the EMCCD
-        """
-        pass
-#        PreAmpGain = self.PreGainPar.value()
-#        n = np.where(self.andor.PreAmps == PreAmpGain)[0][0]
-#        # The (2 - n) accounts for the difference in order between the options
-#        # in the GUI and the camera settings
-#        self.andor.preamp = 2 - n
-#        self.andor.EM_gain = self.GainPar.value()
-
     def setExposure(self):
         """ Method to change the exposure time setting
         """
         self.orcaflash.setPropertyValue('exposure_time', self.expPar.value())
         print('Exp time set to:', self.orcaflash.getPropertyValue('exposure_time'))
-#        self.andor.frame_transfer_mode = self.FTMPar.value()
-#        hhRatesArr = np.array([item.magnitude for item in self.andor.HRRates])
-#        n_hrr = np.where(hhRatesArr == self.HRRatePar.value().magnitude)[0][0]
-#        # The (3 - n) accounts for the difference in order between the options
-#        # in the GUI and the camera settings
-#        self.andor.horiz_shift_speed = 3 - n_hrr
-#
-#        n_vss = np.where(np.array([item.magnitude
-#                                  for item in self.andor.vertSpeeds])
-#                         == self.vertShiftSpeedPar.value().magnitude)[0][0]
-#        self.andor.vert_shift_speed = n_vss
-#
-#        n_vsa = np.where(np.array(self.andor.vertAmps) ==
-#                         self.vertShiftAmpPar.value())[0][0]
-#        self.andor.set_vert_clock(n_vsa)
-#
+
         self.updateTimings()
 
     def cropOrca(self, hpos, vpos, hsize, vsize):
@@ -1203,7 +1200,6 @@ class TormentaGUI(QtGui.QMainWindow):
         self.orcaflash.setPropertyValue('subarray_vsize', 2048)
         self.orcaflash.setPropertyValue('subarray_hsize', 2048)
 
-
         vpos = int(4*np.ceil(vpos/4))
         hpos = int(4*np.ceil(hpos/4))
         vsize = int(min(2048 - vpos, 4*np.ceil(vsize/4)))
@@ -1214,7 +1210,8 @@ class TormentaGUI(QtGui.QMainWindow):
         self.orcaflash.setPropertyValue('subarray_vpos', vpos)
         self.orcaflash.setPropertyValue('subarray_hpos', hpos)
 
-        self.frameStart = (hpos, vpos) # This should be the only place where self.frameStart is changed
+        # This should be the only place where self.frameStart is changed
+        self.frameStart = (hpos, vpos)
         self.shape = (hsize, vsize)     # Only place self.shape is changed
         print('time after beginning of cropOrca= ', time.time())
         print('orca has been cropped to: ', vpos, hpos, vsize, hsize)
@@ -1227,7 +1224,10 @@ class TormentaGUI(QtGui.QMainWindow):
 
         binning = self.binPar.value()
 
-        self.changeParameter(lambda: self.cropOrca(binning*self.X0par.value(), binning*self.Y0par.value(), binning*self.Widthpar.value(), self.Heightpar.value()))
+        self.changeParameter(lambda: self.cropOrca(binning*self.X0par.value(),
+                                                   binning*self.Y0par.value(),
+                                                   binning*self.Widthpar.value(),
+                                                   self.Heightpar.value()))
 
         self.updateTimings()
         self.recWidget.filesizeupdate()
@@ -1245,10 +1245,12 @@ class TormentaGUI(QtGui.QMainWindow):
             self.Heightpar.setWritable(True)
 
 #            if not(self.customFrameLoaded):
-#            ROIsize = (int(0.2 * self.vb.viewRect().width()), int(0.2 * self.vb.viewRect().height()))
-            ROIsize = (int(0.2 * self.vb.viewRect().height()), int(0.2 * self.vb.viewRect().height()))
-            ROIcenter = (int(self.vb.viewRect().center().x()), int(self.vb.viewRect().center().y()))
-            ROIpos = (ROIcenter[0] - 0.5*ROIsize[0], ROIcenter[1] - 0.5*ROIsize[1])
+            ROIsize = (int(0.2 * self.vb.viewRect().height()),
+                       int(0.2 * self.vb.viewRect().height()))
+            ROIcenter = (int(self.vb.viewRect().center().x()),
+                         int(self.vb.viewRect().center().y()))
+            ROIpos = (ROIcenter[0] - 0.5*ROIsize[0],
+                      ROIcenter[1] - 0.5*ROIsize[1])
 
 #            try:
             self.ROI.setPos(ROIpos)
@@ -1267,7 +1269,6 @@ class TormentaGUI(QtGui.QMainWindow):
             self.Widthpar.setWritable(False)
             self.Heightpar.setWritable(False)
 
-
             if frameParam.param('Mode').value() == 'Full Widefield':
                 self.X0par.setValue(630)
                 self.Y0par.setValue(610)
@@ -1276,7 +1277,6 @@ class TormentaGUI(QtGui.QMainWindow):
                 self.adjustFrame()
 
                 self.ROI.hide()
-
 
             elif frameParam.param('Mode').value() == 'Full chip':
                 print('Full chip')
@@ -1298,9 +1298,6 @@ class TormentaGUI(QtGui.QMainWindow):
 
                 self.ROI.hide()
 
-
-
-
 #        else:
 #            pass
 #            side = int(frameParam.param('Mode').value().split('x')[0])
@@ -1316,9 +1313,8 @@ class TormentaGUI(QtGui.QMainWindow):
         self.X0par.setValue(self.frameStart[0] + int(self.ROI.pos()[0]))
         self.Y0par.setValue(self.frameStart[1] + int(self.ROI.pos()[1]))
 
-        self.Widthpar.setValue(int(self.ROI.size()[0])) # [0] is Width
-        self.Heightpar.setValue(int(self.ROI.size()[1])) # [1] is Height
-
+        self.Widthpar.setValue(int(self.ROI.size()[0]))  # [0] is Width
+        self.Heightpar.setValue(int(self.ROI.size()[1]))  # [1] is Height
 
     def AbortROI(self):
 
@@ -1327,8 +1323,8 @@ class TormentaGUI(QtGui.QMainWindow):
         self.X0par.setValue(self.frameStart[0])
         self.Y0par.setValue(self.frameStart[1])
 
-        self.Widthpar.setValue(self.shape[0]) # [0] is Width
-        self.Heightpar.setValue(self.shape[1]) # [1] is Height
+        self.Widthpar.setValue(self.shape[0])  # [0] is Width
+        self.Heightpar.setValue(self.shape[1])  # [1] is Height
 
     def updateTimings(self):
         """ Update the real exposition and accumulation times in the parameter
@@ -1365,12 +1361,12 @@ class TormentaGUI(QtGui.QMainWindow):
         else:
             self.liveviewStop()
 
-# Threading below  is done in this way since making LVThread a QThread resulted in QTimer
-# not functioning in the thread. Image is now also saved as latest_image in
-# TormentaGUI class since setting image in GUI from thread resultet in
-# issues when interacting with the viewbox from GUI. Maybe due to
-# simultaious manipulation of viewbox from GUI and thread.
-
+    # Threading below is done in this way since making LVThread a QThread
+    # resulted in QTimer not functioning in the thread. Image is now also
+    # saved as latest_image in TormentaGUI class since setting image in GUI
+    # from thread resultet in issues when interacting with the viewbox from
+    # GUI. Maybe due to simultaious manipulation of viewbox from GUI and
+    # thread.
     def liveviewStart(self):
 
 #        self.orcaflash.startAcquisition()
@@ -1402,7 +1398,7 @@ class TormentaGUI(QtGui.QMainWindow):
 #
 #        # Initial image
 #        rawframes = self.orcaflash.getFrames()
-#        firstframe = rawframes[0][-1].getData() #return A numpy array that contains the camera data. "Circular" indexing makes [-1] return the latest frame
+#        firstframe = rawframes[0][-1].getData() # return A numpy array that contains the camera data. "Circular" indexing makes [-1] return the latest frame
 #        self.image = np.reshape(firstframe, (self.orcaflash.frame_y, self.orcaflash.frame_x), order='C')
 #        print(self.frame)
 #        print(type(self.frame))
@@ -1483,8 +1479,9 @@ class TormentaGUI(QtGui.QMainWindow):
             pass
 
         pen = pg.mkPen(color=(255, 255, 0), width=0.5,
-                             style=QtCore.Qt.SolidLine, antialias=True)
-        self.alignmentLine = pg.InfiniteLine(pen=pen, angle=angle, movable=True)
+                       style=QtCore.Qt.SolidLine, antialias=True)
+        self.alignmentLine = pg.InfiniteLine(pen=pen, angle=angle,
+                                             movable=True)
         self.alignmentON = True
 
     def resolftRec(self):
@@ -1511,19 +1508,14 @@ class TormentaGUI(QtGui.QMainWindow):
 
         # Stop running threads
         self.viewtimer.stop()
-#        self.stabilizer.timer.stop()
-#        self.stabilizerThread.terminate()
         try:
             self.lvthread.terminate()
         except:
             pass
 
         # Turn off camera, close shutter and flipper
-#        if self.andor.status != 'Camera is idle, waiting for instructions.':
-#            self.andor.abort_acquisition()
-#        self.andor.shutter(0, 2, 0, 0, 0)
         self.orcaflash.shutdown()
-        self.daq.flipper = True
+        self.nidaq.reset()
 #        if self.signalWidget.running:
 #            self.signalWidget.StartStop()
 
@@ -1531,8 +1523,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.laserWidgets.closeEvent(*args, **kwargs)
         self.ZalignWidget.closeEvent(*args, **kwargs)
         self.RotalignWidget.closeEvent(*args, **kwargs)
-#        self.scanWidget.closeEvent(*args, **kwargs)
-#        self.focusWidget.closeEvent(*args, **kwargs)
+        self.scanWidget.closeEvent(*args, **kwargs)
 #        self.signalWidget.closeEvent(*args, **kwargs)
 
         super().closeEvent(*args, **kwargs)
