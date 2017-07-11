@@ -6,7 +6,6 @@ Created on Sun Dec 28 13:25:27 2014
 """
 
 import importlib
-
 import control.mockers as mockers
 
 
