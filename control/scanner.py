@@ -5,10 +5,6 @@ Created on Wed Mar 30 10:32:36 2016
 @author: testaRES
 """
 
-# try:
-#    import libnidaqmx
-# except BaseException:
-#    from control import libnidaqmx
 import nidaqmx
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,7 +18,7 @@ import control.guitools as guitools
 
 class ScanWidget(QtGui.QMainWindow):
     ''' This class is intended as a widget in the bigger GUI, Thus all the
-    commented parameters etc. It contain an instance of stage_scan and
+    commented parameters etc. It contain an instance of stageScan and
     pixel_scan which in turn harbour the analog and digital signals
     respectively.
     The function run is the function that is supposed to start communication
@@ -35,8 +31,6 @@ class ScanWidget(QtGui.QMainWindow):
     def __init__(self, device, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.nidaq = device
-        self.aochannels = [ch.name for ch in device.ao_physical_chans]
-        self.dochannels = [line.name for line in device.do_lines]
         self.all_devices = ['405', '473', '488', 'CAM']
         self.saved_signal = np.array([0, 0])
         self.times_run = 0
@@ -61,17 +55,15 @@ class ScanWidget(QtGui.QMainWindow):
         self.step_sizePar = QtGui.QLineEdit('0.5')
         self.step_sizePar.editingFinished.connect(
             lambda: self.ScanParameterChanged('step_size'))
-        self.sample_rate = 100000
-#        self.sample_rate = np.float(self.sampleRateEdit.text())
+        self.sampleRate = 100000
+#        self.sampleRate = np.float(self.sampleRateEdit.text())
 
-        self.Scan_Mode_label = QtGui.QLabel('Scan mode:')
         self.Scan_Mode = QtGui.QComboBox()
         self.scan_modes = ['FOV scan', 'Line scan']
         self.Scan_Mode.addItems(self.scan_modes)
         self.Scan_Mode.currentIndexChanged.connect(
             lambda: self.setScanMode(self.Scan_Mode.currentText()))
 
-        self.prim_scan_dim_label = QtGui.QLabel('Primary scan dim:')
         self.prim_scan_dim = QtGui.QComboBox()
         self.scan_dims = ['x', 'y']
         self.prim_scan_dim.addItems(self.scan_dims)
@@ -84,15 +76,10 @@ class ScanWidget(QtGui.QMainWindow):
                                 'step_size': self.step_sizePar}
 
         self.scan_par_values = {
-            'width': float(
-                self.widthPar.text()),
-            'height': float(
-                self.heightPar.text()),
-            'sequence_time': float(
-                self.sequence_timePar.text()) /
-            1000,
-            'step_size': float(
-                self.step_sizePar.text())}
+            'width': float(self.widthPar.text()),
+            'height': float(self.heightPar.text()),
+            'sequence_time': float(self.sequence_timePar.text()) / 1000,
+            'step_size': float(self.step_sizePar.text())}
 
         self.start473Par = QtGui.QLineEdit('0')
         self.start473Par.editingFinished.connect(
@@ -130,28 +117,20 @@ class ScanWidget(QtGui.QMainWindow):
                                  'endCAM': self.endCAMPar}
 
         self.pixel_par_values = {
-            'start405': float(
-                self.start488Par.text()) / 1000,
-            'start473': float(
-                self.start405Par.text()) / 1000,
-            'start488': float(
-                self.start473Par.text()) / 1000,
-            'startCAM': float(
-                self.startCAMPar.text()) / 1000,
-            'end405': float(
-                self.end473Par.text()) / 1000,
-            'end473': float(
-                self.end405Par.text()) / 1000,
-            'end488': float(
-                self.end488Par.text()) / 1000,
-            'endCAM': float(
-                self.endCAMPar.text()) / 1000}
+            'start405': float(self.start488Par.text()) / 1000,
+            'start473': float(self.start405Par.text()) / 1000,
+            'start488': float(self.start473Par.text()) / 1000,
+            'startCAM': float(self.startCAMPar.text()) / 1000,
+            'end405': float(self.end473Par.text()) / 1000,
+            'end473': float(self.end405Par.text()) / 1000,
+            'end488': float(self.end488Par.text()) / 1000,
+            'endCAM': float(self.endCAMPar.text()) / 1000}
 
         self.current_dochannels = {'405': 0, '473': 2, '488': 3, 'CAM': 4}
         self.current_aochannels = {'x': 0, 'y': 1}
 
-        self.stage_scan = StageScan(self.sample_rate)
-        self.pixel_cycle = PixelCycle(self.sample_rate)
+        self.stageScan = StageScan(self.sampleRate)
+        self.pixel_cycle = PixelCycle(self.sampleRate)
         self.graph = GraphFrame(self.pixel_cycle)
         self.update_Scan(self.all_devices)
 
@@ -194,9 +173,9 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(self.start405Par, 7, 1)
         grid.addWidget(self.end405Par, 7, 2)
         grid.addWidget(self.scanRadio, 7, 4, 2, 1)
-        grid.addWidget(self.Scan_Mode_label, 6, 5)
+        grid.addWidget(QtGui.QLabel('Scan mode:'), 6, 5)
         grid.addWidget(self.Scan_Mode, 7, 5)
-        grid.addWidget(self.prim_scan_dim_label, 8, 5)
+        grid.addWidget(QtGui.QLabel('Primary scan dim:'), 8, 5)
         grid.addWidget(self.prim_scan_dim, 9, 5)
         grid.addWidget(QtGui.QLabel('473:'), 8, 0)
         grid.addWidget(self.start473Par, 8, 1)
@@ -236,11 +215,11 @@ class ScanWidget(QtGui.QMainWindow):
         self.scanOrNot = value
 
     def setScanMode(self, mode):
-        self.stage_scan.set_scan_mode(mode)
+        self.stageScan.set_scan_mode(mode)
         self.ScanParameterChanged('scan_mode')
 
     def setPrimScanDim(self, dim):
-        self.stage_scan.set_prim_scan_dim(dim)
+        self.stageScan.set_prim_scan_dim(dim)
         self.ScanParameterChanged('prim_scan_dim')
 
     def ScanParameterChanged(self, parameter):
@@ -256,9 +235,9 @@ class ScanWidget(QtGui.QMainWindow):
         if parameter == 'sequence_time':
             self.update_Scan(self.all_devices)
             self.graph.update(self.all_devices)
-        self.stage_scan.update_frames(self.scan_par_values)
-        self.nrFramesPar.setText(str(self.stage_scan.frames))
-        self.scanDuration.setText(str((1 / 1000) * self.stage_scan.frames *
+        self.stageScan.update_frames(self.scan_par_values)
+        self.nrFramesPar.setText(str(self.stageScan.frames))
+        self.scanDuration.setText(str((1 / 1000) * self.stageScan.frames *
                                   float(self.sequence_timePar.text())))
 
     def PixelParameterChanged(self, parameter):
@@ -268,14 +247,14 @@ class ScanWidget(QtGui.QMainWindow):
         self.pixel_cycle.update(
             [device],
             self.pixel_par_values,
-            self.stage_scan.sequence_samples)
+            self.stageScan.sequence_samples)
         self.graph.update([device])
 
     def PreviewScan(self):
 
-        self.stage_scan.update(self.scan_par_values)
-        x_sig = self.stage_scan.sig_dict['x_sig']
-        y_sig = self.stage_scan.sig_dict['y_sig']
+        self.stageScan.update(self.scan_par_values)
+        x_sig = self.stageScan.sig_dict['x_sig']
+        y_sig = self.stageScan.sig_dict['y_sig']
         plt.plot(x_sig, y_sig)
         plt.axis([-0.2, self.scan_par_values['width'] + 0.2, -
                   0.2, self.scan_par_values['height'] + 0.2])
@@ -291,23 +270,23 @@ class ScanWidget(QtGui.QMainWindow):
     def PrepAndRun(self):
 
         if self.scanRadio.isChecked():
-            self.stage_scan.update(self.scan_par_values)
+            self.stageScan.update(self.scan_par_values)
             self.ScanButton.setText('Abort')
-            self.scanner = Scanner(
-                self.nidaq,
-                self.stage_scan,
-                self.pixel_cycle,
-                self.current_aochannels,
-                self.current_dochannels,
-                self)
+            self.scanner = Scanner(self.nidaq,
+                                   self.stageScan,
+                                   self.pixel_cycle,
+                                   self.current_aochannels,
+                                   self.current_dochannels,
+                                   self)
             self.scanner.finalizeDone.connect(self.FinalizeDone)
             self.scanner.scanDone.connect(self.ScanDone)
             self.scanning = True
             self.scanner.runScan()
 
         elif self.ScanButton.isChecked():
-            self.lasercycle = LaserCycle(
-                self.nidaq, self.pixel_cycle, self.current_dochannels)
+            self.lasercycle = LaserCycle(self.nidaq,
+                                         self.pixel_cycle,
+                                         self.current_dochannels)
             self.ScanButton.setText('Stop')
             self.lasercycle.run()
 
@@ -328,11 +307,10 @@ class ScanWidget(QtGui.QMainWindow):
         self.scanning = False
 
     def update_Scan(self, devices):
-        self.stage_scan.update(self.scan_par_values)
-        self.pixel_cycle.update(
-            devices,
-            self.pixel_par_values,
-            self.stage_scan.sequence_samples)
+        self.stageScan.update(self.scan_par_values)
+        self.pixel_cycle.update(devices,
+                                self.pixel_par_values,
+                                self.stageScan.sequence_samples)
 
     def closeEvent(self, *args, **kwargs):
         try:
@@ -362,21 +340,22 @@ class Wait_Thread(QtCore.QThread):
 
 
 class Scanner(QtCore.QObject):
+
     scanDone = QtCore.pyqtSignal()
     finalizeDone = QtCore.pyqtSignal()
 
-    def __init__(self, device, stage_scan, pixel_cycle, current_aochannels,
+    def __init__(self, device, stageScan, pixel_cycle, current_aochannels,
                  current_dochannels, main, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.nidaq = device
-        self.stage_scan = stage_scan
+        self.stageScan = stageScan
         self.pixel_cycle = pixel_cycle
         # Dict containing channel numbers to be written to for each signal
         self.current_aochannels = current_aochannels
         # Dict containing channel numbers to be written to for each device
         self.current_dochannels = current_dochannels
-        self.samples_in_scan = len(self.stage_scan.sig_dict['x_sig'])
+        self.samples_in_scan = len(self.stageScan.sig_dict['x_sig'])
         self.main = main
 
 #        self.aotask = libnidaqmx.AnalogOutputTask('aotask')
@@ -390,8 +369,8 @@ class Scanner(QtCore.QObject):
         self.scanTimeWar = QtGui.QMessageBox()
         self.scanTimeWar.setInformativeText(
             "Are you sure you want to continue?")
-        self.scanTimeWar.setStandardButtons(
-            QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
+        self.scanTimeWar.setStandardButtons(QtGui.QMessageBox.Yes |
+                                            QtGui.QMessageBox.No)
 
     def finalize(self):
         print('in finalize')
@@ -400,35 +379,34 @@ class Scanner(QtCore.QObject):
         # waiting finishes.
         self.waiter.waitdoneSignal.disconnect(self.finalize)
         self.waiter.waitdoneSignal.connect(self.done)
-        written_samps = self.aotask.get_samples_per_channel_generated()
-        final_x = self.stage_scan.sig_dict['x_sig'][written_samps - 1]
-        final_y = self.stage_scan.sig_dict['y_sig'][written_samps - 1]
-        final_samps = [final_x, final_y]
+#        writtenSamps = self.aotask.get_samples_per_channel_generated()
+        writtenSamps = self.aotask.out_stream.curr_write_pos  # TODO: Test
+        final_x = self.stageScan.sig_dict['x_sig'][writtenSamps - 1]
+        final_y = self.stageScan.sig_dict['y_sig'][writtenSamps - 1]
+        finalSamps = [final_x, final_y]
 
-#        Following code should correct channels mentioned in Buglist.
-        final_samps = [0, 0]
-        final_samps[self.current_aochannels['x']] = final_x
-        final_samps[self.current_aochannels['y']] = final_y
+        # Following code should correct channels mentioned in Buglist.
+        finalSamps = [0, 0]
+        finalSamps[self.current_aochannels['x']] = final_x
+        finalSamps[self.current_aochannels['y']] = final_y
 
         return_ramps = np.array([])
         for i in range(0, 2):
-            ramp_and_k = make_ramp(
-                final_samps[i], 0, self.stage_scan.sample_rate)
-            return_ramps = np.append(return_ramps, ramp_and_k[0])
+            rampAndK = makeRamp(finalSamps[i], 0, self.stageScan.sampleRate)
+            return_ramps = np.append(return_ramps, rampAndK[0])
 
         # Seems to decrease frequency of Invalid task errors.
         # magic = np.ones(100)
         print('aotask is: ', self.aotask)
         self.aotask.stop()
         self.aotask.configure_timing_sample_clock(
-            rate=self.stage_scan.sample_rate,
+            rate=self.stageScan.sampleRate,
             sample_mode='finite',
-            samples_per_channel=self.stage_scan.sample_rate)
+            samples_per_channel=self.stageScan.sampleRate)
 
-        self.aotask.write(
-            return_ramps,
-            layout='group_by_channel',
-            auto_start=False)
+        self.aotask.write(return_ramps,
+                          layout='group_by_channel',
+                          auto_start=False)
         self.aotask.start()
 
         self.waiter.start()
@@ -441,7 +419,7 @@ class Scanner(QtCore.QObject):
         self.finalizeDone.emit()
 
     def runScan(self):
-        scan_time = self.samples_in_scan / self.main.sample_rate
+        scan_time = self.samples_in_scan / self.main.sampleRate
         ret = QtGui.QMessageBox.Yes
         self.scanTimeWar.setText("Scan will take %s seconds" % scan_time)
         if scan_time > self.warningTime:
@@ -466,15 +444,14 @@ class Scanner(QtCore.QObject):
                 phys_channel=chanstring, channel_name='chan%s' %
                 dim, min_val=min_ao, max_val=max_ao)
             temp_aochannels.pop(dim)
-            signal = self.stage_scan.sig_dict[dim + '_sig']
+            signal = self.stageScan.sig_dict[dim + '_sig']
             if i == 1 and len(full_ao_signal) != len(signal):
                 tx = 'Length of signals are not equal (printed from RunScan()'
                 print(tx)
             full_ao_signal = np.append(full_ao_signal, signal)
-#            final_samps = np.append(final_samps, signal[-1])
+#            finalSamps = np.append(finalSamps, signal[-1])
 
         # Same as above but for the digital signals/devices
-
         full_do_signal = []
         temp_dochannels = copy.copy(self.current_dochannels)
         for i in range(0, len(temp_dochannels)):
@@ -489,13 +466,13 @@ class Scanner(QtCore.QObject):
             full_do_signal = np.append(full_do_signal, signal)
 
         self.aotask.configure_timing_sample_clock(
-            rate=self.stage_scan.sample_rate,
+            rate=self.stageScan.sampleRate,
             sample_mode='finite',
             samples_per_channel=self.samples_in_scan)
 
         self.dotask.configure_timing_sample_clock(
             source=r'ao/SampleClock',
-            rate=self.pixel_cycle.sample_rate,
+            rate=self.pixel_cycle.sampleRate,
             sample_mode='finite',
             samples_per_channel=self.samples_in_scan)
 
@@ -504,22 +481,20 @@ class Scanner(QtCore.QObject):
 
 #        return_ramps = np.array([])
 #        for i in range(0,2):
-#            ramp_and_k = make_ramp(final_samps[i], 0,
-#                                   self.stage_scan.sample_rate)
-#            return_ramps = np.append(return_ramps, ramp_and_k[0])
+#            rampAndK = makeRamp(finalSamps[i], 0,
+#                                   self.stageScan.sampleRate)
+#            return_ramps = np.append(return_ramps, rampAndK[0])
 #
 #        print(np.ones(1)) # This line alone fixes the problem...
 
         self.waiter.waitdoneSignal.connect(self.finalize)
 
-        self.dotask.write(
-            full_do_signal,
-            layout='group_by_channel',
-            auto_start=False)
-        self.aotask.write(
-            full_ao_signal,
-            layout='group_by_channel',
-            auto_start=False)
+        self.dotask.write(full_do_signal,
+                          layout='group_by_channel',
+                          auto_start=False)
+        self.aotask.write(full_ao_signal,
+                          layout='group_by_channel',
+                          auto_start=False)
 
         self.dotask.start()
         self.aotask.start()
@@ -529,9 +504,9 @@ class Scanner(QtCore.QObject):
 #        self.aotask.wait_until_done()
 #        self.aotask.stop()
 #
-#        self.aotask.configure_timing_sample_clock(rate=self.stage_scan.sample_rate,
+#        self.aotask.configure_timing_sample_clock(rate=self.stageScan.sampleRate,
 #                                                  sample_mode='finite',
-#                                                  samples_per_channel=self.stage_scan.sample_rate)
+#                                                  samples_per_channel=self.stageScan.sampleRate)
 #
 #
 #
@@ -578,12 +553,12 @@ class LaserCycle():
 
         self.dotask.configure_timing_sample_clock(
             source=r'100kHzTimeBase',
-            rate=self.pixel_cycle.sample_rate,
+            rate=self.pixel_cycle.sampleRate,
             sample_mode='continuous')
-        self.dotask.write(
-            full_do_signal,
-            layout='group_by_channel',
-            auto_start=False)
+
+        self.dotask.write(full_do_signal,
+                          layout='group_by_channel',
+                          auto_start=False)
 
         self.dotask.start()
 
@@ -597,14 +572,14 @@ class LaserCycle():
 class StageScan():
     '''Contains the analog signals in sig_dict. The update function takes the
     parameter_values and updates the signals accordingly.'''
-    def __init__(self, sample_rate):
+    def __init__(self, sampleRate):
         self.scan_mode = 'FOV scan'
         self.prim_scan_dim = 'x'
         self.sig_dict = {'x_sig': [], 'y_sig': []}
-        self.sample_rate = sample_rate
+        self.sampleRate = sampleRate
         self.sequence_samples = None
-        self.FOV_scan = FOV_Scan(self.sample_rate)
-        self.line_scan = Line_scan(self.sample_rate)
+        self.FOV_scan = FOV_Scan(self.sampleRate)
+        self.line_scan = Line_scan(self.sampleRate)
         self.scans = {'FOV scan': self.FOV_scan, 'Line scan': self.line_scan}
         self.frames = 0
 
@@ -619,7 +594,7 @@ class StageScan():
         self.frames = self.scans[self.scan_mode].frames
 
     def update(self, par_values):
-        print('in update stage_scan')
+        print('in update stageScan')
         print('self.scan_mode = ', self.scan_mode)
         self.scans[self.scan_mode].update(par_values, self.prim_scan_dim)
         self.sig_dict = self.scans[self.scan_mode].sig_dict
@@ -629,9 +604,9 @@ class StageScan():
 
 class Line_scan():
 
-    def __init__(self, sample_rate):
+    def __init__(self, sampleRate):
         self.sig_dict = {'x_sig': [], 'y_sig': []}
-        self.sample_rate = sample_rate
+        self.sampleRate = sampleRate
         self.corr_step_size = None
         self.sequence_samples = None
         self.frames = 0
@@ -650,7 +625,7 @@ class Line_scan():
 #        start_x = 0
         size_y = par_values['height'] / 2
         sequence_samples = np.round(
-            self.sample_rate *
+            self.sampleRate *
             par_values['sequence_time'])
         step_size = par_values['step_size'] / 2
         self.steps_y = int(np.ceil(size_y / step_size))
@@ -658,9 +633,9 @@ class Line_scan():
         self.corr_step_size = size_y / self.steps_y
         self.sequence_samples = int(sequence_samples)
         column_samples = self.steps_y * self.sequence_samples
-        # ramp_and_k contains [ramp, k]
-        ramp_and_k = make_ramp(start_y, size_y, column_samples)
-        ramp = ramp_and_k[0]
+        # rampAndK contains [ramp, k]
+        rampAndK = makeRamp(start_y, size_y, column_samples)
+        ramp = rampAndK[0]
 
         self.sig_dict[prim_scan_dim + '_sig'] = 1.14 * ramp
         self.sig_dict[chr(121 - (ord(prim_scan_dim) % 2)) +
@@ -669,9 +644,9 @@ class Line_scan():
 
 class FOV_Scan():
 
-    def __init__(self, sample_rate):
+    def __init__(self, sampleRate):
         self.sig_dict = {'x_sig': [], 'y_sig': []}
-        self.sample_rate = sample_rate
+        self.sampleRate = sampleRate
         self.corr_step_size = None
         self.sequence_samples = None
         self.frames = 0
@@ -702,7 +677,7 @@ class FOV_Scan():
         # WARNING: Correct for units of the time, now seconds!!!!
         self.sequence_samples = int(
             np.round(
-                self.sample_rate *
+                self.sampleRate *
                 par_values['sequence_time']))
         self.steps_x = int(np.ceil(size_x / step_size))
         self.steps_y = int(np.ceil(size_y / step_size))
@@ -710,13 +685,13 @@ class FOV_Scan():
         self.corr_step_size = size_x / self.steps_x
         row_samples = self.steps_x * self.sequence_samples
 
-        # ramp_and_k contains [ramp, k]
-        ramp_and_k = make_ramp(start_x, size_x, row_samples)
-        k = ramp_and_k[1]
-        ltr_ramp = ramp_and_k[0]
+        # rampAndK contains [ramp, k]
+        rampAndK = makeRamp(start_x, size_x, row_samples)
+        k = rampAndK[1]
+        ltr_ramp = rampAndK[0]
         # rtl_ramp contains only ramp, no k since same k = -k
         rtl_ramp = ltr_ramp[::-1]
-        gradual_k = make_ramp(k, -k, self.sequence_samples)
+        gradual_k = makeRamp(k, -k, self.sequence_samples)
         turn_rtl = np.cumsum(gradual_k[0])
         turn_ltr = -turn_rtl
         max_turn = np.max(turn_rtl)
@@ -768,19 +743,19 @@ class PixelCycle():
     ''' Contains the digital signals for the pixel cycle. The update function
     takes a parameter_values dict and updates the signal accordingly.'''
 
-    def __init__(self, sample_rate):
+    def __init__(self, sampleRate):
         self.sig_dict = {'405sig': [], '473sig': [], '488sig': [],
                          'CAMsig': []}
-        self.sample_rate = sample_rate
+        self.sampleRate = sampleRate
 
     def update(self, devices, par_values, cycle_samples):
         for device in devices:
             signal = np.zeros(cycle_samples)
             start_name = 'start' + device
             end_name = 'end' + device
-            start_pos = par_values[start_name] * self.sample_rate
+            start_pos = par_values[start_name] * self.sampleRate
             start_pos = int(min(start_pos, cycle_samples - 1))
-            end_pos = par_values[end_name] * self.sample_rate
+            end_pos = par_values[end_name] * self.sampleRate
             end_pos = int(min(end_pos, cycle_samples))
             signal[range(start_pos, end_pos)] = 1
             self.sig_dict[device + 'sig'] = signal
@@ -813,13 +788,13 @@ class GraphFrame(pg.GraphicsWindow):
             self.plot_sig_dict[device].setData(signal)
 
 
-def make_ramp(start, end, samples):
+def makeRamp(start, end, samples):
 
-    ramp = []
     k = (end - start) / (samples - 1)
-    for i in range(0, samples):
-        ramp.append(start + k * i)
-
+    ramp = [start + k * i for i in range(0, samples)]
+#    ramp = []
+#    for i in range(0, samples):
+#        ramp.append(start + k * i)
     return np.array([np.asarray(ramp), k])
 
 
@@ -857,9 +832,3 @@ def distance_to_voltage_X(D_signal):
     elapsed = time.time() - now
     print('Elapsed time: ', elapsed)
     return V_signal
-
-
-if __name__ == '__main__':
-    system = nidaqmx.system.System.local()
-    ScanWid = ScanWidget(system.devices['Dev1'])
-#    ScanWid.update_Scan()

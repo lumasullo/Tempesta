@@ -6,7 +6,7 @@ Created on Thu Mar 31 11:54:52 2016
 """
 
 from pyqtgraph.Qt import QtGui
-from scanner_only import Scan_self_GUI
+from control import scanner
 import nidaqmx
 
 
@@ -15,7 +15,7 @@ def main():
     app = QtGui.QApplication([])
 
     system = nidaqmx.system.System.local()
-    win = Scan_self_GUI.ScanWidget(system.devices['Dev1'])
+    win = scanner.ScanWidget(system.devices['Dev1'])
     win.show()
 
     app.exec_()
