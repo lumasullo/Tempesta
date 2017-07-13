@@ -6,6 +6,7 @@ Created on Thu Mar 31 11:54:52 2016
 """
 
 from pyqtgraph.Qt import QtGui
+from control import scanner_aurelien
 from control import scanner
 import nidaqmx
 
@@ -15,7 +16,10 @@ def main():
     app = QtGui.QApplication([])
 
     system = nidaqmx.system.System.local()
-    win = scanner.ScanWidget(system.devices['Dev1'])
+    widget = scanner_aurelien.ScanWidget(system.devices['Dev1'], None)
+#    widget = scanner.ScanWidget(system.devices['Dev1'], None)
+    win = QtGui.QMainWindow()
+    win.setCentralWidget(widget)
     win.show()
 
     app.exec_()

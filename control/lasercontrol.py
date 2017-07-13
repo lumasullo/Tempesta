@@ -5,17 +5,9 @@ Created on Tue Aug 12 11:51:21 2014
 @author: Federico Barabas
 """
 
-from PyQt4 import QtGui, QtCore
-from lantz import Q_
-# from control import libnidaqmx
 import numpy as np
-
-
-def mWtomV(x):
-    # p are the coefficients from Ti:Sa calibration at 25/08/2016
-    p = [0.0000000038094, -0.00000444662, 0.0019, -0.36947, 42.6684, 196]
-    y = np.polyval(p, x)
-    return y
+from pyqtgraph.Qt import QtCore, QtGui
+from lantz import Q_
 
 
 class UpdatePowers(QtCore.QObject):
