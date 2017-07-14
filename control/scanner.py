@@ -43,18 +43,18 @@ class ScanWidget(QtGui.QFrame):
 
         self.widthPar = QtGui.QLineEdit('10')
         self.widthPar.editingFinished.connect(
-            lambda: self.ScanParameterChanged('width'))
+            lambda: self.scanParameterChanged('width'))
         self.heightPar = QtGui.QLineEdit('10')
         self.heightPar.editingFinished.connect(
-            lambda: self.ScanParameterChanged('height'))
+            lambda: self.scanParameterChanged('height'))
         self.seqTimePar = QtGui.QLineEdit('100')  # Milliseconds
         self.seqTimePar.editingFinished.connect(
-            lambda: self.ScanParameterChanged('sequence_time'))
+            lambda: self.scanParameterChanged('sequence_time'))
         self.nrFramesPar = QtGui.QLabel()
         self.scanDuration = QtGui.QLabel()
         self.step_sizePar = QtGui.QLineEdit('0.5')
         self.step_sizePar.editingFinished.connect(
-            lambda: self.ScanParameterChanged('step_size'))
+            lambda: self.scanParameterChanged('step_size'))
         self.sampleRate = 100000
 #        self.sampleRate = np.float(self.sampleRateEdit.text())
 
@@ -83,29 +83,29 @@ class ScanWidget(QtGui.QFrame):
 
         self.start473Par = QtGui.QLineEdit('0')
         self.start473Par.editingFinished.connect(
-            lambda: self.PixelParameterChanged('start473'))
+            lambda: self.pxParameterChanged('start473'))
         self.start405Par = QtGui.QLineEdit('0')
         self.start405Par.editingFinished.connect(
-            lambda: self.PixelParameterChanged('start405'))
+            lambda: self.pxParameterChanged('start405'))
         self.start488Par = QtGui.QLineEdit('0')
         self.start488Par.editingFinished.connect(
-            lambda: self.PixelParameterChanged('start488'))
+            lambda: self.pxParameterChanged('start488'))
         self.startCAMPar = QtGui.QLineEdit('0')
         self.startCAMPar.editingFinished.connect(
-            lambda: self.PixelParameterChanged('startCAM'))
+            lambda: self.pxParameterChanged('startCAM'))
 
         self.end473Par = QtGui.QLineEdit('0')
         self.end473Par.editingFinished.connect(
-            lambda: self.PixelParameterChanged('end473'))
+            lambda: self.pxParameterChanged('end473'))
         self.end405Par = QtGui.QLineEdit('0')
         self.end405Par.editingFinished.connect(
-            lambda: self.PixelParameterChanged('end405'))
+            lambda: self.pxParameterChanged('end405'))
         self.end488Par = QtGui.QLineEdit('0')
         self.end488Par.editingFinished.connect(
-            lambda: self.PixelParameterChanged('end488'))
+            lambda: self.pxParameterChanged('end488'))
         self.endCAMPar = QtGui.QLineEdit('0')
         self.endCAMPar.editingFinished.connect(
-            lambda: self.PixelParameterChanged('endCAM'))
+            lambda: self.pxParameterChanged('endCAM'))
 
         self.pxParameters = {'start405': self.start405Par,
                              'start473': self.start473Par,
@@ -132,7 +132,7 @@ class ScanWidget(QtGui.QFrame):
         self.stageScan = StageScan(self.sampleRate)
         self.pxCycle = PixelCycle(self.sampleRate)
         self.graph = GraphFrame(self.pxCycle)
-        self.update_Scan(self.all_devices)
+        self.updateScan(self.all_devices)
 
         self.scanRadio = QtGui.QRadioButton('Scan')
         self.scanRadio.clicked.connect(lambda: self.setScanOrNot(True))
@@ -143,9 +143,9 @@ class ScanWidget(QtGui.QFrame):
 
         self.ScanButton = QtGui.QPushButton('Scan')
         self.scanning = False
-        self.ScanButton.clicked.connect(self.ScanOrAbort)
+        self.ScanButton.clicked.connect(self.scanOrAbort)
         self.PreviewButton = QtGui.QPushButton('Preview')
-        self.PreviewButton.clicked.connect(self.PreviewScan)
+        self.PreviewButton.clicked.connect(self.previewScan)
 
         grid = QtGui.QGridLayout()
         self.setLayout(grid)
@@ -195,10 +195,10 @@ class ScanWidget(QtGui.QFrame):
 
     @scanOrNot.setter
     def scanOrNot(self, value):
-        self.EnableScanPars(value)
+        self.enableScanParameters(value)
         self.ScanButton.setCheckable(not value)
 
-    def EnableScanPars(self, value):
+    def enableScanParameters(self, value):
         self.widthPar.setEnabled(value)
         self.heightPar.setEnabled(value)
         self.step_sizePar.setEnabled(value)
@@ -213,36 +213,36 @@ class ScanWidget(QtGui.QFrame):
         self.scanOrNot = value
 
     def setScanMode(self, mode):
-        self.stageScan.set_scan_mode(mode)
-        self.ScanParameterChanged('scan_mode')
+        self.stageScan.setScanMode(mode)
+        self.scanParameterChanged('scan_mode')
 
     def setPrimScanDim(self, dim):
-        self.stageScan.set_prim_scan_dim(dim)
-        self.ScanParameterChanged('prim_scan_dim')
+        self.stageScan.setPrimScanDim(dim)
+        self.scanParameterChanged('prim_scan_dim')
 
-    def ScanParameterChanged(self, par):
-        if par not in ('scan_mode', 'prim_scan_dim'):
-            if par == 'sequence_time':
+    def scanParameterChanged(self, p):
+        if p not in ('scan_mode', 'prim_scan_dim'):
+            if p == 'sequence_time':
                 # To get in seconds
-                self.scanParValues[par] = float(self.scan_pars[par].text()) / 1000
+                self.scanParValues[p] = float(self.scanParameters[p].text())
+                self.scanParValues[p] *= 0.001
+                self.updateScan(self.all_devices)
+                self.graph.update(self.all_devices)
             else:
-                self.scanParValues[par] = float(self.scan_pars[par].text())
+                self.scanParValues[p] = float(self.scanParameters[p].text())
 
-        if par == 'sequence_time':
-            self.update_Scan(self.all_devices)
-            self.graph.update(self.all_devices)
-        self.stageScan.update_frames(self.scanParValues)
+        self.stageScan.updateFrames(self.scanParValues)
         self.nrFramesPar.setText(str(self.stageScan.frames))
         self.scanDuration.setText(str((1 / 1000) * self.stageScan.frames *
                                   float(self.seqTimePar.text())))
 
-    def PixelParameterChanged(self, par):
+    def pxParameterChanged(self, par):
         self.pxParValues[par] = float(self.pxParameters[par].text()) / 1000
         dev = [par[-3] + par[-2] + par[-1]]
-        self.pxCycle.update(dev, self.pxParValues, self.stageScan.seqSamples)
+        self.pxCycle.update(dev, self.pxParValues, self.stageScan.seqSamps)
         self.graph.update(dev)
 
-    def PreviewScan(self):
+    def previewScan(self):
         self.stageScan.update(self.scanParValues)
         x_sig = self.stageScan.sig_dict['x_sig']
         y_sig = self.stageScan.sig_dict['y_sig']
@@ -250,16 +250,15 @@ class ScanWidget(QtGui.QFrame):
         plt.axis([-0.2, self.scanParValues['width'] + 0.2, -
                   0.2, self.scanParValues['height'] + 0.2])
 
-    def ScanOrAbort(self):
+    def scanOrAbort(self):
         if not self.scanning:
-            self.PrepAndRun()
+            self.prepAndRun()
         else:
             self.scanner.abort()
 
-    # PrepAndRun is only called if scanner is not running (See ScanOrAbort
-    # funciton)
-    def PrepAndRun(self):
-
+    def prepAndRun(self):
+        """Prepares Tempesta for scanning then starts the scan.
+        Only called if scanner is not running (See scanOrAbort function)"""
         if self.scanRadio.isChecked():
             self.stageScan.update(self.scanParValues)
             self.ScanButton.setText('Abort')
@@ -269,8 +268,8 @@ class ScanWidget(QtGui.QFrame):
                                    self.currAOchan,
                                    self.currDOchan,
                                    self)
-            self.scanner.finalizeDone.connect(self.FinalizeDone)
-            self.scanner.scanDone.connect(self.ScanDone)
+            self.scanner.finalizeDone.connect(self.finalizeDone)
+            self.scanner.scanDone.connect(self.scanDone)
             self.scanning = True
             self.scanner.runScan()
 
@@ -285,22 +284,22 @@ class ScanWidget(QtGui.QFrame):
             self.ScanButton.setText('Run')
             del self.lasercycle
 
-    def ScanDone(self):
-        print('in ScanDone()')
+    def scanDone(self):
+        print('in scanDone()')
         self.ScanButton.setEnabled(False)
 
-    def FinalizeDone(self):
+    def finalizeDone(self):
         self.ScanButton.setText('Scan')
         self.ScanButton.setEnabled(True)
         print('Scan Done')
         del self.scanner
         self.scanning = False
 
-    def update_Scan(self, devices):
+    def updateScan(self, devices):
         self.stageScan.update(self.scanParValues)
         self.pxCycle.update(devices,
                             self.pxParValues,
-                            self.stageScan.seqSamples)
+                            self.stageScan.seqSamps)
 
     def closeEvent(self, *args, **kwargs):
         try:
@@ -310,7 +309,7 @@ class ScanWidget(QtGui.QFrame):
 
 
 # This can probably replaced by nidaqmx.task.register_done_event
-class Wait_Thread(QtCore.QThread):
+class WaitThread(QtCore.QThread):
     waitdoneSignal = QtCore.pyqtSignal()
 
     def __init__(self, task):
@@ -351,7 +350,7 @@ class Scanner(QtCore.QObject):
         self.aotask = nidaqmx.Task('aotask')
         self.dotask = nidaqmx.Task('dotask')
 
-        self.waiter = Wait_Thread(self.aotask)
+        self.waiter = WaitThread(self.aotask)
 
         self.warningTime = 10
         self.scanTimeWar = QtGui.QMessageBox()
@@ -361,7 +360,7 @@ class Scanner(QtCore.QObject):
                                             QtGui.QMessageBox.No)
 
     def runScan(self):
-        scan_time = self.stageScan.seqSamples / self.main.sampleRate
+        scan_time = self.stageScan.seqSamps / self.main.sampleRate
         ret = QtGui.QMessageBox.Yes
         self.scanTimeWar.setText("Scan will take %s seconds" % scan_time)
         if scan_time > self.warningTime:
@@ -392,7 +391,7 @@ class Scanner(QtCore.QObject):
         self.aotask.timing.cfg_samp_clk_timing(
             rate=self.stageScan.sampleRate,
             sample_mode=nidaqmx.constants.AcquisitionType.FINITE,
-            samps_per_chan=self.stageScan.seqSamples)
+            samps_per_chan=self.stageScan.seqSamps)
 
         # Same as above but for the digital signals/devices
         tmpDOchan = copy.copy(self.currDOchan)
@@ -411,7 +410,7 @@ class Scanner(QtCore.QObject):
             rate=self.pxCycle.sampleRate,
             source=r'ao/SampleClock',
             sample_mode=nidaqmx.constants.AcquisitionType.FINITE,
-            samps_per_chan=self.stageScan.seqSamples)
+            samps_per_chan=self.stageScan.seqSamps)
 
         self.waiter.waitdoneSignal.connect(self.finalize)
 
@@ -520,39 +519,39 @@ class StageScan():
         self.prim_scan_dim = 'x'
         self.sig_dict = {'x_sig': [], 'y_sig': []}
         self.sampleRate = sampleRate
-        self.seqSamples = None
-        self.FOV_scan = FOV_Scan(self.sampleRate)
-        self.line_scan = Line_scan(self.sampleRate)
-        self.scans = {'FOV scan': self.FOV_scan, 'Line scan': self.line_scan}
+        self.seqSamps = None
+        self.FOVScan = FOVScan(self.sampleRate)
+        self.LineScan = LineScan(self.sampleRate)
+        self.scans = {'FOV scan': self.FOVScan, 'Line scan': self.LineScan}
         self.frames = 0
 
-    def set_scan_mode(self, mode):
+    def setScanMode(self, mode):
         self.scan_mode = mode
 
-    def set_prim_scan_dim(self, dim):
+    def setPrimScanDim(self, dim):
         self.prim_scan_dim = dim
 
-    def update_frames(self, par_values):
-        self.scans[self.scan_mode].update_frames(par_values)
+    def updateFrames(self, par_values):
+        self.scans[self.scan_mode].updateFrames(par_values)
         self.frames = self.scans[self.scan_mode].frames
 
     def update(self, par_values):
         self.scans[self.scan_mode].update(par_values, self.prim_scan_dim)
         self.sig_dict = self.scans[self.scan_mode].sig_dict
-        self.seqSamples = self.scans[self.scan_mode].seqSamples
+        self.seqSamps = self.scans[self.scan_mode].seqSamps
         self.frames = self.scans[self.scan_mode].frames
 
 
-class Line_scan():
+class LineScan():
 
     def __init__(self, sampleRate):
         self.sig_dict = {'x_sig': [], 'y_sig': []}
         self.sampleRate = sampleRate
         self.corr_step_size = None
-        self.seqSamples = None
+        self.seqSamps = None
         self.frames = 0
 
-    def update_frames(self, par_values):
+    def updateFrames(self, par_values):
         size_y = par_values['height'] / 2
         step_size = par_values['step_size'] / 2
         steps_y = int(np.ceil(size_y / step_size))
@@ -570,8 +569,8 @@ class Line_scan():
         self.steps_y = int(np.ceil(size_y / step_size))
         # Step size compatible with width
         self.corr_step_size = size_y / self.steps_y
-        self.seqSamples = int(seqSamples)
-        colSamples = self.steps_y * self.seqSamples
+        self.seqSamps = int(seqSamples)
+        colSamples = self.steps_y * self.seqSamps
         # rampAndK contains [ramp, k]
         rampAndK = makeRamp(start_y, size_y, colSamples)
         ramp = rampAndK[0]
@@ -581,13 +580,13 @@ class Line_scan():
                       '_sig'] = np.zeros(len(ramp))
 
 
-class FOV_Scan():
+class FOVScan():
 
     def __init__(self, sampleRate):
         self.sig_dict = {'x_sig': [], 'y_sig': []}
         self.sampleRate = sampleRate
         self.corr_step_size = None
-        self.seqSamples = None
+        self.seqSamps = None
         self.frames = 0
 
     # Update signals according to parameters.
@@ -595,7 +594,7 @@ class FOV_Scan():
     # from expected scan. Maybe either limit input parameters to numbers that
     # "fit each other" or find other solution, eg step size has to be width
     # divided by an integer. Maybe not a problem ???
-    def update_frames(self, par_values):
+    def updateFrames(self, par_values):
         step_size = par_values['step_size'] / 2
         size_x = par_values['width'] / 2
         size_y = par_values['height'] / 2
@@ -613,13 +612,13 @@ class FOV_Scan():
         size_y = par_values['height'] / 2
         step_size = par_values['step_size'] / 2
         # WARNING: Correct for units of the time, now seconds!!!!
-        self.seqSamples = int(np.round(
+        self.seqSamps = int(np.round(
             self.sampleRate * par_values['sequence_time']))
         self.steps_x = int(np.ceil(size_x / step_size))
         self.steps_y = int(np.ceil(size_y / step_size))
         # Step size compatible with width
         self.corr_step_size = size_x / self.steps_x
-        row_samples = self.steps_x * self.seqSamples
+        row_samples = self.steps_x * self.seqSamps
 
         # rampAndK contains [ramp, k]
         rampAndK = makeRamp(start_x, size_x, row_samples)
@@ -627,17 +626,17 @@ class FOV_Scan():
         ltr_ramp = rampAndK[0]
         # rtl_ramp contains only ramp, no k since same k = -k
         rtl_ramp = ltr_ramp[::-1]
-        gradual_k = makeRamp(k, -k, self.seqSamples)
+        gradual_k = makeRamp(k, -k, self.seqSamps)
         turn_rtl = np.cumsum(gradual_k[0])
         turn_ltr = -turn_rtl
         max_turn = np.max(turn_rtl)
-        adjustor = 1 - self.seqSamples % 2
+        adjustor = 1 - self.seqSamps % 2
 
         # Create first and last part by flipping and turnign the turn_rtl array
         first_part = max_turn - \
-            turn_rtl[range(int(np.ceil(self.seqSamples / 2)),
-                           self.seqSamples)]
-        mx = int(np.floor(self.seqSamples / 2) - adjustor + 1)
+            turn_rtl[range(int(np.ceil(self.seqSamps / 2)),
+                           self.seqSamps)]
+        mx = int(np.floor(self.seqSamps / 2) - adjustor + 1)
         last_part = max_turn + turn_rtl[range(0, mx)]
         y_ramp_smooth = np.append(first_part, last_part)
         # adjust scale and offset of ramp
