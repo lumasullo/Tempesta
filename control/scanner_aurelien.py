@@ -156,15 +156,14 @@ class ScanWidget(QtGui.QFrame):
                              'end405': self.end405Par,
                              'endCAM': self.endCAMPar}
 
-        self.pxParValues = {
-            'start405': float(self.start488Par.text()) / 1000,
-            'start473': float(self.start405Par.text()) / 1000,
-            'start488': float(self.start473Par.text()) / 1000,
-            'startCAM': float(self.startCAMPar.text()) / 1000,
-            'end405': float(self.end473Par.text()) / 1000,
-            'end473': float(self.end405Par.text()) / 1000,
-            'end488': float(self.end488Par.text()) / 1000,
-            'endCAM': float(self.endCAMPar.text()) / 1000}
+        self.pxParValues = {'start405': float(self.start488Par.text()) / 1000,
+                            'start473': float(self.start405Par.text()) / 1000,
+                            'start488': float(self.start473Par.text()) / 1000,
+                            'startCAM': float(self.startCAMPar.text()) / 1000,
+                            'end405': float(self.end473Par.text()) / 1000,
+                            'end473': float(self.end405Par.text()) / 1000,
+                            'end488': float(self.end488Par.text()) / 1000,
+                            'endCAM': float(self.endCAMPar.text()) / 1000}
 
         self.currDOchan = {'405': 0, '473': 2, '488': 3, 'CAM': 4}
         self.currAOchan = {'x': 0, 'y': 1, 'z': 2}
@@ -258,8 +257,8 @@ class ScanWidget(QtGui.QFrame):
 #        grid.addWidget(QtGui.QLabel("Detector:"), 8, 4)
 #        grid.addWidget(self.recDevice, 8, 5)
 
-        grid.addWidget(QtGui.QLabel('Start:'), 5, 1)
-        grid.addWidget(QtGui.QLabel('End:'), 5, 2)
+        grid.addWidget(QtGui.QLabel('Start  (ms):'), 5, 1)
+        grid.addWidget(QtGui.QLabel('End  (ms):'), 5, 2)
         grid.addWidget(QtGui.QLabel('405:'), 7, 0)
         grid.addWidget(self.start405Par, 7, 1)
         grid.addWidget(self.end405Par, 7, 2)
@@ -275,9 +274,9 @@ class ScanWidget(QtGui.QFrame):
         grid.addWidget(self.endCAMPar, 10, 2)
         grid.addWidget(self.graph, 11, 0, 1, 6)
 
-        grid.addWidget(self.ScanButton, 12, 3)
-        grid.addWidget(self.PreviewButton, 12, 4)
-        grid.addWidget(self.positionner, 13, 0, 1, 4)
+        grid.addWidget(self.ScanButton, 12, 0, 1, 3)
+        grid.addWidget(self.PreviewButton, 12, 3, 1, 3)
+        grid.addWidget(self.positionner, 13, 0, 1, 6)
 
     @property
     def scanOrNot(self):
@@ -398,14 +397,13 @@ class ScanWidget(QtGui.QFrame):
             self.ScanButton.setText('Abort')
             channels_used = [self.stageScan.ax1, self.stageScan.ax2]
             self.positionner.resetChannels(channels_used)
-            self.scanner = Scanner(
-                self.nidaq,
-                self.stageScan,
-                self.pxCycle,
-                self.currAOchan,
-                self.currDOchan,
-                self.currRecDevice,
-                self)
+            self.scanner = Scanner(self.nidaq,
+                                   self.stageScan,
+                                   self.pxCycle,
+                                   self.currAOchan,
+                                   self.currDOchan,
+                                   self.currRecDevice,
+                                   self)
             self.scanner.finalizeDone.connect(self.finalizeDone)
             self.scanner.scanDone.connect(self.scanDone)
             self.scanning = True
@@ -441,7 +439,7 @@ class ScanWidget(QtGui.QFrame):
         self.stageScan.update(self.scanParValues)
         self.pxCycle.update(devices, self.pxParValues, self.stageScan.seqSamps)
 
-    def sted_scan(self):
+    def stedScan(self):
         """does a stage scan and records data with an APD at the same time to
         record STED images."""
         self.scanRadio.setChecked(True)
@@ -657,7 +655,7 @@ class Scanner(QtCore.QObject):
         self.aotask.write(self.fullAOsignal, auto_start=False)
 
         # Digital signals/devices
-        tmpDOchan = copy.copy(self.current_dochannels)
+        tmpDOchan = copy.copy(self.currDOchan)
         fullDOsignal = np.zeros((len(tmpDOchan), self.pxCycle.cycleSamples),
                                 dtype=bool)
         for i in range(0, len(tmpDOchan)):
@@ -808,17 +806,17 @@ class Scanner(QtCore.QObject):
 
 class LaserCycle():
 
-    def __init__(self, device, pxCycle, curren_dochannels):
+    def __init__(self, device, pxCycle, currDOchan):
 
         self.nidaq = device
         self.pxCycle = pxCycle
-        self.currDOchan = curren_dochannels
+        self.currDOchan = currDOchan
 
     def run(self):
         self.dotask = nidaqmx.Task('dotask')
 
-        tmpDOchan = copy.copy(self.current_dochannels)
-        fullDOsignal = np.zeros((len(tmpDOchan), self.pixelCycle.cycleSamples),
+        tmpDOchan = copy.copy(self.currDOchan)
+        fullDOsignal = np.zeros((len(tmpDOchan), self.pxCycle.cycleSamples),
                                 dtype=bool)
         for i in range(0, len(tmpDOchan)):
             dev = min(tmpDOchan, key=tmpDOchan.get)
@@ -827,7 +825,7 @@ class LaserCycle():
                 lines=chanstring,
                 name_to_assign_to_lines='chan%s' % dev)
             tmpDOchan.pop(dev)
-            fullDOsignal[i] = self.pixelCycle.sigDict[dev + 'sig']
+            fullDOsignal[i] = self.pxCycle.sigDict[dev + 'sig']
 
         self.dotask.timing.cfg_samp_clk_timing(
            source=r'100kHzTimeBase',
@@ -1021,7 +1019,6 @@ class GraphFrame(pg.GraphicsWindow):
                               'CAM': self.plot.plot(pen='w')}
 
     def update(self, devices=None):
-
         if devices is None:
             devices = self.plot_sig_dict
 
@@ -1392,12 +1389,8 @@ class RecThreadAPD(QtCore.QThread):
             apd_data = np.absolute(apd_data[0:length_signal])
             sensor_data = sensor_data[0:length_signal]
 
-            line = lineFromSine(
-                apd_data,
-                sensor_data,
-                self.steps_per_line,
-                amplitude,
-                initial_position)
+            line = lineFromSine(apd_data, sensor_data, self.steps_per_line,
+                                amplitude, initial_position)
             self.emit(QtCore.SIGNAL("line(PyQt_PyObject)"), line)
             if counter < 6:
                 print("counter", counter)
@@ -1496,8 +1489,7 @@ class RecThreadPMT(QtCore.QThread):
         amplitude = float(self.imageDisplay.scanWidget.widthPar.text(
         )) / correction_factors[self.main_axis]
         initial_position = getattr(
-            self.imageDisplay.scanWidget.positionner,
-            self.main_axis)
+            self.imageDisplay.scanWidget.positionner, self.main_axis)
 
         while(counter > 0 and not self.exiting):
             data = self.aitask.read(self.sampsPerLine, timeout=10)
@@ -1521,8 +1513,7 @@ class RecThreadPMT(QtCore.QThread):
 
         if record_sensor_output:
             name = str(round(self.rate / self.sampsPerLine)) + "Hz"
-            np.save(save_folder + "\\" + "sensor_output_x" + name,
-                    sensor_vals)
+            np.save(save_folder + "\\" + "sensor_output_x" + name, sensor_vals)
         self.aitask.stop()
         self.exiting = True
 
@@ -1562,22 +1553,22 @@ class Positionner(QtGui.QWidget):
         # this positionner to access the analog output channels
         self.isActive = True
         self.active_channels = ["x", "y", "z"]
-        # PMT control
-        self.pmt_value_line = QtGui.QLineEdit()
-        self.pmt_slider = QtGui.QSlider(QtCore.Qt.Horizontal)
-        self.pmt_slider.valueChanged.connect(self.changePMTsensitivity)
-        self.pmt_slider.setRange(0, 125)
-        self.pmt_slider.setTickInterval(10)
-        self.pmt_slider.setTickPosition(QtGui.QSlider.TicksBothSides)
-        self.pmt_slider.setValue(self.pmt_sensitivity * 100)
-
-        self.pmt_value_line.setText(str(self.pmt_sensitivity))
-
-        self.pmt_minVal = QtGui.QLabel("0")
-        self.pmt_maxVal = QtGui.QLabel("1.25")
-        self.pmt_sliderLabel = QtGui.QLabel("PMT sensitivity")
-
-        # Creating the analog output tasks
+#        # PMT control
+#        self.pmt_value_line = QtGui.QLineEdit()
+#        self.pmt_slider = QtGui.QSlider(QtCore.Qt.Horizontal)
+#        self.pmt_slider.valueChanged.connect(self.changePMTsensitivity)
+#        self.pmt_slider.setRange(0, 125)
+#        self.pmt_slider.setTickInterval(10)
+#        self.pmt_slider.setTickPosition(QtGui.QSlider.TicksBothSides)
+#        self.pmt_slider.setValue(self.pmt_sensitivity * 100)
+#
+#        self.pmt_value_line.setText(str(self.pmt_sensitivity))
+#
+#        self.pmt_minVal = QtGui.QLabel("0")
+#        self.pmt_maxVal = QtGui.QLabel("1.25")
+#        self.pmt_sliderLabel = QtGui.QLabel("PMT sensitivity")
+#
+#        # Creating the analog output tasks
 #        self.sensitivityTask = nidaqmx.AnalogOutputTask()
 #        self.sensitivityTask.create_voltage_channel(
 #            pmt_sensitivity_channel, min_val=0, max_val=1.25)
@@ -1625,9 +1616,7 @@ class Positionner(QtGui.QWidget):
         self.y_value_line.editingFinished.connect(self.editY)
         self.y_slider = QtGui.QSlider(QtCore.Qt.Horizontal)
         self.y_slider.sliderReleased.connect(self.moveY)
-        self.y_slider.setRange(
-            100 * min_ao_horizontal,
-            100 * max_ao_horizontal)
+        self.y_slider.setRange(100*min_ao_horizontal, 100*max_ao_horizontal)
         self.y_slider.setValue(self.y)
         self.y_minVal = QtGui.QLabel("-37.5")
         self.y_maxVal = QtGui.QLabel("37.5")
@@ -1651,29 +1640,29 @@ class Positionner(QtGui.QWidget):
         layout = QtGui.QGridLayout()
         self.setLayout(layout)
         layout.addWidget(self.title, 0, 0)
-        layout.addWidget(self.pmt_sliderLabel, 1, 0, 1, 1)
-        layout.addWidget(self.pmt_minVal, 2, 0, 1, 1)
-        layout.addWidget(self.pmt_maxVal, 2, 2, 1, 1)
-        layout.addWidget(self.pmt_slider, 3, 0, 1, 3)
-        layout.addWidget(self.pmt_value_line, 3, 3, 1, 1)
+#        layout.addWidget(self.pmt_sliderLabel, 1, 0, 1, 1)
+#        layout.addWidget(self.pmt_minVal, 2, 0, 1, 1)
+#        layout.addWidget(self.pmt_maxVal, 2, 2, 1, 1)
+#        layout.addWidget(self.pmt_slider, 3, 0, 1, 3)
+#        layout.addWidget(self.pmt_value_line, 3, 3, 1, 1)
 
-        layout.addWidget(self.z_sliderLabel, 1, 4, 1, 1)
-        layout.addWidget(self.z_minVal, 2, 4, 1, 1)
-        layout.addWidget(self.z_maxVal, 2, 6, 1, 1)
-        layout.addWidget(self.z_slider, 3, 4, 1, 3)
-        layout.addWidget(self.z_value_line, 3, 7, 1, 1)
+        layout.addWidget(self.z_sliderLabel, 1, 8)
+        layout.addWidget(self.z_minVal, 2, 8)
+        layout.addWidget(self.z_maxVal, 2, 10)
+        layout.addWidget(self.z_slider, 3, 8, 1, 3)
+        layout.addWidget(self.z_value_line, 3, 11)
 
-        layout.addWidget(self.x_sliderLabel, 4, 0, 1, 1)
-        layout.addWidget(self.x_minVal, 5, 0, 1, 1)
-        layout.addWidget(self.x_maxVal, 5, 2, 1, 1)
-        layout.addWidget(self.x_slider, 6, 0, 1, 3)
-        layout.addWidget(self.x_value_line, 6, 3, 1, 1)
+        layout.addWidget(self.x_sliderLabel, 1, 0)
+        layout.addWidget(self.x_minVal, 2, 0)
+        layout.addWidget(self.x_maxVal, 2, 2)
+        layout.addWidget(self.x_slider, 3, 0, 1, 3)
+        layout.addWidget(self.x_value_line, 3, 3)
 
-        layout.addWidget(self.y_sliderLabel, 4, 4, 1, 1)
-        layout.addWidget(self.y_minVal, 5, 4, 1, 1)
-        layout.addWidget(self.y_maxVal, 5, 6, 1, 1)
-        layout.addWidget(self.y_slider, 6, 4, 1, 3)
-        layout.addWidget(self.y_value_line, 6, 7, 1, 1)
+        layout.addWidget(self.y_sliderLabel, 1, 4)
+        layout.addWidget(self.y_minVal, 2, 4)
+        layout.addWidget(self.y_maxVal, 2, 6)
+        layout.addWidget(self.y_slider, 3, 4, 1, 3)
+        layout.addWidget(self.y_value_line, 3, 7)
 
     def move(self):
         """moves the 3 axis to the positions specified by the sliders"""
