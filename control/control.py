@@ -28,8 +28,7 @@ import tifffile as tiff     # http://www.lfd.uci.edu/~gohlke/pythonlibs/#vlfd
 from lantz import Q_
 
 import control.lasercontrol as lasercontrol
-# import control.Scan as Scan
-import control.Scan_self_GUI as scanWidget
+import control.scanner as scanWidget
 import control.align as align
 import control.guitools as guitools
 

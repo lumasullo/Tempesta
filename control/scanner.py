@@ -70,7 +70,7 @@ class ScanWidget(QtGui.QFrame):
         self.prim_scan_dim.currentIndexChanged.connect(
             lambda: self.setPrimScanDim(self.prim_scan_dim.currentText()))
 
-        self.scan_parameters = {'width': self.widthPar,
+        self.scanParameters = {'width': self.widthPar,
                                 'height': self.heightPar,
                                 'sequence_time': self.seqTimePar,
                                 'step_size': self.step_sizePar}
@@ -572,8 +572,7 @@ class LineScan():
         self.seqSamps = int(seqSamples)
         colSamples = self.steps_y * self.seqSamps
         # rampAndK contains [ramp, k]
-        rampAndK = makeRamp(start_y, size_y, colSamples)
-        ramp = rampAndK[0]
+        ramp = makeRamp(start_y, size_y, colSamples)[0]
 
         self.sig_dict[prim_scan_dim + '_sig'] = 1.14 * ramp
         self.sig_dict[chr(121 - (ord(prim_scan_dim) % 2)) +
