@@ -26,19 +26,11 @@ save_folder = r"C:\Users\aurelien.barbotin\Documents\Data\signals_15_8"
 
 # These dictionnaries contain values specific to the different axis of our
 # piezo motors.
-# correctionFactors: for each direction, corresponds to the movement in
+# corrFactors: for each direction, corresponds to the movement in
 # µm induced by a command of 1V
-x_factor = 4.06
-y_factor = 3.9
-z_factor = 10
-correctionFactors = {'x': 4.06, 'y': 3.9, 'z': 10}
+corrFactors = {'x': 4.06, 'y': 3.9, 'z': 10}
+
 # minimum and maximum voltages which can drive the different axis
-# xy stage:
-min_ao_horizontal = -10
-max_ao_horizontal = 10
-# z stage:
-min_ao_vertical = 0
-max_ao_vertical = 10
 minVolt = {'x': -10, 'y': -10, 'z': 0}
 maxVolt = {'x': 10, 'y': 10, 'z': 10}
 
@@ -66,7 +58,7 @@ class ScanWidget(QtGui.QFrame):
         self.main = main  # The main GUI
 
         # Creating the GUI itself
-        initWidthHeight = 10
+        initWidthHeight = 1
         initStep = 0.05
         self.widthPar = QtGui.QLineEdit(str(initWidthHeight))
         self.widthPar.editingFinished.connect(
@@ -103,7 +95,6 @@ class ScanWidget(QtGui.QFrame):
         self.currRecDevice = None
 
         # Number of image planes to record when doing a 3D scan
-        self.nPlanes = 1
         self.nPlanesPar = QtGui.QLineEdit('1')
         self.nPlanesPar.editingFinished.connect(
             lambda: self.scanParameterChanged('nPlanes'))
@@ -350,15 +341,12 @@ class ScanWidget(QtGui.QFrame):
         self.currDOchan[sig] = self.DOchanParsDict[sig].currentIndex()
 
     def scanParameterChanged(self, par):
-        if not par == 'scanMode' and not par == 'nPlanes':
+        if par != 'scanMode':
             self.scanParValues[par] = float(self.scanParameters[par].text())
-            self.scanParValues[par] *= 0.001
+            if par == 'seqTime':
+                self.scanParValues[par] *= 0.001
+                self.updateScan(['405', '473', '488', 'CAM'])
 
-        if par == 'nPlanes':
-            self.nPlanes = int(self.scanParameters[par].text())
-
-        if par == 'seqTime':
-            self.updateScan(['405', '473', '488', 'CAM'])
         self.stageScan.updateFrames(self.scanParValues)
         self.nScanStepsLabel.setText(str(self.stageScan.nScanSteps))
         self.freqLabel.setText(str(self.stageScan.freq))
@@ -372,16 +360,14 @@ class ScanWidget(QtGui.QFrame):
     def previewScan(self):
         """Displays a matplotlib graph representing the scanning's
         trajectory."""
+        print(self.scanParValues)
         self.stageScan.update(self.scanParValues)
-        x_sig = self.stageScan.sigDict['x']
-        y_sig = self.stageScan.sigDict['y']
         plt.figure()
-        plt.plot(x_sig, y_sig)
-        plt.axis([-0.2, self.scanParValues['width'] / x_factor +
-                  0.2, -0.2, self.scanParValues['height'] / y_factor + 0.2])
+        plt.plot(self.stageScan.sigDict['x'], self.stageScan.sigDict['y'])
+        plt.axis([-0.2, self.scanParValues['width']/corrFactors['x'] + 0.2,
+                  -0.2, self.scanParValues['height']/corrFactors['y'] + 0.2])
         plt.xlabel("x axis")
         plt.ylabel("y axis")
-        print("preview enclenched")
         plt.show()
 
     def scanOrAbort(self):
@@ -454,7 +440,7 @@ class ScanWidget(QtGui.QFrame):
 #        else:
 #            self.display.saveImage("sted_plane_"+str(self.sted_scan_counter))
 
-        if self.sted_scan_counter == self.nPlanes:
+        if self.sted_scan_counter == self.scanParameters['nPlanes']:
             print("end 3D scan")
             self.sted_scan_counter = 0
             return
@@ -619,11 +605,11 @@ class Scanner(QtCore.QObject):
         self.delay += phaseCorr(freq)/freq*self.stageScan.sampleRate/2/np.pi
         self.delay = int(self.delay)
 
-        sine = np.arange(self.delay) / self.delay * 2 * np.pi * \
-            freq / self.stageScan.sampleRate
+        sine = np.arange(self.delay)/self.delay*2*np.pi*freq \
+            / self.stageScan.sampleRate
         sine = np.sin(sine) * self.stageScan.size1 / 2
         signal1 = np.concatenate((signal1, sine))
-        signal2 = np.concatenate((signal2, signal2[-1] * np.ones(self.delay)))
+        signal2 = np.concatenate((signal2, signal2[-1]*np.ones(self.delay)))
 
         self.stageScan.sigDict[ax1] = signal1
         self.stageScan.sigDict[ax2] = signal2
@@ -866,10 +852,8 @@ class StageScan():
         self.steps1 = int(np.ceil(parValues['width']/parValues['stepSize']))
         self.steps2 = int(np.ceil(parValues['height']/parValues['stepSize']))
         self.nScanSteps = self.steps1 * self.steps2
-        print(parValues['width'], parValues['stepSize'], self.nScanSteps)
 
-#        stepSize1 = parValues['stepSize'] / correctionFactors[self.ax1]
-        # WARNING: Correct for units of the time, now seconds!!!!
+#        stepSize1 = parValues['stepSize'] / corrFactors[self.ax1]
         self.seqSamps = int(np.ceil(self.sampleRate*parValues['seqTime']))
         if self.seqSamps == 1:
             self.seqSamps += 1
@@ -889,11 +873,10 @@ class StageScan():
             start1 = 0
             start2 = 0
             print("couldn't access to the positionner")
-        print("width:", parValues['width'])
-        self.size1 = parValues['width'] / correctionFactors[self.ax1]
-        self.size2 = parValues['height'] / correctionFactors[self.ax2]
-        stepSize1 = parValues['stepSize'] / correctionFactors[self.ax1]
-        stepSize2 = parValues['stepSize'] / correctionFactors[self.ax2]
+        self.size1 = parValues['width'] / corrFactors[self.ax1]
+        self.size2 = parValues['height'] / corrFactors[self.ax2]
+        stepSize1 = parValues['stepSize'] / corrFactors[self.ax1]
+        stepSize2 = parValues['stepSize'] / corrFactors[self.ax2]
 
         # We want at least two samples per point
         self.seqSamps = int(np.ceil(self.sampleRate*parValues['seqTime']))
@@ -915,10 +898,8 @@ class StageScan():
         nSampsFlat = int((rowSamps - nSamplesRamp) / 2)
 #        nSampsFlat_2 = rowSamps - nSampsFlat - nSamplesRamp
         rampAx2 = makeRamp(0, self.corrStepSize, nSamplesRamp)[0]
-        print("row samples", rowSamps)
 
         self.freq = self.sampleRate / (rowSamps * 2)
-        print("scan, self.freq", self.freq)
 
         # Not sure whether I need the APD or PMT version. Here it's APD
         nSamplesRamp = int(2 * fracRemoved * rowSamps)
@@ -966,7 +947,6 @@ class StageScan():
 #        # Correction for amplitude:
         sig1 = sine * ampCorrection(fracRemoved, self.freq)
         sig1 += start1
-        print("shape signals", sig1.shape, sig2.shape)
         # Assign signal to axis 1
         self.sigDict[self.ax1] = sig1
         # Assign signal to axis 2
@@ -1203,19 +1183,19 @@ class ImageDisplay(QtGui.QWidget):
             x0 = (self.ROI.pos()[0] - self.shape[0] / 2) * self.pixel_size
             y0 = self.ROI.pos()[1] * self.pixel_size
             print("width", width, height, "x n y", x0, y0)
-            max0 = (x0 + width / 2) / correctionFactors[self.scan_axes[0]]
+            max0 = (x0 + width / 2) / corrFactors[self.scan_axes[0]]
             if max0 > maxVolt[self.scan_axes[0]]:
                 print("invalid ROI")
                 return
-            min0 = (x0 - width / 2) / correctionFactors[self.scan_axes[0]]
+            min0 = (x0 - width / 2) / corrFactors[self.scan_axes[0]]
             if min0 < minVolt[self.scan_axes[0]]:
                 print("invalid ROI")
                 return
-            max1 = (y0 + height) / correctionFactors[self.scan_axes[1]]
+            max1 = (y0 + height) / corrFactors[self.scan_axes[1]]
             if max1 > maxVolt[self.scan_axes[1]]:
                 print("invalid ROI")
                 return
-            min1 = y0 / correctionFactors[self.scan_axes[1]]
+            min1 = y0 / corrFactors[self.scan_axes[1]]
             if min1 < minVolt[self.scan_axes[1]]:
                 print("invalid ROI")
                 return
@@ -1230,11 +1210,11 @@ class ImageDisplay(QtGui.QWidget):
             getattr(self.scanWidget.positionner, "set_" +
                     self.scan_axes[0])(self.initPosition[0] +
                                        (x0 + width / 2) /
-                                       correctionFactors[self.scan_axes[0]])
+                                       corrFactors[self.scan_axes[0]])
             getattr(self.scanWidget.positionner, "set_" +
                     self.scan_axes[1])(self.initPosition[1] +
                                        y0 /
-                                       correctionFactors[self.scan_axes[0]])
+                                       corrFactors[self.scan_axes[0]])
             print("after")
 
     def setPxValue(self, val):
@@ -1366,7 +1346,7 @@ class RecThreadAPD(QtCore.QThread):
         last_value = throw_apd_data[-1]
 
         amplitude = float(self.imageDisplay.scanWidget.widthPar.text(
-        )) / correctionFactors[self.main_axis]
+        )) / corrFactors[self.main_axis]
         initPosition = getattr(self.imageDisplay.scanWidget.positionner,
                                self.main_axis)
 
@@ -1486,7 +1466,7 @@ class RecThreadPMT(QtCore.QThread):
             sensorVals[0:self.delay] = dat[:, 1]
 
         amplitude = float(self.imageDisplay.scanWidget.widthPar.text(
-        )) / correctionFactors[self.main_axis]
+        )) / corrFactors[self.main_axis]
         initPosition = getattr(
             self.imageDisplay.scanWidget.positionner, self.main_axis)
 
@@ -1572,17 +1552,17 @@ class Positionner(QtGui.QWidget):
         xchan = "Dev1/ao" + str(self.scanWidget.currAOchan["x"])
         self.aotask.ao_channels.add_ao_voltage_chan(
             physical_channel=xchan, name_to_assign_to_channel='x',
-            min_val=min_ao_horizontal, max_val=max_ao_horizontal)
+            min_val=minVolt['x'], max_val=maxVolt['x'])
 
         ychan = "Dev1/ao" + str(self.scanWidget.currAOchan["y"])
         self.aotask.ao_channels.add_ao_voltage_chan(
             physical_channel=ychan, name_to_assign_to_channel='y',
-            min_val=min_ao_horizontal, max_val=max_ao_horizontal)
+            min_val=minVolt['x'], max_val=maxVolt['x'])
 
         zchan = "Dev1/ao" + str(self.scanWidget.currAOchan["z"])
         self.aotask.ao_channels.add_ao_voltage_chan(
             physical_channel=zchan, name_to_assign_to_channel='z',
-            min_val=min_ao_vertical, max_val=max_ao_vertical)
+            min_val=minVolt['z'], max_val=maxVolt['z'])
 
         self.aotask.timing.cfg_samp_clk_timing(
             rate=self.sampleRate,
@@ -1597,7 +1577,7 @@ class Positionner(QtGui.QWidget):
         self.x_value_line.editingFinished.connect(self.editX)
         self.x_slider = QtGui.QSlider(QtCore.Qt.Horizontal)
         self.x_slider.sliderReleased.connect(self.moveX)
-        self.x_slider.setRange(100*min_ao_horizontal, 100*max_ao_horizontal)
+        self.x_slider.setRange(100*minVolt['x'], 100*maxVolt['x'])
         self.x_slider.setValue(self.x)
         self.x_minVal = QtGui.QLabel("-37.5")
         self.x_maxVal = QtGui.QLabel("37.5")
@@ -1608,7 +1588,7 @@ class Positionner(QtGui.QWidget):
         self.y_value_line.editingFinished.connect(self.editY)
         self.y_slider = QtGui.QSlider(QtCore.Qt.Horizontal)
         self.y_slider.sliderReleased.connect(self.moveY)
-        self.y_slider.setRange(100*min_ao_horizontal, 100*max_ao_horizontal)
+        self.y_slider.setRange(100*minVolt['x'], 100*maxVolt['x'])
         self.y_slider.setValue(self.y)
         self.y_minVal = QtGui.QLabel("-37.5")
         self.y_maxVal = QtGui.QLabel("37.5")
@@ -1619,7 +1599,7 @@ class Positionner(QtGui.QWidget):
         self.z_value_line.editingFinished.connect(self.editZ)
         self.z_slider = QtGui.QSlider(QtCore.Qt.Horizontal)
         self.z_slider.sliderReleased.connect(self.moveZ)
-        self.z_slider.setRange(100 * min_ao_vertical, 100 * max_ao_vertical)
+        self.z_slider.setRange(100 * minVolt['z'], 100 * maxVolt['z'])
         self.z_slider.setValue(self.z)
         self.z_minVal = QtGui.QLabel("0")
         self.z_maxVal = QtGui.QLabel("100")
@@ -1689,63 +1669,64 @@ class Positionner(QtGui.QWidget):
     def moveX(self):
         """Specifies the movement of the x axis."""
         value = self.x_slider.value() / 100
-        self.x_value_line.setText(str(round(value * x_factor, 2)))
+        self.x_value_line.setText(str(round(value*corrFactors['x'], 2)))
         print("move x")
         self.move()
 
     def moveY(self):
         """Specifies the movement of the y axis."""
         value = self.y_slider.value() / 100
-        self.y_value_line.setText(str(round(value * y_factor, 2)))
+        self.y_value_line.setText(str(round(value*corrFactors['y'], 2)))
         self.move()
 
     def moveZ(self):
         """Specifies the movement of the z axis."""
         value = self.z_slider.value() / 100
-        self.z_value_line.setText(str(round(value * z_factor, 2)))
+        self.z_value_line.setText(str(round(value*corrFactors['z'], 2)))
         self.move()
 
     def editX(self):
         """Method called when a position for x is entered manually. Repositions
         the slider and initiates the movement of the stage"""
-        self.x_slider.setValue(100*float(self.x_value_line.text())/x_factor)
+        value = 100*float(self.x_value_line.text())/corrFactors['x']
+        self.x_slider.setValue(value)
         self.move()
 
     def editY(self):
         """Method called when a position for y is entered manually. Repositions
         the slider and initiates the movement of the stage"""
-        self.y_slider.setValue(100*float(self.y_value_line.text())/y_factor)
+        value = 100*float(self.y_value_line.text())/corrFactors['y']
+        self.y_slider.setValue(value)
         self.move()
 
     def editZ(self):
         """Method called when a position for z is entered manually. Repositions
         the slider and initiates the movement of the stage"""
-        self.z_slider.setValue(100*float(self.z_value_line.text())/z_factor)
+        value = 100*float(self.z_value_line.text())/corrFactors['z']
+        self.z_slider.setValue(value)
         self.move()
 
     def setX(self, value):
         """This method sets x to value in Volts and moves accordingly the
         slider and the corresponding value line"""
-        print("in set x", value, round(value * x_factor, 2))
-        new_slider_val = value * 100
-        self.x_slider.setValue(new_slider_val)
-        self.x_value_line.setText(str(round(value * x_factor, 2)))
+        valueLine = round(value * corrFactors['x'], 2)
+        print("in set x", value, valueLine)
+        self.x_slider.setValue(value * 100)
+        self.x_value_line.setText(str(valueLine))
         self.move()
 
     def setY(self, value):
         """This method sets y to value in Volts and moves accordingly the
         slider and the corresponding value line"""
-        new_slider_val = value * 100
-        self.y_slider.setValue(new_slider_val)
-        self.y_value_line.setText(str(round(value * y_factor, 2)))
+        self.y_slider.setValue(value * 100)
+        self.y_value_line.setText(str(round(value*corrFactors['y'], 2)))
         self.move()
 
     def setZ(self, value):
         """This method sets x to value in Volts and moves accordingly the
         slider and the corresponding value line"""
-        new_slider_val = value * 100
-        self.z_slider.setValue(new_slider_val)
-        self.z_value_line.setText(str(round(value * z_factor, 2)))
+        self.z_slider.setValue(value * 100)
+        self.z_value_line.setText(str(round(value*corrFactors['z'], 2)))
         self.move()
 
     def goToZero(self):
@@ -1791,8 +1772,7 @@ class Positionner(QtGui.QWidget):
             total_channels = ["x", "y", "z"]
             self.active_channels = total_channels
             for elt in total_channels:
-                channel = "Dev1/ao" + \
-                    str(self.scanWidget.currAOchan[elt])
+                channel = "Dev1/ao" + str(self.scanWidget.currAOchan[elt])
             self.aotask.ao_channels.add_ao_voltage_chan(
                 physical_channel=channel, name_to_assign_to_channel=elt,
                 min_val=minVolt[elt], max_val=maxVolt[elt])
@@ -1851,7 +1831,7 @@ def recFromSine(acquisition_signal, ref_signal, number_of_points):
     corresponding position measured in ref_signal"""
     volt_range = max(ref_signal) - min(ref_signal)
     results = np.zeros(number_of_points)
-    print("real amplitude:", volt_range * correctionFactors["x"] * 2)
+    print("real amplitude:", volt_range * corrFactors["x"] * 2)
     if volt_range != max(ref_signal) - min(ref_signal):
         print("bad synchronization in voltage range")
         print("max",
