@@ -5,17 +5,6 @@ Created on Tue Aug 12 20:02:08 2014
 @author: Federico Barabas
 """
 
-# -*- coding: utf-8 -*-
-"""
-    lantz.simulators.fungen
-    ~~~~~~~~~~~~~~~~~~~~~~~
-
-    A simulated function generator.
-    See specification in the Lantz documentation.
-
-    :copyright: 2012 by The Lantz Authors
-    :license: BSD, see LICENSE for more details.
-"""
 
 import logging
 import numpy as np

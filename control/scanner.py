@@ -72,8 +72,7 @@ class ScanWidget(QtGui.QMainWindow):
         self.stepSizeZPar = QtGui.QLineEdit('0.05')
         self.stepSizeZPar.editingFinished.connect(
             lambda: self.scanParameterChanged('stepSizeZ'))
-#        self.sampleRate = 100000
-        self.sampleRate = 10000
+        self.sampleRate = 70000
 
         self.scanMode = QtGui.QComboBox()
         self.scanModes = ['FOV scan', 'VOL scan', 'Line scan']
@@ -151,6 +150,7 @@ class ScanWidget(QtGui.QMainWindow):
         self.stageScan = StageScan(self.sampleRate)
         self.pxCycle = PixelCycle(self.sampleRate)
         self.graph = GraphFrame(self.pxCycle)
+        self.graph.plot.getAxis('bottom').setScale(1/self.sampleRate)
         self.updateScan(self.allDevices)
 
         self.scanRadio = QtGui.QRadioButton('Scan')
@@ -829,20 +829,19 @@ class PixelCycle():
 class GraphFrame(pg.GraphicsWindow):
     """Creates the plot that plots the preview of the pulses.
     Fcn update() updates the plot of "device" with signal "signal"."""
-
     def __init__(self, pxCycle, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.pxCycle = pxCycle
         self.plot = self.addPlot(row=1, col=0)
+        self.plot.setLabel('bottom', 'Time', 's')
+        self.plot.setYRange(0, 1)
         self.plot.showGrid(x=False, y=False)
-        self.plotSigDict = {'405': self.plot.plot(pen=pg.mkPen(73, 0, 188)),
-                            '473': self.plot.plot(pen=pg.mkPen(97, 0, 97)),
+        self.plotSigDict = {'405': self.plot.plot(pen=pg.mkPen(130, 0, 200)),
+                            '473': self.plot.plot(pen=pg.mkPen(0, 183, 255)),
                             '488': self.plot.plot(pen=pg.mkPen(0, 247, 255)),
                             'CAM': self.plot.plot(pen='w')}
-
         self.resize(600, 200)
-        self.plot.setLabel('bottom', 'Time', 's')
 
     def update(self, mx, devices=None):
         if devices is None:
@@ -850,8 +849,7 @@ class GraphFrame(pg.GraphicsWindow):
 
         for device in devices:
             signal = self.pxCycle.sigDict[device]
-            x = np.linspace(0, mx, len(signal))
-            self.plotSigDict[device].setData(x, signal)
+            self.plotSigDict[device].setData(signal)
 
 
 def makeRamp(start, end, samples):
