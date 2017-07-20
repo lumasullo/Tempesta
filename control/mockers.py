@@ -5,8 +5,11 @@ Created on Tue Aug 12 20:02:08 2014
 @author: Federico Barabas
 """
 
-import logging
+import ctypes
+import ctypes.util
 import numpy as np
+
+import logging
 
 from lantz import Driver
 from lantz import Q_
@@ -21,105 +24,10 @@ class constants:
         self.GND = 0
 
 
-class MockDAQ(Driver):
-
-    def __init__(self):
-        super(MockDAQ).__init__()
-        self.constants = constants()
-        self.digital_IO = np.zeros(23, dtype='bool')
-        self.flipperState = True
-
-    @property
-    def idn(self):
-        return 'Simulated Labjack T7'
-
-    def streamStop(self):
-        pass
-
-    def streamStart(self, *args, **kwargs):
-        pass
-
-    def streamRead(self):
-        return (np.random.normal(1, 0.1, 100), 0)
-
-    def writeNames(self, *args, **kwargs):
-        pass
-
-    def address(self, port):
-        return (0, 0)
-
-    @property
-    def flipper(self):
-        return self.flipperState
-
-    @flipper.setter
-    def flipper(self, value):
-        self.flipperState = value
-
-    def toggleFlipper(self):
-        pass
-
-
-class MockScanZ(Driver):
-
-    def __init__(self):
-        super(MockScanZ).__init__()
-        self.um = Q_(1, 'um')
-
-        self._position = 1000 * self.um
-        self._hostPosition = 'left'
-
-    @property
-    def position(self):
-        '''Gets and sets current position.
-        If the value is set to z = 0, the display changes to REL 0 (relative
-        display mode). To return to ABS mode use inst.move_absolute(0) and then
-        inst.position = 0. Thus, the stage will return to 0 micrometers and the
-        display screen will switch to ABS mode.
-        '''
-        return self._position
-
-    @position.setter
-    def position(self, value):
-        '''Gets and sets current position.
-        If the value is set to z = 0, the display changes to REL 0 (relative
-        display mode). To return to ABS mode use inst.move_absolute(0) and then
-        inst.position = 0. Thus, the stage will return to 0 micrometers and the
-        display screen will switch to ABS mode.
-        '''
-        try:
-            value.magnitude
-            self._position = value.to('um')
-        except:
-            self._position = value * self.um
-
-    def moveRelative(self, value):
-        self.position = self.position + value
-
-    @property
-    def umPerRevolution(self):
-        return 100 * self.um
-
-    @umPerRevolution.setter
-    def umPerRevolution(self, value):
-        pass
-
-    @property
-    def hostPosition(self):
-        return self._hostPosition
-
-    @hostPosition.setter
-    def hostPosition(self, value):
-        self._hostPosition = value
-
-    def finalize(self):
-        pass
-
-
 class MockLaser(Driver):
 
     def __init__(self):
-        super(MockLaser).__init__()
+        super().__init__()
 
         self.mW = Q_(1, 'mW')
 
@@ -187,247 +95,304 @@ class MockLaser(Driver):
         return 0
 
     def query(self, text):
-
         return 0
 
-class MockCamera(Driver):
+
+class HMockCamData():
+
+    # __init__
+    #
+    # Create a data object of the appropriate size.
+    #
+    # @param size The size of the data object in bytes.
+    #
+    def __init__(self, size):
+        self.np_array = np.random.randint(1, 65536, int(size))
+        self.size = size
+
+    # __getitem__
+    #
+    # @param slice The slice of the item to get.
+    #
+    def __getitem__(self, slice):
+        return self.np_array[slice]
+
+    # copyData
+    #
+    # Uses the C memmove function to copy data from an address in memory
+    # into memory allocated for the numpy array of this object.
+    #
+    # @param address The memory address of the data to copy.
+    #
+    def copyData(self, address):
+        ctypes.memmove(self.np_array.ctypes.data, address, self.size)
+
+    # getData
+    #
+    # @return A numpy array that contains the camera data.
+    #
+    def getData(self):
+        return self.np_array
+
+    # getDataPtr
+    #
+    # @return The physical address in memory of the data.
+    #
+    def getDataPtr(self):
+        return self.np_array.ctypes.data
+
+
+class MockHamamatsu(Driver):
 
     def __init__(self):
-        super(MockCamera).__init__()
 
-        self.degC = Q_(1, 'degC')
+        self.buffer_index = 0
+        self.camera_id = 9999
+        self.camera_model = 'Mock Hamamatsu camera'
+        self.debug = False
+        self.frame_x = 500
+        self.frame_y = 500
+        self.frame_bytes = self.frame_x * self.frame_y * 2
+        self.last_frame_number = 0
+        self.properties = {}
+        self.max_backlog = 0
+        self.number_image_buffers = 0
+
         self.s = Q_(1, 's')
-        self.us = Q_(1, 'us')
 
-        self.mock = True
-        self.temperature_setpoint = Q_(-10, 'degC')
-        self.cooler_on_state = False
-        self.acq_mode = 'Run till abort'
-        self.status_state = 'Camera is idle, waiting for instructions.'
-        self.image_size = self.detector_shape
-        self.preamp_st = 1
-        self.EM_gain_st = 1
-        self.ftm_state = False
-        self.horiz_shift_speed_state = 1
-        self.n_preamps = 1
+        # Open the camera.
+#        self.camera_handle = ctypes.c_void_p(0)
+#        self.checkStatus(dcam.dcam_open(ctypes.byref(self.camera_handle),
+#                                        ctypes.c_int32(self.camera_id),
+#                                        None),
+#                         "dcam_open")
+        # Get camera properties.
+        self.properties = {'Name': 'MOCK Hamamatsu',
+                           'exposure_time': 9999,  # * self.s,
+                           'accumulation_time': 99999,  # * self.s,
+                           'image_width': 2048,
+                           'image_height': 2048,
+                           'image_framebytes': 8,
+                           'subarray_hsize': 2048,
+                           'subarray_vsize': 2048,
+                           'subarray_mode': 'OFF',
+                           'timing_readout_time': 9999,
+                           'internal_frame_rate': 9999,
+                           'internal_frame_interval': 9999}
 
-        self.PreAmps = np.around([self.true_preamp(n)
-                                  for n in np.arange(self.n_preamps)],
-                                 decimals=1)[::-1]
-        self.HRRates = [self.true_horiz_shift_speed(n)
-                        for n in np.arange(self.n_horiz_shift_speeds())]
-        self.vertSpeeds = [np.round(self.true_vert_shift_speed(n), 1)
-                           for n in np.arange(self.n_vert_shift_speeds)]
-        self.vertAmps = ['+' + str(self.true_vert_amp(n))
-                         for n in np.arange(self.n_vert_clock_amps)]
-        self.vertAmps[0] = 'Normal'
+        # Get camera max width, height.
+        self.max_width = self.getPropertyValue("image_width")[0]
+        self.max_height = self.getPropertyValue("image_height")[0]
 
-    @property
-    def idn(self):
-        """Identification of the device
-        """
-        return 'Simulated Andor camera'
+    def captureSetup(self):
+        ''' (internal use only). This is called at the start of new acquisition
+        sequence to determine the current ROI and get the camera configured
+        properly.'''
+        self.buffer_index = -1
+        self.last_frame_number = 0
 
-    @property
-    def detector_shape(self):
-        return (512, 512)
+        # Set sub array mode.
+        self.setSubArrayMode()
 
-    @property
-    def px_size(self):
-        """ This function returns the dimension of the pixels in the detector
-        in microns.
-        """
-        return (8, 8)
+        # Get frame properties.
+        self.frame_x = int(self.getPropertyValue("image_width")[0])
+        self.frame_y = int(self.getPropertyValue("image_height")[0])
+        self.frame_bytes = self.getPropertyValue("image_framebytes")[0]
 
-    @property
-    def temperature(self):
-        """ This function returns the temperature of the detector to the
-        nearest degree. It also gives the status of cooling process.
-        """
-        return Q_(55555, 'degC')
-
-    @property
-    def temperature_setpoint(self):
-        return self.temperature_sp
-
-    @temperature_setpoint.setter
-    def temperature_setpoint(self, value):
-        self.temperature_sp = value
-
-    @property
-    def cooler_on(self):
-        return self.cooler_on_state
-
-    @cooler_on.setter
-    def cooler_on(self, value):
-        self.cooler_on_state = value
-
-
-
-    @property
-    def acquisition_mode(self):
-        """ This function will set the acquisition mode to be used on the next
-        StartAcquisition.
-        NOTE: In Mode 5 the system uses a “Run Till Abort” acquisition mode. In
-        Mode 5 only, the camera continually acquires data until the
-        AbortAcquisition function is called. By using the SetDriverEvent
-        function you will be notified as each acquisition is completed.
-        """
-        return self.acq_mode
-
-    @acquisition_mode.setter
-    def acquisition_mode(self, mode):
-        self.acq_mode = mode
-
-    def start_acquisition(self):
-        """ This function starts an acquisition. The status of the acquisition
-        can be monitored via GetStatus().
-        """
-        self.status_state = 'Acquisition in progress.'
-        self.j = 0
-
-    def abort_acquisition(self):
-        """This function aborts the current acquisition if one is active
-        """
-        self.status_state = 'Camera is idle, waiting for instructions.'
-
-    @property
-    def status(self):
-        """ This function will return the current status of the Andor SDK
-        system. This function should be called before an acquisition is started
-        to ensure that it is IDLE and during an acquisition to monitor the
-        process.
-        """
-        return self.status_state
-
-    def set_image(self, shape, p_0):
-        """ This function will set the horizontal and vertical binning to be
-        used when taking a full resolution image.
-        Parameters
-            int hbin: number of pixels to bin horizontally.
-            int vbin: number of pixels to bin vertically.
-            int hstart: Start column (inclusive).
-            int hend: End column (inclusive).
-            int vstart: Start row (inclusive).
-            int vend: End row (inclusive).
-        """
-        self.image_size = (shape)
-
-    def free_int_mem(self):
-        """The FreeInternalMemory function will deallocate any memory used
-        internally to store the previously acquired data. Note that once this
-        function has been called, data from last acquisition cannot be
-        retrived.
-        """
+    def checkStatus(self, fn_return, fn_name="unknown"):
+        ''' Check return value of the dcam function call. Throw an error if
+        not as expected?
+        @return The return value of the function.'''
         pass
 
-    def most_recent_image16(self, npixels):
-        """ This function will update the data array with the most recently
-        acquired image in any acquisition mode. The data are returned as long
-        integers (32-bit signed integers). The "array" must be exactly the same
-        size as the complete image.
-        """
-        return np.random.normal(100, 10, self.image_size).astype(np.uint16)
+    def getFrames(self):
+        ''' Gets all of the available frames.
 
-    def images16(self, first, last, shape, validfirst, validlast):
-        arr = np.random.normal(100, 10, (last - first + 1, shape[0], shape[1]))
-        return arr.astype(np.uint16)
+        This will block waiting for new frames even if there new frames
+        available when it is called.
 
-    def set_n_kinetics(self, n):
-        self.n = n
+        @return [frames, [frame x size, frame y size]]'''
+        frames = []
 
-    def set_n_accum(self, i):
+        for i in range(2):
+            # Create storage
+            hc_data = HMockCamData(self.frame_x * self.frame_y)
+            frames.append(hc_data)
+
+        return [frames, [self.frame_x, self.frame_y]]
+
+    def getModelInfo(self):
+        ''' Returns the model of the camera
+
+        @param camera_id The (integer) camera id number.
+
+        @return A string containing the camera name.'''
+        return ('WARNING!: This is a Mock Version of the Hamamatsu Orca flash '
+                'camera')
+
+    def getProperties(self):
+        ''' Return the list of camera properties. This is the one to call if you
+        want to know the camera properties.
+
+        @return A dictionary of camera properties.'''
+        return self.properties
+
+    def getPropertyAttribute(self, property_name):
+        ''' Return the attribute structure of a particular property.
+
+        FIXME (OPTIMIZATION): Keep track of known attributes?
+
+        @param property_name The name of the property to get the attributes of.
+
+        @return A DCAM_PARAM_PROPERTYATTR object.'''
         pass
 
-    def set_accum_time(self, dt):
+    # getPropertyText
+    #
+    # Return the text options of a property (if any).
+    #
+    # @param property_name The name of the property to get the text values of.
+    #
+    # @return A dictionary of text properties (which may be empty).
+    #
+    def getPropertyText(self, property_name):
         pass
 
-    def set_kinetic_cycle_time(self, dt):
+    # getPropertyRange
+    #
+    # Return the range for an attribute.
+    #
+    # @param property_name The name of the property (as a string).
+    #
+    # @return [minimum value, maximum value]
+    #
+    def getPropertyRange(self, property_name):
         pass
 
-    @property
-    def n_images_acquired(self):
-        self.j += 1
-        if self.j == self.n:
-            self.status_state = 'Camera is idle, waiting for instructions.'
-        return self.j
-
-    @property
-    def new_images_index(self):
-        return (self.j, self.j)
-
-    def shutter(self, *args):
+    # getPropertyRW
+    #
+    # Return if a property is readable / writeable.
+    #
+    # @return [True/False (readable), True/False (writeable)]
+    #
+    def getPropertyRW(self, property_name):
         pass
 
-    @property
-    def preamp(self):
-        return self.preamp_st
+    # getPropertyVale
+    #
+    # Return the current setting of a particular property.
+    #
+    # @param property_name The name of the property.
+    #
+    # @return [the property value, the property type]
+    #
+    def getPropertyValue(self, property_name):
 
-    @preamp.setter
-    def preamp(self, value):
-        self.preamp_st = value
+        prop_value = self.properties[property_name]
+        prop_type = property_name
 
-    def true_preamp(self, n):
-        return 10
+        return [prop_value, prop_type]
 
-    def n_horiz_shift_speeds(self):
-        return 1
+    # isCameraProperty
+    #
+    # Check if a property name is supported by the camera.
+    #
+    # @param property_name The name of the property.
+    #
+    # @return True/False if property_name is a supported camera property.
+    #
+    def isCameraProperty(self, property_name):
+        if (property_name in self.properties):
+            return True
+        else:
+            return False
 
-    def true_horiz_shift_speed(self, n):
-        return 100 * self.us
+    # newFrames
+    #
+    # Return a list of the ids of all the new frames since the last check.
+    #
+    # This will block waiting for at least one new frame.
+    #
+    # @return [id of the first frame, .. , id of the last frame]
+    #
+    def newFrames(self):
 
-    @property
-    def horiz_shift_speed(self):
-        return self.horiz_shift_speed_state
+        # Create a list of the new frames.
+        new_frames = [0]
 
-    @horiz_shift_speed.setter
-    def horiz_shift_speed(self, value):
-        self.horiz_shift_speed_state = value
+        return new_frames
 
-    @property
-    def max_exposure(self):
-        return 12 * self.s
+    # setPropertyValue
+    #
+    # Set the value of a property.
+    #
+    # @param property_name The name of the property.
+    # @param property_value The value to set the property to.
+    #
+    def setPropertyValue(self, property_name, property_value):
 
-    @property
-    def acquisition_timings(self):
-        return 0.01 * self.s, 0.01 * self.s, 0.01 * self.s
+        # Check if the property exists.
+        if not (property_name in self.properties):
+            print(" unknown property name:", property_name)
+            return False
 
-    @property
-    def EM_gain_range(self):
-        return (0, 1000)
+        # If the value is text, figure out what the
+        # corresponding numerical property value is.
 
-    @property
-    def EM_gain(self):
-        return self.EM_gain_st
+        self.properties[property_name] = property_value
+        print(property_name, 'set to:', self.properties[property_name])
+#            if (property_value in text_values):
+#                property_value = float(text_values[property_value])
+#            else:
+#                print(" unknown property text value:", property_value, "for",
+#                      property_name)
+#                return False
+        return property_value
 
-    @EM_gain.setter
-    def EM_gain(self, value):
-        self.EM_gain_st = value
+    # setSubArrayMode
+    #
+    # This sets the sub-array mode as appropriate based on the current ROI.
+    #
+    def setSubArrayMode(self):
 
-    @property
-    def n_vert_shift_speeds(self):
-        return 4
+        # Check ROI properties.
+        roi_w = self.getPropertyValue("subarray_hsize")[0]
+        roi_h = self.getPropertyValue("subarray_vsize")[0]
+        self.properties['image_height'] = roi_h
+        self.properties['image_width'] = roi_w
 
-    def true_vert_shift_speed(self, n):
-        return 3.3 * self.us
+        # If the ROI is smaller than the entire frame turn on subarray mode
+        if ((roi_w == self.max_width) and (roi_h == self.max_height)):
+            self.setPropertyValue("subarray_mode", "OFF")
+        else:
+            self.setPropertyValue("subarray_mode", "ON")
 
-    @property
-    def n_vert_clock_amps(self):
-        return 4
+    # startAcquisition
+    #
+    # Start data acquisition.
+    #
+    def startAcquisition(self):
+        self.captureSetup()
+        n_buffers = int((2.0 * 1024 * 1024 * 1024) / self.frame_bytes)
+        self.number_image_buffers = n_buffers
 
-    def true_vert_amp(self, n):
-        return 1
+        self.hcam_data = []
+        for i in range(1, 2):
+            hc_data = HMockCamData(self.frame_x * self.frame_y)
+            self.hcam_data.append(hc_data)
 
-    def set_vert_clock(self, n):
+        print('size of hcam_data = ', np.size(self.hcam_data))
+
+    # stopAcquisition
+    #
+    # Stop data acquisition.
+    #
+    def stopAcquisition(self):
         pass
 
-    def set_exposure_time(self, t):
+    # shutdown
+    #
+    # Close down the connection to the camera.
+    #
+    def shutdown(self):
         pass
-
-    @property
-    def frame_transfer_mode(self):
-        return self.ftm_state
-
-    @frame_transfer_mode.setter
-    def frame_transfer_mode(self, state):
-        self.ftm_state = state
