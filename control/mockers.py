@@ -333,14 +333,13 @@ class MockHamamatsu(Driver):
 
         # Check if the property exists.
         if not (property_name in self.properties):
-            print(" unknown property name:", property_name)
             return False
 
         # If the value is text, figure out what the
         # corresponding numerical property value is.
 
         self.properties[property_name] = property_value
-        print(property_name, 'set to:', self.properties[property_name])
+#        print(property_name, 'set to:', self.properties[property_name])
 #            if (property_value in text_values):
 #                property_value = float(text_values[property_value])
 #            else:

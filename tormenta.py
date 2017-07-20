@@ -2,33 +2,32 @@
 """
 Created on Thu May 21 13:19:31 2015
 
-@author: Federico Barabas
+@author: Barabas, Bodén, Masullo
 """
 from pyqtgraph.Qt import QtGui
+import nidaqmx
+
+from control import control
+import control.instruments as instruments
 
 
 def main():
 
-    from control import control
-    import control.instruments as instruments
-
     app = QtGui.QApplication([])
 
+    cobolt = 'cobolt.cobolt0601.Cobolt0601'
+
+    # NI-DAQ channels configuration
+    DO = {'405': 0, '473': 1, '488': 2, 'CAM': 3}
+    AO = {'x': 0, 'y': 1, 'z': 2}
+    outChannels = [DO, AO]
+    nidaq = nidaqmx.system.System.local().devices['Dev1']
+
 # TODO: create an instruments.Camera(hamamatsu) or something similar
-#    with instruments.Camera('hamamatsu.hamamatsu_camera.HamamatsuCameraMR') as orcaflash, \
-    with instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM4') as violetlaser, \
-         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM13') as exclaser, \
-         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM5') as offlaser:
+    with instruments.Laser(cobolt, 'COM4') as violetlaser, \
+            instruments.Laser(cobolt, 'COM13') as exclaser, \
+            instruments.Laser(cobolt, 'COM5') as offlaser:
 
-<<<<<<< HEAD
-        orcaflash = instruments.Camera()
-        print(violetlaser.idn)
-        print(exclaser.idn)
-        print(offlaser.idn)
-        print('Prior Z stage')
-
-        win = control.TormentaGUI(violetlaser, exclaser, offlaser, orcaflash)
-=======
         orcaflashV3 = instruments.Camera(0)
         orcaflashV2 = instruments.Camera(1)
         print(violetlaser.idn)
@@ -36,8 +35,8 @@ def main():
         print(offlaser.idn)
 
         win = control.TormentaGUI(violetlaser, exclaser, offlaser,
-                                  orcaflashV2, orcaflashV3)
->>>>>>> DualCam
+                                  orcaflashV2, orcaflashV3,
+                                  nidaq, outChannels)
         win.show()
 
         app.exec_()

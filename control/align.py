@@ -6,8 +6,6 @@ Created on Mon Sep 19 15:01:14 2016
 """
 
 import numpy as np
-import scipy.ndimage as ndi
-from matplotlib import pyplot as plt
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
@@ -67,7 +65,7 @@ class AlignWidgetAverage(QtGui.QFrame):
 
         if self.main.liveviewButton.isChecked():
             self.selected = self.ROI.getArrayRegion(
-                self.main.latest_images[self.main.curr_cam_ind], self.main.img)
+                self.main.latest_images[self.main.currCamIdx], self.main.img)
             value = np.mean(self.selected)
             self.graph.updateGraph(value)
         else:
@@ -189,7 +187,7 @@ class AlignWidgetXYProject(QtGui.QFrame):
             self.selected = self.ROI.getArrayRegion(self.main.latest_images[0],
                                                     self.main.img)
         else:
-            self.selected = self.main.latest_images[self.main.curr_cam_ind]
+            self.selected = self.main.latest_images[self.main.currCamIdx]
 
         if self.Xradio.isChecked():
             values = np.mean(self.selected, 0)

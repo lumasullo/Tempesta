@@ -37,10 +37,13 @@ class ScanWidget(QtGui.QMainWindow):
     As seen in the commened lines of run() I also tried running in a QThread
     created in run().
     The rest of the functions contain mosly GUI related code.'''
-    def __init__(self, device, *args, **kwargs):
+    def __init__(self, device, outChannels, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         self.nidaq = device
-        self.allDevices = ['405', '473', '488', 'CAM']
+        self.currDOchan, self.currAOchan = outChannels
+
+        self.allDevices = list(self.currDOchan.keys())
         self.saveScanBtn = QtGui.QPushButton('Save Scan')
 
         def saveScanFcn(): return guitools.saveScan(self)
@@ -65,7 +68,8 @@ class ScanWidget(QtGui.QMainWindow):
         self.seqTimePar.editingFinished.connect(
             lambda: self.scanParameterChanged('seqTime'))
         self.nrFramesPar = QtGui.QLabel()
-        self.scanDuration = QtGui.QLabel()
+        self.scanDuration = 0
+        self.scanDurationLabel = QtGui.QLabel(str(self.scanDuration))
         self.stepSizeXYPar = QtGui.QLineEdit('0.05')
         self.stepSizeXYPar.editingFinished.connect(
             lambda: self.scanParameterChanged('stepSizeXY'))
@@ -144,14 +148,12 @@ class ScanWidget(QtGui.QMainWindow):
                             'end405': 0.001*float(self.end405Par.text()),
                             'endCAM': 0.001*float(self.endCAMPar.text())}
 
-        self.currDOchan = {'405': 0, '473': 1, '488': 2, 'CAM': 3}
-        self.currAOchan = {'x': 0, 'y': 1, 'z': 2}
-
         self.stageScan = StageScan(self.sampleRate)
         self.pxCycle = PixelCycle(self.sampleRate)
         self.graph = GraphFrame(self.pxCycle)
         self.graph.plot.getAxis('bottom').setScale(1/self.sampleRate)
         self.updateScan(self.allDevices)
+        self.scanParameterChanged('seqTime')
 
         self.scanRadio = QtGui.QRadioButton('Scan')
         self.scanRadio.clicked.connect(lambda: self.setScanOrNot(True))
@@ -187,7 +189,7 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(QtGui.QLabel('Frames in scan:'), 4, 3)
         grid.addWidget(self.nrFramesPar, 4, 4)
         grid.addWidget(QtGui.QLabel('Scan duration (s):'), 5, 3)
-        grid.addWidget(self.scanDuration, 5, 4)
+        grid.addWidget(self.scanDurationLabel, 5, 4)
         grid.setColumnMinimumWidth(4, 50)
 
         grid.addWidget(self.scanRadio, 4, 0)
@@ -277,25 +279,29 @@ class ScanWidget(QtGui.QMainWindow):
 
         if p == 'seqTime':
             self.updateScan(self.allDevices)
-            self.graph.update(self.scanParValues['seqTime'], self.allDevices)
+            self.graph.update(self.allDevices)
         self.stageScan.updateFrames(self.scanParValues)
         self.nrFramesPar.setText(str(self.stageScan.frames))
-        self.scanDuration.setText(
-            str(0.001*self.stageScan.frames * float(self.seqTimePar.text())))
+        self.scanDuration = (self.stageScan.frames *
+                             self.scanParValues['seqTime'])
+        self.scanDurationLabel.setText(str(np.round(self.scanDuration, 2)))
 
     def pxParameterChanged(self, p):
         self.pxParValues[p] = 0.001*float(self.pxParameters[p].text())
         device = [p[-3] + p[-2] + p[-1]]
         self.pxCycle.update(device, self.pxParValues, self.stageScan.seqSamps)
-        self.graph.update(self.scanParValues['seqTime'], device)
+        self.graph.update(device)
 
     def previewScan(self):
         self.stageScan.update(self.scanParValues)
-        plt.plot(self.stageScan.sigDict['x'], self.stageScan.sigDict['y'])
-        plt.axis([-0.2, self.scanParValues['sizeX'] + 0.2, - 0.2,
-                  self.scanParValues['sizeY'] + 0.2])
-        plt.xlabel("x axis")
-        plt.ylabel("y axis")
+        plt.plot(self.stageScan.sigDict['x'] * convFactors['x'],
+                 self.stageScan.sigDict['y'] * convFactors['y'])
+        mx = max(self.scanParValues['sizeX'], self.scanParValues['sizeY'])
+        plt.margins(0.1*mx)
+        plt.axis('scaled')
+
+        plt.xlabel("x axis [µm]")
+        plt.ylabel("y axis [µm]")
 
     def scanOrAbort(self):
         if not self.scanning:
@@ -352,25 +358,24 @@ class ScanWidget(QtGui.QMainWindow):
 class WaitThread(QtCore.QThread):
     waitdoneSignal = QtCore.pyqtSignal()
 
-    def __init__(self, aotask):
+    def __init__(self, task):
         super().__init__()
-        self.aotask = aotask
+        self.task = task
         self.wait = True
 
     def run(self):
-        print('will wait for aotask')
-#        self.aotask.wait_until_done()
-        while not self.aotask.is_done() and self.wait:
-            pass
+        if self.wait:
+            self.task.wait_until_done(nidaqmx.constants.WAIT_INFINITELY)
         self.wait = True
         self.waitdoneSignal.emit()
-        print('aotask is done')
+        print(self.task.name + ' is done')
 
     def stop(self):
         self.wait = False
 
 
 class Scanner(QtCore.QObject):
+
     scanDone = QtCore.pyqtSignal()
     finalizeDone = QtCore.pyqtSignal()
 
@@ -401,15 +406,16 @@ class Scanner(QtCore.QObject):
     def runScan(self):
         scanTime = self.sampsInScan / self.main.sampleRate
         ret = QtGui.QMessageBox.Yes
-        self.scantimewar.setText("Scan will take %s seconds" % scanTime)
+        self.scanTimeW.setText("Scan will take %s seconds" % scanTime)
         if scanTime > 10:
-            ret = self.scantimewar.exec_()
+            ret = self.scanTimeW.exec_()
 
         if ret == QtGui.QMessageBox.No:
             self.done()
             return
 
-        fullAOsignal = np.zeros((2, len(self.stageScan.sigDict['x'])))
+        fullAOsignal = np.zeros((len(self.currAOchan),
+                                 len(self.stageScan.sigDict['x'])))
         tempAOchan = copy.copy(self.currAOchan)
         # Following loop creates the voltage channels in smallest to largest
         # order and places signals in same order.
@@ -431,8 +437,8 @@ class Scanner(QtCore.QObject):
 
         # Same as above but for the digital signals/devices
         tempDOchan = copy.copy(self.currDOchan)
-        fullDOsignal = np.zeros((len(tempDOchan), self.pxCycle.cycleSamples),
-                                dtype=bool)
+        fullDOsignal = np.zeros(
+            (len(tempDOchan), len(self.pxCycle.sigDict['405'])), dtype=bool)
         for i in range(0, len(tempDOchan)):
             dev = min(tempDOchan, key=tempDOchan.get)
             chanstring = 'Dev1/port0/line%s' % tempDOchan[dev]
@@ -479,7 +485,9 @@ class Scanner(QtCore.QObject):
         print('Aborting scan')
         self.waiter.stop()
         self.aotask.stop()
+        self.aotask.close()
         self.dotask.stop()
+        self.dotask.close()
         self.finalize()
 
     def finalize(self):
@@ -487,13 +495,17 @@ class Scanner(QtCore.QObject):
         self.scanDone.emit()
         # Apparently important, otherwise finalize is called again when next
         # waiting finishes.
-        self.waiter.waitdoneSignal.disconnect(self.finalize)
+        try:
+            self.waiter.waitdoneSignal.disconnect(self.finalize)
+        except TypeError:
+            # This happens when the scan is aborted after the warning
+            pass
         self.waiter.waitdoneSignal.connect(self.done)
 
         # Following code should correct channels mentioned in Buglist. Not
         # correct though, assumes channels are 0, 1 and 2.
         # TODO: Test abort (task function)
-        writtenSamps = np.round(self.aotask.out_stream.curr_write_pos)
+        writtenSamps = int(np.round(self.aotask.out_stream.curr_write_pos))
         finalSamps = [0, 0, 0]
         tempAOchan = copy.copy(self.currAOchan)
         for i in range(0, 3):
@@ -505,7 +517,7 @@ class Scanner(QtCore.QObject):
         returnRamps = [makeRamp(finalSamps[i], 0, self.stageScan.sampleRate)
                        for i in range(0, 3)]
 
-        print('aotaskis: ', self.aotask)
+        print('task is: ', self.aotask.name)
         self.aotask.stop()
         self.aotask.timing.cfg_samp_clk_timing(
             rate=self.stageScan.sampleRate,
@@ -514,14 +526,14 @@ class Scanner(QtCore.QObject):
 
         self.aotask.write(returnRamps, auto_start=False)
         self.aotask.start()
-
         self.waiter.start()
 
     def done(self):
-        print('in self.done()')
         self.aotask.stop()
+        self.aotask.close()
         self.dotask.stop()
-        self.nidaq.reset()
+        self.dotask.close()
+        self.nidaq.reset_device()
         self.finalizeDone.emit()
 
 
@@ -536,7 +548,7 @@ class LaserCycle():
         self.dotask = nidaqmx.Task('dotask')
 
         tmpDOchan = copy.copy(self.currDOchan)
-        fullDOsignal = np.zeros((len(tmpDOchan), self.pxCycle.cycleSamples),
+        fullDOsignal = np.zeros((len(tmpDOchan), self.pxCycle.cycleSamps),
                                 dtype=bool)
         for i in range(0, len(tmpDOchan)):
             dev = min(tmpDOchan, key=tmpDOchan.get)
@@ -558,9 +570,9 @@ class LaserCycle():
 
     def stop(self):
         self.dotask.stop()
-        self.dotask.clear()
+        self.dotask.close()
         del self.dotask
-        self.nidaq.reset()
+        self.nidaq.reset_device()
 
 
 class StageScan():
@@ -591,8 +603,6 @@ class StageScan():
         self.frames = self.scans[self.scanMode].frames
 
     def update(self, parValues):
-        print('in update stageScan')
-        print('self.scanMode = ', self.scanMode)
         self.scans[self.scanMode].update(parValues, self.primScanDim)
         self.sigDict = self.scans[self.scanMode].sigDict
         self.seqSamps = self.scans[self.scanMode].seqSamps
@@ -843,7 +853,7 @@ class GraphFrame(pg.GraphicsWindow):
                             'CAM': self.plot.plot(pen='w')}
         self.resize(600, 200)
 
-    def update(self, mx, devices=None):
+    def update(self, devices=None):
         if devices is None:
             devices = self.plotSigDict
 

@@ -11,7 +11,6 @@ import numpy as np
 import os
 import time
 import re
-import nidaqmx
 
 import matplotlib.pyplot as plt
 
@@ -26,7 +25,6 @@ from tkinter import Tk, filedialog, messagebox
 import h5py as hdf
 import tifffile as tiff     # http://www.lfd.uci.edu/~gohlke/pythonlibs/#vlfd
 from lantz import Q_
-import nidaqmx
 
 import control.lasercontrol as lasercontrol
 # import control.SignalGen as SignalGen
@@ -631,15 +629,9 @@ class RecWorker(QtCore.QObject):
         print('doneSignal emitted from thread')
 
 
-class FileWarning(QtGui.QMessageBox):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-
 class CamParamTree(ParameterTree):
     """ Making the ParameterTree for configuration of the camera during imaging
     """
-
     def __init__(self, orcaflash, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -808,18 +800,21 @@ class LVWorker(QtCore.QObject):
 
 
 class TormentaGUI(QtGui.QMainWindow):
-    '''The main GUI class.'''
 
     liveviewStarts = QtCore.pyqtSignal()
     liveviewEnds = QtCore.pyqtSignal()
 
-    def __init__(self, violetlaser, exclaser, offlaser, orcaflashV2,
-                 orcaflashV3, *args, **kwargs):
+    def __init__(self, violetlaser, exclaser, offlaser,
+                 orcaflashV2, orcaflashV3, nidaq, outChannels,
+                 *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.lasers = (violetlaser, exclaser, offlaser)
         self.cameras = [orcaflashV2, orcaflashV3]
-
+        self.nidaq = nidaq
+        self.outChannels = outChannels
         self.orcaflash = self.cameras[0]
+
         self.changeParameter(
             lambda: self.cameras[0].setPropertyValue('trigger_polarity', 2))
         self.changeParameter(
@@ -843,15 +838,11 @@ class TormentaGUI(QtGui.QMainWindow):
                         self.cameras[1].getPropertyValue('image_width')[0])]
         self.frameStart = (0, 0)
 
-        self.nidaq = nidaqmx.system.System.local().devices['Dev1']
-
         self.lvworkers = [None, None]
         self.lvthreads = [None, None]
         self.currCamIdx = 0
         self.latest_images = [np.zeros(self.shapes[self.currCamIdx]),
                               np.zeros(self.shapes[self.currCamIdx])]
-
-        self.filewarning = FileWarning()
 
         self.s = Q_(1, 's')
         self.lastTime = time.clock()
@@ -1074,13 +1065,12 @@ class TormentaGUI(QtGui.QMainWindow):
         dockArea = DockArea()
 
         laserDock = Dock("Laser Control", size=(1, 1))
-        self.lasers = (violetlaser, exclaser, offlaser)
         self.laserWidgets = lasercontrol.LaserWidget(self.lasers, self.nidaq)
         laserDock.addWidget(self.laserWidgets)
         dockArea.addDock(laserDock)
 
         scanDock = Dock('Scan')
-        self.scanWidget = scanner.ScanWidget(self.nidaq)
+        self.scanWidget = scanner.ScanWidget(self.nidaq, self.outChannels)
         scanDock.addWidget(self.scanWidget)
         dockArea.addDock(scanDock)
 
@@ -1125,7 +1115,7 @@ class TormentaGUI(QtGui.QMainWindow):
         dockArea.addDock(RotalignDock, 'above', ZalignDock)
 
         # Scan Widget
-        self.scanxyWidget = scanWidget.ScanWidget(self.nidaq, self)
+        self.scanxyWidget = scanner.ScanWidget(self.nidaq, self.outChannels)
 #        self.scanImageDock = Dock("Image from scanning", size=(300, 300))
 #        self.scanImageDock.addWidget(self.scanxyWidget.display)
 #        dockArea.addDock(self.scanImageDock)
@@ -1569,7 +1559,7 @@ class TormentaGUI(QtGui.QMainWindow):
 #        if self.signalWidget.running:
 #            self.signalWidget.StartStop()
 
-        self.nidaq.reset()
+        self.nidaq.reset_device()
 
         self.laserWidgets.closeEvent(*args, **kwargs)
         self.ZalignWidget.closeEvent(*args, **kwargs)

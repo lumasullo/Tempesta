@@ -2,7 +2,7 @@
 """
 Created on Thu Mar 31 11:54:52 2016
 
-@author: testaRES
+@author: Barabas, Bodén, Masullo
 """
 
 from pyqtgraph.Qt import QtGui
@@ -14,8 +14,12 @@ def main():
 
     app = QtGui.QApplication([])
 
+    # NI-DAQ channels configuration
     system = nidaqmx.system.System.local()
-    widget = scanner.ScanWidget(system.devices['Dev1'], None)
+    DO = {'405': 0, '473': 1, '488': 2, 'CAM': 3}
+    AO = {'x': 0, 'y': 1, 'z': 2}
+
+    widget = scanner.ScanWidget(system.devices['Dev1'], [DO, AO])
     win = QtGui.QMainWindow()
     win.setCentralWidget(widget)
     win.show()
