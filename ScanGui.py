@@ -4,20 +4,20 @@ Created on Thu Mar 31 11:54:52 2016
 
 @author: testaRES
 """
- 
+
 from pyqtgraph.Qt import QtGui
-from scanner_only import Scan_self_GUI
-# from control import control
-from control import libnidaqmx
+from control import scanner
+import nidaqmx
 
 
 def main():
 
     app = QtGui.QApplication([])
 
-    win = Scan_self_GUI.ScanWidget(libnidaqmx.Device('Dev1'))
-#    win = control.TormentaGUI(bluelaser, violetlaser, uvlaser,
-#                              scanZ, daq, orcaflash)
+    system = nidaqmx.system.System.local()
+    widget = scanner.ScanWidget(system.devices['Dev1'], None)
+    win = QtGui.QMainWindow()
+    win.setCentralWidget(widget)
     win.show()
 
     app.exec_()

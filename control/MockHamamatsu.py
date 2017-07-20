@@ -6,16 +6,15 @@ Created on Tue Feb  9 12:56:16 2016
 """
 import ctypes
 import ctypes.util
-import logging
 import numpy as np
-import pygame
 
 from lantz import Driver
 from lantz import Q_
 
+
 class HMockCamData():
 
-    ## __init__
+    # __init__
     #
     # Create a data object of the appropriate size.
     #
@@ -25,14 +24,14 @@ class HMockCamData():
         self.np_array = np.random.randint(1, 65536, int(size))
         self.size = size
 
-    ## __getitem__
+    # __getitem__
     #
     # @param slice The slice of the item to get.
     #
     def __getitem__(self, slice):
         return self.np_array[slice]
 
-    ## copyData
+    # copyData
     #
     # Uses the C memmove function to copy data from an address in memory
     # into memory allocated for the numpy array of this object.
@@ -42,14 +41,14 @@ class HMockCamData():
     def copyData(self, address):
         ctypes.memmove(self.np_array.ctypes.data, address, self.size)
 
-    ## getData
+    # getData
     #
     # @return A numpy array that contains the camera data.
     #
     def getData(self):
         return self.np_array
 
-    ## getDataPtr
+    # getDataPtr
     #
     # @return The physical address in memory of the data.
     #
@@ -57,9 +56,7 @@ class HMockCamData():
         return self.np_array.ctypes.data
 
 
-
 class MockHamamatsu(Driver):
-
 
     def __init__(self):
 
@@ -69,12 +66,12 @@ class MockHamamatsu(Driver):
         self.debug = False
         self.frame_x = 500
         self.frame_y = 500
-        self.frame_bytes = self.frame_x*self.frame_y*2
+        self.frame_bytes = self.frame_x * self.frame_y * 2
         self.last_frame_number = 0
         self.properties = {}
         self.max_backlog = 0
         self.number_image_buffers = 0
-        
+
         self.s = Q_(1, 's')
 
         # Open the camera.
@@ -85,25 +82,23 @@ class MockHamamatsu(Driver):
 #                         "dcam_open")
         # Get camera properties.
         self.properties = {'Name': 'MOCK Hamamatsu',
-        'exposure_time': 9999 * self.s,
-        'accumulation_time': 99999 * self.s,
-        'image_width': 2048, 
-        'image_height': 2048, 
-        'image_framebytes': 8, 
-        'subarray_hsize': 2048, 
-        'subarray_vsize': 2048,
-        'subarray_mode': 'OFF',
-        'timing_readout_time': 9999,
-        'internal_frame_rate': 9999,
-        'internal_frame_interval': 9999};
+                           'exposure_time': 9999,  # * self.s,
+                           'accumulation_time': 99999,  # * self.s,
+                           'image_width': 2048,
+                           'image_height': 2048,
+                           'image_framebytes': 8,
+                           'subarray_hsize': 2048,
+                           'subarray_vsize': 2048,
+                           'subarray_mode': 'OFF',
+                           'timing_readout_time': 9999,
+                           'internal_frame_rate': 9999,
+                           'internal_frame_interval': 9999}
 
         # Get camera max width, height.
         self.max_width = self.getPropertyValue("image_width")[0]
         self.max_height = self.getPropertyValue("image_height")[0]
-        
-        
 
-    ## captureSetup
+    # captureSetup
     #
     # Capture setup (internal use only). This is called at the start
     # of new acquisition sequence to determine the current ROI and
@@ -121,41 +116,38 @@ class MockHamamatsu(Driver):
         self.frame_y = int(self.getPropertyValue("image_height")[0])
         self.frame_bytes = self.getPropertyValue("image_framebytes")[0]
 
-
-    ## checkStatus
+    # checkStatus
     #
     # Check return value of the dcam function call.
     # Throw an error if not as expected?
     #
     # @return The return value of the function.
     #
-    def checkStatus(self, fn_return, fn_name= "unknown"):
+    def checkStatus(self, fn_return, fn_name="unknown"):
         pass
 
-
-    ## getFrames
+    # getFrames
     #
     # Gets all of the available frames.
     #
-    # This will block waiting for new frames even if 
+    # This will block waiting for new frames even if
     # there new frames available when it is called.
     #
     # @return [frames, [frame x size, frame y size]]
     #
     def getFrames(self):
-        
+
         frames = []
 
         for i in range(2):
-        # Create storage
-            hc_data = HMockCamData(self.frame_x*self.frame_y)
-    
-    
+            # Create storage
+            hc_data = HMockCamData(self.frame_x * self.frame_y)
+
             frames.append(hc_data)
 
         return [frames, [self.frame_x, self.frame_y]]
-        
-    ## getModelInfo
+
+    # getModelInfo
     #
     # Returns the model of the camera
     #
@@ -164,10 +156,10 @@ class MockHamamatsu(Driver):
     # @return A string containing the camera name.
     #
     def getModelInfo(self):
+        return ('WARNING!: This is a Mock Version of the Hamamatsu Orca flash '
+                'camera')
 
-        return 'WARNING!: This is a Mock Version of the Hamamatsu Orca flash camera'
-
-    ## getProperties
+    # getProperties
     #
     # Return the list of camera properties. This is the one to call if you
     # want to know the camera properties.
@@ -177,7 +169,7 @@ class MockHamamatsu(Driver):
     def getProperties(self):
         return self.properties
 
-    ## getPropertyAttribute
+    # getPropertyAttribute
     #
     # Return the attribute structure of a particular property.
     #
@@ -190,7 +182,7 @@ class MockHamamatsu(Driver):
     def getPropertyAttribute(self, property_name):
         pass
 
-    ## getPropertyText
+    # getPropertyText
     #
     # Return the text options of a property (if any).
     #
@@ -201,7 +193,7 @@ class MockHamamatsu(Driver):
     def getPropertyText(self, property_name):
         pass
 
-    ## getPropertyRange
+    # getPropertyRange
     #
     # Return the range for an attribute.
     #
@@ -212,7 +204,7 @@ class MockHamamatsu(Driver):
     def getPropertyRange(self, property_name):
         pass
 
-    ## getPropertyRW
+    # getPropertyRW
     #
     # Return if a property is readable / writeable.
     #
@@ -221,7 +213,7 @@ class MockHamamatsu(Driver):
     def getPropertyRW(self, property_name):
         pass
 
-    ## getPropertyVale
+    # getPropertyVale
     #
     # Return the current setting of a particular property.
     #
@@ -236,7 +228,7 @@ class MockHamamatsu(Driver):
 
         return [prop_value, prop_type]
 
-    ## isCameraProperty
+    # isCameraProperty
     #
     # Check if a property name is supported by the camera.
     #
@@ -250,11 +242,11 @@ class MockHamamatsu(Driver):
         else:
             return False
 
-    ## newFrames
+    # newFrames
     #
     # Return a list of the ids of all the new frames since the last check.
     #
-    # This will block waiting for at least one new frame. 
+    # This will block waiting for at least one new frame.
     #
     # @return [id of the first frame, .. , id of the last frame]
     #
@@ -265,7 +257,7 @@ class MockHamamatsu(Driver):
 
         return new_frames
 
-    ## setPropertyValue
+    # setPropertyValue
     #
     # Set the value of a property.
     #
@@ -279,7 +271,7 @@ class MockHamamatsu(Driver):
             print(" unknown property name:", property_name)
             return False
 
-        # If the value is text, figure out what the 
+        # If the value is text, figure out what the
         # corresponding numerical property value is.
 
         self.properties[property_name] = property_value
@@ -287,11 +279,12 @@ class MockHamamatsu(Driver):
 #            if (property_value in text_values):
 #                property_value = float(text_values[property_value])
 #            else:
-#                print(" unknown property text value:", property_value, "for", property_name)
-#                return False  
+#                print(" unknown property text value:", property_value, "for",
+#                      property_name)
+#                return False
         return property_value
 
-    ## setSubArrayMode
+    # setSubArrayMode
     #
     # This sets the sub-array mode as appropriate based on the current ROI.
     #
@@ -309,32 +302,30 @@ class MockHamamatsu(Driver):
         else:
             self.setPropertyValue("subarray_mode", "ON")
 
-
-    ## startAcquisition
+    # startAcquisition
     #
     # Start data acquisition.
     #
     def startAcquisition(self):
         self.captureSetup()
-        n_buffers = int((2.0 * 1024 * 1024 * 1024)/self.frame_bytes)
+        n_buffers = int((2.0 * 1024 * 1024 * 1024) / self.frame_bytes)
         self.number_image_buffers = n_buffers
 
         self.hcam_data = []
-        for i in range(1,2):
-            hc_data = HMockCamData(self.frame_x*self.frame_y)
+        for i in range(1, 2):
+            hc_data = HMockCamData(self.frame_x * self.frame_y)
             self.hcam_data.append(hc_data)
-        
+
         print('size of hcam_data = ', np.size(self.hcam_data))
 
-
-    ## stopAcquisition
+    # stopAcquisition
     #
     # Stop data acquisition.
     #
     def stopAcquisition(self):
         pass
 
-    ## shutdown
+    # shutdown
     #
     # Close down the connection to the camera.
     #
