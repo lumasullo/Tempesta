@@ -151,7 +151,7 @@ class ScanWidget(QtGui.QMainWindow):
         self.stageScan = StageScan(self.sampleRate)
         self.pxCycle = PixelCycle(self.sampleRate)
         self.graph = GraphFrame(self.pxCycle)
-        self.graph.plot.getAxis('bottom').setScale(1/self.sampleRate)
+        self.graph.plot.getAxis('bottom').setScale(1000/self.sampleRate)
         self.updateScan(self.allDevices)
         self.scanParameterChanged('seqTime')
 
@@ -201,20 +201,20 @@ class ScanWidget(QtGui.QMainWindow):
 
         grid.addWidget(QtGui.QLabel('Sequence Time (ms):'), 8, 0)
         grid.addWidget(self.seqTimePar, 8, 1)
-        grid.addWidget(QtGui.QLabel('Start (ms):'), 9, 1)
-        grid.addWidget(QtGui.QLabel('End (ms):'), 9, 2)
-        grid.addWidget(QtGui.QLabel('405:'), 10, 0)
-        grid.addWidget(self.start405Par, 10, 1)
-        grid.addWidget(self.end405Par, 10, 2)
-        grid.addWidget(QtGui.QLabel('473:'), 11, 0)
-        grid.addWidget(self.start473Par, 11, 1)
-        grid.addWidget(self.end473Par, 11, 2)
-        grid.addWidget(QtGui.QLabel('488:'), 12, 0)
-        grid.addWidget(self.start488Par, 12, 1)
-        grid.addWidget(self.end488Par, 12, 2)
-        grid.addWidget(QtGui.QLabel('Camera:'), 13, 0)
-        grid.addWidget(self.startCAMPar, 13, 1)
-        grid.addWidget(self.endCAMPar, 13, 2)
+        grid.addWidget(QtGui.QLabel('Start (ms):'), 7, 3)
+        grid.addWidget(QtGui.QLabel('End (ms):'), 7, 4)
+        grid.addWidget(QtGui.QLabel('405:'), 8, 2)
+        grid.addWidget(self.start405Par, 8, 3)
+        grid.addWidget(self.end405Par, 8, 4)
+        grid.addWidget(QtGui.QLabel('473:'), 9, 2)
+        grid.addWidget(self.start473Par, 9, 3)
+        grid.addWidget(self.end473Par, 9, 4)
+        grid.addWidget(QtGui.QLabel('488:'), 10, 2)
+        grid.addWidget(self.start488Par, 10, 3)
+        grid.addWidget(self.end488Par, 10, 4)
+        grid.addWidget(QtGui.QLabel('Camera:'), 11, 2)
+        grid.addWidget(self.startCAMPar, 11, 3)
+        grid.addWidget(self.endCAMPar, 11, 4)
 
         grid.addWidget(self.graph, 14, 0, 1, 5)
         grid.addWidget(self.PreviewButton, 15, 0)
@@ -340,7 +340,6 @@ class ScanWidget(QtGui.QMainWindow):
     def finalizeDone(self):
         self.ScanButton.setText('Scan')
         self.ScanButton.setEnabled(True)
-        print('Scan Done')
         del self.scanner
         self.scanning = False
 
@@ -475,10 +474,15 @@ class Scanner(QtCore.QObject):
         self.waiter.waitdoneSignal.connect(self.finalize)
 
         self.dotask.write(fullDOsignal, auto_start=False)
-        self.aotask.write(fullAOsignal, auto_start=False)
+        try:
+            self.aotask.write(fullAOsignal, auto_start=False)
+            self.aotask.start()
+        except nidaqmx.errors.DaqError as e:
+            print(e)
+            self.done()
 
         self.dotask.start()
-        self.aotask.start()
+
         self.waiter.start()
 
     def abort(self):
@@ -517,7 +521,6 @@ class Scanner(QtCore.QObject):
         returnRamps = [makeRamp(finalSamps[i], 0, self.stageScan.sampleRate)
                        for i in range(0, 3)]
 
-        print('task is: ', self.aotask.name)
         self.aotask.stop()
         self.aotask.timing.cfg_samp_clk_timing(
             rate=self.stageScan.sampleRate,
@@ -844,7 +847,6 @@ class GraphFrame(pg.GraphicsWindow):
 
         self.pxCycle = pxCycle
         self.plot = self.addPlot(row=1, col=0)
-        self.plot.setLabel('bottom', 'Time', 's')
         self.plot.setYRange(0, 1)
         self.plot.showGrid(x=False, y=False)
         self.plotSigDict = {'405': self.plot.plot(pen=pg.mkPen(130, 0, 200)),

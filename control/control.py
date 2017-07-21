@@ -1081,22 +1081,18 @@ class TormentaGUI(QtGui.QMainWindow):
         dockArea.addDock(consoleDock, 'above', scanDock)
 
         # Line Alignment Tool
-        alignmentDock = Dock("Alignment Tool", size=(50, 50))
+        alignmentDock = Dock("Alignment Tool", size=(50, 30))
         self.alignmentWidget = QtGui.QWidget()
         alignmentDock.addWidget(self.alignmentWidget)
         dockArea.addDock(alignmentDock)
 
         alignmentLayout = QtGui.QGridLayout()
         self.alignmentWidget.setLayout(alignmentLayout)
-
         self.angleEdit = QtGui.QLineEdit('30')
         self.alignmentLineMakerButton = QtGui.QPushButton('Alignment Line')
         self.angle = np.float(self.angleEdit.text())
-
         self.alignmentLineMakerButton.clicked.connect(self.alignmentToolAux)
-
         self.alignmentCheck = QtGui.QCheckBox('Show Alignment Tool')
-
         alignmentLayout.addWidget(QtGui.QLabel('Line Angle'), 0, 0)
         alignmentLayout.addWidget(self.angleEdit, 0, 1)
         alignmentLayout.addWidget(self.alignmentLineMakerButton, 1, 0)

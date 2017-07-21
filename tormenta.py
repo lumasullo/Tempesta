@@ -24,9 +24,9 @@ def main():
     nidaq = nidaqmx.system.System.local().devices['Dev1']
 
 # TODO: create an instruments.Camera(hamamatsu) or something similar
-    with instruments.Laser(cobolt, 'COM4') as violetlaser, \
+    with instruments.Laser(cobolt, 'COM5') as violetlaser, \
             instruments.Laser(cobolt, 'COM13') as exclaser, \
-            instruments.Laser(cobolt, 'COM5') as offlaser:
+            instruments.Laser(cobolt, 'COM4') as offlaser:
 
         orcaflashV3 = instruments.Camera(0)
         orcaflashV2 = instruments.Camera(1)
