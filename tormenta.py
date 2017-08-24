@@ -26,17 +26,18 @@ def main():
 # TODO: create an instruments.Camera(hamamatsu) or something similar
     with instruments.Laser(cobolt, 'COM5') as violetlaser, \
             instruments.Laser(cobolt, 'COM13') as exclaser, \
-            instruments.Laser(cobolt, 'COM6') as offlaser1, \
-            instruments.Laser(cobolt, 'COM4') as offlaser2:
+            instruments.LinkedLaserCheck(cobolt, ['COM6', 'COM4']) as offlaser:
+#            instruments.Laser(cobolt, 'COM6') as offlaser1, \
+#            instruments.Laser(cobolt, 'COM4') as offlaser2:
 
         orcaflashV3 = instruments.Camera(0)
         orcaflashV2 = instruments.Camera(1)
         print(violetlaser.idn)
         print(exclaser.idn)
-        print(offlaser1.idn)
-        print(offlaser2.idn)
+        print(offlaser.idn)
+#        print(offlaser2.idn)
 
-        win = control.TormentaGUI(violetlaser, exclaser, offlaser1, offlaser2,
+        win = control.TormentaGUI(violetlaser, exclaser, offlaser,  # offlaser2,
                                   orcaflashV2, orcaflashV3,
                                   nidaq, outChannels)
         win.show()
