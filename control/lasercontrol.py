@@ -141,10 +141,12 @@ class DigitalControl(QtGui.QFrame):
 #    def GlobalDigitalMod(self):
 #        if self.DigitalControlButton.isChecked():
 #            for i in np.arange(len(self.lasers)):
-#                self.lasers[i].laser.power_sp = float(self.powers[i]) * self.mW
+#                powMag = float(self.powers[i])
+#                self.lasers[i].laser.power_sp = powMag * self.mW
 #        else:
 #            for i in np.arange(len(self.lasers)):
-#                self.lasers[i].laser.power_sp = float(self.lasers[i].laser.setPointEdit) * self.mW
+#                powMag = float(self.lasers[i].laser.setPointEdit)
+#                self.lasers[i].laser.power_sp = powMag * self.mW
 
     def GlobalDigitalMod(self):
         self.digitalPowers = [float(self.blueReadoutPower.text()),
@@ -156,7 +158,8 @@ class DigitalControl(QtGui.QFrame):
                 self.lasers[i].laser.digital_mod = True
                 self.lasers[i].laser.enter_mod_mode()
                 print(self.lasers[i].laser.mod_mode)
-                self.lasers[i].laser.power_sp = float(self.digitalPowers[i]) * self.mW
+                powMag = float(self.digitalPowers[i])
+                self.lasers[i].laser.power_sp = powMag * self.mW
         else:
             for i in np.arange(len(self.lasers)):
                 self.lasers[i].changeEdit()
@@ -171,15 +174,17 @@ class DigitalControl(QtGui.QFrame):
                               float(self.lilaOnPower.text())]
         if self.DigitalControlButton.isChecked():
             for i in np.arange(len(self.lasers)):
-                self.lasers[i].laser.power_sp = float(self.digitalPowers[i]) * self.mW
+                powMag = float(self.digitalPowers[i])
+                self.lasers[i].laser.power_sp = powMag * self.mW
 
 
 class LaserControl(QtGui.QFrame):
 
     def __init__(self, laser, name, color, prange, tickInterval, singleStep,
                  daq=None, port=None, invert=True, modulable=True,
-                 *args, **kwargs):
+                 linked=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         self.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
         self.laser = laser
         self.mW = Q_(1, 'mW')
