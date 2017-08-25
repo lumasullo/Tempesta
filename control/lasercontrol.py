@@ -94,6 +94,7 @@ class LaserWidget(QtGui.QFrame):
 
     def closeEvent(self, *args, **kwargs):
         self.updateThread.terminate()
+        self.offlaser.finalize()
         super().closeEvent(*args, **kwargs)
 
 

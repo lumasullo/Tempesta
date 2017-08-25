@@ -23,23 +23,18 @@ def main():
     outChannels = [DO, AO]
     nidaq = nidaqmx.system.System.local().devices['Dev1']
 
-# TODO: create an instruments.Camera(hamamatsu) or something similar
     with instruments.Laser(cobolt, 'COM5') as violetlaser, \
-            instruments.Laser(cobolt, 'COM13') as exclaser, \
-            instruments.LinkedLaserCheck(cobolt, ['COM6', 'COM4']) as offlaser:
-#            instruments.Laser(cobolt, 'COM6') as offlaser1, \
-#            instruments.Laser(cobolt, 'COM4') as offlaser2:
+            instruments.Laser(cobolt, 'COM13') as exclaser:
 
+        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM6', 'COM4'])
         orcaflashV3 = instruments.Camera(0)
         orcaflashV2 = instruments.Camera(1)
         print(violetlaser.idn)
         print(exclaser.idn)
         print(offlaser.idn)
-#        print(offlaser2.idn)
 
-        win = control.TormentaGUI(violetlaser, exclaser, offlaser,  # offlaser2,
-                                  orcaflashV2, orcaflashV3,
-                                  nidaq, outChannels)
+        win = control.TormentaGUI(violetlaser, exclaser, offlaser, orcaflashV2,
+                                  orcaflashV3, nidaq, outChannels)
         win.show()
 
         app.exec_()
