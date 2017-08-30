@@ -23,10 +23,10 @@ def main():
     outChannels = [DO, AO]
     nidaq = nidaqmx.system.System.local().devices['Dev1']
 
-    with instruments.Laser(cobolt, 'COM5') as violetlaser, \
-            instruments.Laser(cobolt, 'COM13') as exclaser:
-
-        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM6', 'COM4'])
+    with instruments.Laser(cobolt, 'COM4') as violetlaser, \
+            instruments.Laser(cobolt, 'COM13') as exclaser, \
+            instruments.Laser(cobolt, 'COM6') as offlaser:
+#        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM6', 'COM4'])
         orcaflashV3 = instruments.Camera(0)
         orcaflashV2 = instruments.Camera(1)
         print(violetlaser.idn)

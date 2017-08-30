@@ -76,7 +76,7 @@ class ScanWidget(QtGui.QMainWindow):
         self.stepSizeZPar = QtGui.QLineEdit('0.05')
         self.stepSizeZPar.editingFinished.connect(
             lambda: self.scanParameterChanged('stepSizeZ'))
-        self.sampleRate = 70000
+        self.sampleRate =100000
 
         self.scanMode = QtGui.QComboBox()
         self.scanModes = ['FOV scan', 'VOL scan', 'Line scan']
@@ -662,25 +662,25 @@ class FOVscan():
         slightly from expected scan. Maybe either limit input parameters to
         numbers that "fit each other" or find other solution, eg step size has
         to be width divided by an integer. Maybe not a problem ???'''
-        stepSizeX = parValues['stepSizeXY'] / convFactors['x']
-        stepSizeY = parValues['stepSizeXY'] / convFactors['y']
-        sizeX = parValues['sizeX'] / convFactors['x']
-        sizeY = parValues['sizeY'] / convFactors['y']
+        stepSizeX = parValues['stepSizeXY']
+        stepSizeY = parValues['stepSizeXY']
+        sizeX = parValues['sizeX']
+        sizeY = parValues['sizeY']
         stepsX = int(np.ceil(sizeX / stepSizeX))
         stepsY = int(np.ceil(sizeY / stepSizeY))
         # +1 because nr of frames per line is one more than nr of steps
-        self.frames = (stepsY + 1) * (stepsX + 1)
+        self.frames = stepsY * stepsX
 
     def update(self, parValues, primScanDim):
         '''Create signals.
-        First, distances are converted to voltages.'''
+        Signals are first created in units of distance and converted to voltage at the end.'''
         # Create signals
         startX = 0
         startY = 0
-        sizeX = parValues['sizeX'] / convFactors['x']
-        sizeY = parValues['sizeY'] / 2
-        stepSizeX = parValues['stepSizeXY'] / convFactors['x']
-        stepSizeY = parValues['stepSizeXY'] / convFactors['y']
+        sizeX = parValues['sizeX']
+        sizeY = parValues['sizeY']
+        stepSizeX = parValues['stepSizeXY']
+        stepSizeY = parValues['stepSizeXY']
         self.seqSamps = int(np.round(self.sampleRate*parValues['seqTime']))
         self.stepsX = int(np.ceil(sizeX / stepSizeX))
         self.stepsY = int(np.ceil(sizeY / stepSizeY))
@@ -691,26 +691,20 @@ class FOVscan():
         LTRramp = makeRamp(startX, sizeX, rowSamps)
         RTLramp = LTRramp[::-1]
 
-        primDimSig = []
-        secDimSig = []
+        Xsig = []
+        Ysig = []
         newValue = startY
         for i in range(0, self.stepsY):
             if i % 2 == 0:
-                primDimSig = np.concatenate((primDimSig, LTRramp))
+                Xsig = np.concatenate((Xsig, LTRramp))
             else:
-                primDimSig = np.concatenate((primDimSig, RTLramp))
-            secDimSig = np.concatenate((secDimSig, newValue*np.ones(rowSamps)))
+                Xsig = np.concatenate((Xsig, RTLramp))
+            Ysig = np.concatenate((Ysig, newValue*np.ones(rowSamps)))
             newValue = newValue + self.corrStepSize
 
-        # Assign primary scan dir
-        # 1.14 is emperically measured correction factor
-        self.sigDict[primScanDim] = 1.14 * primDimSig
-        # Assign second and third dim
-        for key in self.sigDict:
-            if not key[0] == primScanDim and not key[0] == 'z':
-                self.sigDict[key] = 1.14 * secDimSig
-            elif not key[0] == primScanDim:
-                self.sigDict[key] = np.zeros(len(secDimSig))
+        self.sigDict['x'] = Xsig / convFactors['x']
+        self.sigDict['y'] = Ysig / convFactors['y']
+        self.sigDict['z'] = np.zeros(len(Ysig))
 
 
 class VOLscan():
@@ -825,8 +819,10 @@ class PixelCycle():
     def __init__(self, sampleRate):
         self.sigDict = {'405': [], '473': [], '488': [], 'CAM': []}
         self.sampleRate = sampleRate
+        self.cycleSamps = None
 
     def update(self, devices, parValues, cycleSamps):
+        self.cycleSamps = cycleSamps
         for device in devices:
             signal = np.zeros(cycleSamps)
             start_name = 'start' + device
