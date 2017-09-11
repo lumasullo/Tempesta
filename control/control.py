@@ -805,14 +805,13 @@ class TormentaGUI(QtGui.QMainWindow):
     liveviewEnds = QtCore.pyqtSignal()
 
     def __init__(self, violetlaser, exclaser, offlaser,  # offlaser2,
-                 orcaflashV2, orcaflashV3, nidaq, outChannels,
+                 orcaflashV2, orcaflashV3, nidaq,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.lasers = (violetlaser, exclaser, offlaser)  # , offlaser2)
         self.cameras = [orcaflashV2, orcaflashV3]
         self.nidaq = nidaq
-        self.outChannels = outChannels
         self.orcaflash = self.cameras[0]
 
         self.changeParameter(
@@ -1070,7 +1069,7 @@ class TormentaGUI(QtGui.QMainWindow):
         dockArea.addDock(laserDock)
 
         scanDock = Dock('Scan')
-        self.scanWidget = scanner.ScanWidget(self.nidaq, self.outChannels)
+        self.scanWidget = scanner.ScanWidget(self.nidaq, self)
         scanDock.addWidget(self.scanWidget)
         dockArea.addDock(scanDock)
 
@@ -1111,7 +1110,7 @@ class TormentaGUI(QtGui.QMainWindow):
         dockArea.addDock(RotalignDock, 'above', ZalignDock)
 
         # Scan Widget
-        self.scanxyWidget = scanner.ScanWidget(self.nidaq, self.outChannels)
+        self.scanxyWidget = scanner.ScanWidget(self.nidaq, self)
 #        self.scanImageDock = Dock("Image from scanning", size=(300, 300))
 #        self.scanImageDock.addWidget(self.scanxyWidget.display)
 #        dockArea.addDock(self.scanImageDock)

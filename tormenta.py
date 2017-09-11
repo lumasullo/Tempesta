@@ -17,24 +17,21 @@ def main():
 
     cobolt = 'cobolt.cobolt0601.Cobolt0601'
 
-    # NI-DAQ channels configuration
-    DO = {'405': 0, '473': 1, '488': 2, 'CAM': 3}
-    AO = {'x': 0, 'y': 1, 'z': 2}
-    outChannels = [DO, AO]
     nidaq = nidaqmx.system.System.local().devices['Dev1']
 
-    with instruments.Laser(cobolt, 'COM4') as violetlaser, \
-            instruments.Laser(cobolt, 'COM13') as exclaser, \
-            instruments.Laser(cobolt, 'COM6') as offlaser:
-#        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM6', 'COM4'])
+    with instruments.Laser(cobolt, 'COM5') as violetlaser:#, \
+#            instruments.LaserTTL(4) as exclaser:  #, \
+#            instruments.Laser(cobolt, 'COM6') as offlaser:
+        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM6', 'COM4'])
+        exclaser = instruments.LaserTTL(0)
         orcaflashV3 = instruments.Camera(0)
         orcaflashV2 = instruments.Camera(1)
         print(violetlaser.idn)
-        print(exclaser.idn)
+        print(exclaser.line)
         print(offlaser.idn)
 
-        win = control.TormentaGUI(violetlaser, exclaser, offlaser, orcaflashV2,
-                                  orcaflashV3, nidaq, outChannels)
+        win = control.TormentaGUI(violetlaser, offlaser, exclaser, orcaflashV2,
+                                  orcaflashV3, nidaq)
         win.show()
 
         app.exec_()
