@@ -7,6 +7,12 @@ Created on Sun Dec 28 13:25:27 2014
 
 import importlib
 import control.mockers as mockers
+from instrumental.drivers.cameras.uc480 import UC480_Camera
+from lantz.drivers.piezosystemjena.nv401 import nv401
+
+
+
+import time
 
 
 class Laser(object):
@@ -107,3 +113,17 @@ class Camera(object):
         except:
             print('Initializing Mock Hamamatsu')
             return mockers.MockHamamatsu()
+
+
+class PZT(object):
+
+    def __new__(cls, iName, port, *args):
+        if iName == 'nv401':
+            inst = nv401.via_serial(port)
+            return inst
+        elif iName == 'mock':
+            return mockers.MockPZT()
+        else:
+            raise ValueError('Enter the right piezo name, if you dont have piezo, you can use "mock"')
+
+
