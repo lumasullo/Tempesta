@@ -12,7 +12,7 @@ import time
 
 import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
-
+import collections
 import nidaqmx
 
 import control.guitools as guitools
@@ -37,13 +37,14 @@ class ScanWidget(QtGui.QMainWindow):
     As seen in the commened lines of run() I also tried running in a QThread
     created in run().
     The rest of the functions contain mosly GUI related code.'''
-    def __init__(self, device, outChannels, *args, **kwargs):
+    def __init__(self, device, main, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.DigModW = QtGui.QMessageBox()
+        self.DigModW.setInformativeText("You need to be in digital modulation to scan")
 
         self.nidaq = device
-        self.currDOchan, self.currAOchan = outChannels
-
-        self.allDevices = list(self.currDOchan.keys())
+        self.main = main
+        self.allDevices = ['405', '473', '488', 'CAM']
         self.saveScanBtn = QtGui.QPushButton('Save Scan')
 
         def saveScanFcn(): return guitools.saveScan(self)
@@ -76,7 +77,7 @@ class ScanWidget(QtGui.QMainWindow):
         self.stepSizeZPar = QtGui.QLineEdit('0.05')
         self.stepSizeZPar.editingFinished.connect(
             lambda: self.scanParameterChanged('stepSizeZ'))
-        self.sampleRate =100000
+        self.sampleRate = 100000
 
         self.scanMode = QtGui.QComboBox()
         self.scanModes = ['FOV scan', 'VOL scan', 'Line scan']
@@ -251,23 +252,6 @@ class ScanWidget(QtGui.QMainWindow):
         self.stageScan.setPrimScanDim(dim)
         self.scanParameterChanged('primScanDim')
 
-    def AOchanChanged(self):
-        """Function is obsolete since we never change channels this way,
-        Z-channel not implemented"""
-#        Xchan = self.XchanPar.currentIndex()
-#        Ychan = self.YchanPar.currentIndex()
-#        if Xchan == Ychan:
-#            Ychan = (Ychan + 1)%4
-#            self.YchanPar.setCurrentIndex(Ychan)
-#        self.currAOchan['x'] = Xchan
-#        self.currAOchan['y'] = Ychan
-
-    def DOchanChanged(self, sig, new_index):
-        for i in self.currDOchan:
-            if i != sig and new_index == self.currDOchan[i]:
-                self.DOchanParsDict[sig].setCurrentIndex(self.currDOchan[sig])
-
-        self.currDOchan[sig] = self.DOchanParsDict[sig].currentIndex()
 
     def scanParameterChanged(self, p):
         if p not in ('scanMode', 'primScanDim'):
@@ -305,7 +289,10 @@ class ScanWidget(QtGui.QMainWindow):
 
     def scanOrAbort(self):
         if not self.scanning:
-            self.prepAndRun()
+            if self.main.laserWidgets.DigCtrl.DigitalControlButton.isChecked():
+                self.prepAndRun()
+            else:
+                self.DigModW.exec_()
         else:
             self.scanner.abort()
 
@@ -315,16 +302,15 @@ class ScanWidget(QtGui.QMainWindow):
         if self.scanRadio.isChecked():
             self.stageScan.update(self.scanParValues)
             self.ScanButton.setText('Abort')
-            self.scanner = Scanner(self.nidaq, self.stageScan, self.pxCycle,
-                                   self.currAOchan, self.currDOchan, self)
+            self.scanner = Scanner(self.nidaq, self.stageScan,
+                                   self.pxCycle, self)
             self.scanner.finalizeDone.connect(self.finalizeDone)
             self.scanner.scanDone.connect(self.scanDone)
             self.scanning = True
             self.scanner.runScan()
 
         elif self.ScanButton.isChecked():
-            self.lasercycle = LaserCycle(self.nidaq, self.pxCycle,
-                                         self.currDOchan)
+            self.lasercycle = LaserCycle(self.nidaq, self.pxCycle)
             self.ScanButton.setText('Stop')
             self.lasercycle.run()
 
@@ -378,29 +364,25 @@ class Scanner(QtCore.QObject):
     scanDone = QtCore.pyqtSignal()
     finalizeDone = QtCore.pyqtSignal()
 
-    def __init__(self, device, stageScan, pxCycle, currAOchan, currDOchan,
-                 main, *args, **kwargs):
+    def __init__(self, device, stageScan, pxCycle, main, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.nidaq = device
         self.stageScan = stageScan
         self.pxCycle = pxCycle
-        # Dict containing channel numbers to be written to for each signal
-        self.currAOchan = currAOchan
-        # Dict containing channel numbers to be written to for each device
-        self.currDOchan = currDOchan
+
         self.sampsInScan = len(self.stageScan.sigDict['x'])
         self.main = main
 
         self.aotask = nidaqmx.Task('aotask')
         self.dotask = nidaqmx.Task('dotask')
-
         self.waiter = WaitThread(self.aotask)
 
         self.scanTimeW = QtGui.QMessageBox()
         self.scanTimeW.setInformativeText("Are you sure you want to continue?")
         self.scanTimeW.setStandardButtons(QtGui.QMessageBox.Yes |
                                           QtGui.QMessageBox.No)
+        self.channel_order = ['x', 'y', 'z']
 
     def runScan(self):
         scanTime = self.sampsInScan / self.main.sampleRate
@@ -413,48 +395,44 @@ class Scanner(QtCore.QObject):
             self.done()
             return
 
-        fullAOsignal = np.zeros((len(self.currAOchan),
-                                 len(self.stageScan.sigDict['x'])))
-        tempAOchan = copy.copy(self.currAOchan)
-        # Following loop creates the voltage channels in smallest to largest
-        # order and places signals in same order.
-        for i in range(0, 3):
-            # dim = dimension ('x' or 'y') containing smallest channel nr.
-            dim = min(tempAOchan, key=tempAOchan.get)
-            chanstring = 'Dev1/ao%s' % tempAOchan[dim]
+        # Following loop creates the voltage channels
+        AOchans = [0, 1, 2]
+        for n in AOchans:
             self.aotask.ao_channels.add_ao_voltage_chan(
-                physical_channel=chanstring,
-                name_to_assign_to_channel='chan%s' % dim,
-                min_val=minVolt[dim], max_val=maxVolt[dim])
-            tempAOchan.pop(dim)
-            fullAOsignal[i] = self.stageScan.sigDict[dim]
+                    physical_channel='Dev1/ao%s' % n,
+                    name_to_assign_to_channel='chan_%s' % self.channel_order[n],
+                    min_val=minVolt[self.channel_order[n]],
+                    max_val=maxVolt[self.channel_order[n]])
+
+        fullAOsignal = np.array([self.stageScan.sigDict[self.channel_order[i]]
+                        for i in AOchans])
 
         self.aotask.timing.cfg_samp_clk_timing(
             rate=self.stageScan.sampleRate,
+            source=r'100kHzTimeBase',
             sample_mode=nidaqmx.constants.AcquisitionType.FINITE,
             samps_per_chan=self.sampsInScan)
 
         # Same as above but for the digital signals/devices
-        tempDOchan = copy.copy(self.currDOchan)
-        fullDOsignal = np.zeros(
-            (len(tempDOchan), len(self.pxCycle.sigDict['405'])), dtype=bool)
-        for i in range(0, len(tempDOchan)):
-            dev = min(tempDOchan, key=tempDOchan.get)
-            chanstring = 'Dev1/port0/line%s' % tempDOchan[dev]
-            self.dotask.do_channels.add_do_chan(
-                lines=chanstring,
-                name_to_assign_to_lines='chan%s' % dev)
-            tempDOchan.pop(dev)
+        devs = list(self.pxCycle.sigDict.keys())
+        DOchans = range(0, 4)
+        for d in DOchans:
+            chanstring = 'Dev1/port0/line%s' % d
+            self.dotask.do_channels.add_do_chan(lines=chanstring,
+                                                name_to_assign_to_lines='chan%s' % devs[d])
 
-            if self.stageScan.scanMode == 'VOLscan':
-                signal = np.tile(self.pxCycle.sigDict[dev],
-                                 self.stageScan.VOLscan.cyclesPerSlice)
-                signal = np.concatenate((signal,
-                                         np.zeros(self.stageScan.seqSamps)))
-            else:
-                signal = self.pxCycle.sigDict[dev]
+        fullDOsignal = np.array([self.pxCycle.sigDict[devs[i]]
+                                for i in DOchans])
 
-            fullDOsignal[i] = self.pxCycle.sigDict[dev]
+        """If doing VOLume scan, the time needed for the stage to move
+        between z-planes needs to be filled with zeros/False. This time is
+        equal to one "sequence-time". To do so we first have to repeat the
+        sequence for the whole scan in one plane and then append with zeros."""
+        if self.stageScan.scanMode == 'VOLscan':
+            fullDOsignal = np.tile(fullDOsignal,
+                                   self.stageScan.VOLscan.cyclesPerSlice)
+            fullDOsignal = np.concatenate((fullDOsignal,
+                                           np.zeros(4, self.stageScan.seqSamps)))
 
         self.dotask.timing.cfg_samp_clk_timing(
             rate=self.pxCycle.sampleRate,
@@ -462,26 +440,13 @@ class Scanner(QtCore.QObject):
             sample_mode=nidaqmx.constants.AcquisitionType.FINITE,
             samps_per_chan=self.sampsInScan)
 
-        # Following is to create ramps back to zero for the analog channels
-        # during one second.
-#        returnRamps = np.array([])
-#        for i in range(0,2):
-#            rampAndK = makeRamp(finalSamps[i], 0, self.stageScan.sampleRate)
-#            returnRamps = np.append(returnRamps, rampAndK)
-#
-#        print(np.ones(1)) # This line alone fixes the problem...
-
         self.waiter.waitdoneSignal.connect(self.finalize)
 
+        self.aotask.write(fullAOsignal, auto_start=False)
         self.dotask.write(fullDOsignal, auto_start=False)
-        try:
-            self.aotask.write(fullAOsignal, auto_start=False)
-            self.aotask.start()
-        except nidaqmx.errors.DaqError as e:
-            print(e)
-            self.done()
 
         self.dotask.start()
+        self.aotask.start()
 
         self.waiter.start()
 
@@ -510,16 +475,13 @@ class Scanner(QtCore.QObject):
         # correct though, assumes channels are 0, 1 and 2.
         # TODO: Test abort (task function)
         writtenSamps = int(np.round(self.aotask.out_stream.curr_write_pos))
-        finalSamps = [0, 0, 0]
-        tempAOchan = copy.copy(self.currAOchan)
-        for i in range(0, 3):
-            # dim = dimension ('x', 'y' or 'z') containing smallest channel nr.
-            dim = min(tempAOchan, key=tempAOchan.get)
-            finalSamps[i] = self.stageScan.sigDict[dim][writtenSamps - 1]
-            tempAOchan.pop(dim)
-
-        returnRamps = [makeRamp(finalSamps[i], 0, self.stageScan.sampleRate)
-                       for i in range(0, 3)]
+        chans = [0,1,2]
+        dim = [self.channel_order[i] for i in chans]
+        finalSamps = [self.stageScan.sigDict[dim[i]][writtenSamps - 1]
+                      for i in chans]
+        print(finalSamps)
+        returnRamps = np.array([makeRamp(finalSamps[i], 0, self.stageScan.sampleRate)
+                       for i in chans])
 
         self.aotask.stop()
         self.aotask.timing.cfg_samp_clk_timing(
@@ -542,25 +504,23 @@ class Scanner(QtCore.QObject):
 
 class LaserCycle():
 
-    def __init__(self, device, pxCycle, currDOchan):
+    def __init__(self, device, pxCycle):
         self.nidaq = device
         self.pxCycle = pxCycle
-        self.currDOchan = currDOchan
 
     def run(self):
-        self.dotask = nidaqmx.Task('dotask')
+        self.dotask = nidaqmx.Task('dotaskLaser')
 
-        tmpDOchan = copy.copy(self.currDOchan)
-        fullDOsignal = np.zeros((len(tmpDOchan), self.pxCycle.cycleSamps),
-                                dtype=bool)
-        for i in range(0, len(tmpDOchan)):
-            dev = min(tmpDOchan, key=tmpDOchan.get)
-            chanstring = 'Dev1/port0/line%s' % tmpDOchan[dev]
-            self.dotask.do_channels.add_do_chan(
-                lines=chanstring,
-                name_to_assign_to_lines='chan%s' % dev)
-            tmpDOchan.pop(dev)
-            fullDOsignal[i] = self.pxCycle.sigDict[dev]
+        devs = list(self.pxCycle.sigDict.keys())
+        DOchans = range(0, 4)
+        for d in DOchans:
+            chanstring = 'Dev1/port0/line%s' % d
+            self.dotask.do_channels.add_do_chan(lines=chanstring,
+                                                name_to_assign_to_lines='chan%s' % devs[d])
+
+        DOchans = [0, 1, 2, 3]
+        fullDOsignal = np.array([self.pxCycle.sigDict[devs[i]]
+                                for i in DOchans])
 
         self.dotask.timing.cfg_samp_clk_timing(
            source=r'100kHzTimeBase',
@@ -635,7 +595,9 @@ class LineScan():
         sizeY = parValues['sizeY'] / convFactors['y']
         seqSamps = np.round(self.sampleRate * parValues['seqTime'])
         stepSize = parValues['stepSizeXY'] / convFactors['y']
+        self.stepsX = 0
         self.stepsY = int(np.ceil(sizeY / stepSize))
+        self.stepsZ = 0
         # Step size compatible with width
         self.corrStepSize = sizeY / self.stepsY
         self.seqSamps = int(seqSamps)
@@ -684,6 +646,7 @@ class FOVscan():
         self.seqSamps = int(np.round(self.sampleRate*parValues['seqTime']))
         self.stepsX = int(np.ceil(sizeX / stepSizeX))
         self.stepsY = int(np.ceil(sizeY / stepSizeY))
+        self.stepsZ = 0
         # Step size compatible with width
         self.corrStepSize = sizeX / self.stepsX
         rowSamps = self.stepsX * self.seqSamps
@@ -723,18 +686,19 @@ class VOLscan():
         pass
 
     def update(self, parValues, primScanDim):
+        """Updates the VOL-scan signals, units of length are used when creating  the scan signals and is converted to voltages at the end """
         print('Updating VOL scan')
         # Create signals
         startX = 0
         startY = 0
         startZ = 0
         # Division by 2 to convert from distance to voltage
-        sizeX = parValues['sizeX'] / convFactors['x']
-        sizeY = parValues['sizeY'] / convFactors['y']
-        sizeZ = parValues['sizeZ'] / convFactors['z']
-        stepSizeX = parValues['stepSizeXY'] / convFactors['x']
-        stepSizeY = parValues['stepSizeXY'] / convFactors['y']
-        stepSizeZ = parValues['stepSizeZ'] / convFactors['z']
+        sizeX = parValues['sizeX']
+        sizeY = parValues['sizeY']
+        sizeZ = parValues['sizeZ']
+        stepSizeX = parValues['stepSizeXY']
+        stepSizeY = parValues['stepSizeXY']
+        stepSizeZ = parValues['stepSizeZ']
         # WARNING: Correct for units of the time, now seconds!!!!
         self.seqSamps = int(np.round(self.sampleRate * parValues['seqTime']))
         self.stepsX = int(np.ceil(sizeX / stepSizeX))
@@ -752,61 +716,56 @@ class VOLscan():
         # RTLramp contains only ramp, no k since same k = -k
         RTLramp = LTRramp[::-1]
 
-        primDimSig = []
-        secDimSig = []
+        Xsig = []
+        Ysig = []
         newValue = startY
         for i in range(0, self.stepsY):
             if i % 2 == 0:
-                primDimSig = np.concatenate((primDimSig, LTRramp))
+                Xsig = np.concatenate((Xsig, LTRramp))
             else:
-                primDimSig = np.concatenate((primDimSig, RTLramp))
-            secDimSig = np.concatenate((secDimSig, newValue*np.ones(rowSamps)))
-            newValue = newValue + self.corrStepSizeXY
+                Xsig = np.concatenate((Xsig, RTLramp))
+            Ysig = np.concatenate((Ysig, newValue*np.ones(rowSamps)))
+            newValue = newValue + self.corrStepSize
 
-        sampsPerSlice = len(primDimSig)  # Used in Scanner->runScan
+        sampsPerSlice = len(Xsig)  # Used in Scanner->runScan
         self.cyclesPerSlice = sampsPerSlice / self.seqSamps
         """Below we make the concatenation along the third dimension, between
         the "slices" we add a smooth transition to avoid too rapid motion that
         seems to cause strange movent. This needs to be syncronized with the
         pixel cycle signal"""
-        fullZprimDimSig = primDimSig
-        fullZsecDimSig = secDimSig
-        fullZthirdDimSig = startZ * np.ones(len(primDimSig))
+        fullXsig = Xsig
+        fullYsig = Ysig
+        fullZsig = startZ * np.ones(len(Xsig))
         newValue = startZ + 1
-        primDimTransition = makeSmoothStep(
-            primDimSig[-1], primDimSig[0], self.seqSamps)
-        secDimTransition = makeSmoothStep(
-            secDimSig[-1], secDimSig[0], self.seqSamps)
-        thirdDimTransition = makeSmoothStep(
+        XTransition = makeSmoothStep(
+            Xsig[-1], Xsig[0], self.seqSamps)
+        YTransition = makeSmoothStep(
+            Ysig[-1], Ysig[0], self.seqSamps)
+        ZTransition = makeSmoothStep(
             0, self.corrStepSizeZ, self.seqSamps)
 
         for i in range(1, self.stepsZ - 1):
-            fullZprimDimSig = np.concatenate(
-                (fullZprimDimSig, primDimTransition))
-            fullZsecDimSig = np.concatenate(
-                (fullZsecDimSig, secDimTransition))
-            fullZthirdDimSig = np.concatenate(
-                (fullZthirdDimSig, newValue + thirdDimTransition))
+            fullXsig = np.concatenate(
+                (fullXsig, XTransition))
+            fullYsig = np.concatenate(
+                (fullYsig, YTransition))
+            fullZsig = np.concatenate(
+                (fullZsig, newValue + ZTransition))
 
-            fullZprimDimSig = np.concatenate((fullZprimDimSig, primDimSig))
-            fullZsecDimSig = np.concatenate((fullZsecDimSig, secDimSig))
-            fullZthirdDimSig = np.concatenate(
-                (fullZthirdDimSig, newValue * np.ones(len(primDimSig))))
+            fullXsig = np.concatenate((fullXsig, Xsig))
+            fullYsig = np.concatenate((fullYsig, Ysig))
+            fullZsig = np.concatenate(
+                (fullZsig, newValue * np.ones(len(Xsig))))
             newValue = newValue + self.corrStepSizeZ
 
-        fullZprimDimSig = np.concatenate((fullZprimDimSig, primDimSig))
-        fullZsecDimSig = np.concatenate((fullZsecDimSig, secDimSig))
-        fullZthirdDimSig = np.concatenate((fullZthirdDimSig,
-                                           newValue*np.ones(len(primDimSig))))
-        # Assign primary scan dir
-        # 1.14 is an emperically measured correction factor
-        self.sigDict[primScanDim] = 1.14 * fullZprimDimSig
-        # Assign second and third dim
-        for key in self.sigDict:
-            if not key[0] == primScanDim and not key[0] == 'z':
-                self.sigDict[key] = 1.14 * fullZsecDimSig
-            elif not key[0] == primScanDim:
-                self.sigDict[key] = 1.14 * fullZthirdDimSig
+        fullXsig = np.concatenate((fullXsig, Xsig))
+        fullYsig = np.concatenate((fullYsig, Ysig))
+        fullZsig = np.concatenate((fullZsig,
+                                   newValue*np.ones(len(primDimSig))))
+        # Assign signals to scanDict
+        self.sigDict['x'] = fullXsig / convFactors['x']
+        self.sigDict['y'] = fullXsig / convFactors['y']
+        self.sigDict['z'] = fullXsig / convFactors['z']
 
         print('Final X: ' + str(fullZprimDimSig[-1]))
         print('Final Y: ' + str(fullZsecDimSig[-1]))
@@ -817,21 +776,24 @@ class PixelCycle():
     ''' Contains the digital signals for the pixel cycle. The update function
     takes a parameter_values dict and updates the signal accordingly.'''
     def __init__(self, sampleRate):
-        self.sigDict = {'405': [], '473': [], '488': [], 'CAM': []}
+        self.sigDict = collections.OrderedDict([('405', []),
+                                                ('473', []),
+                                                ('488', []),
+                                                ('CAM', [])])
         self.sampleRate = sampleRate
         self.cycleSamps = None
 
     def update(self, devices, parValues, cycleSamps):
         self.cycleSamps = cycleSamps
         for device in devices:
-            signal = np.zeros(cycleSamps)
+            signal = np.zeros(cycleSamps, dtype='bool')
             start_name = 'start' + device
             end_name = 'end' + device
             start_pos = parValues[start_name] * self.sampleRate
             start_pos = int(min(start_pos, cycleSamps - 1))
             end_pos = parValues[end_name] * self.sampleRate
             end_pos = int(min(end_pos, cycleSamps))
-            signal[range(start_pos, end_pos)] = 1
+            signal[range(start_pos, end_pos)] = True
             self.sigDict[device] = signal
 
 

@@ -7,12 +7,9 @@ Created on Sun Dec 28 13:25:27 2014
 
 import importlib
 import control.mockers as mockers
-from instrumental.drivers.cameras.uc480 import UC480_Camera
-from lantz.drivers.piezosystemjena.nv401 import nv401
-
-
-
 import time
+import numpy as np
+import nidaqmx
 
 
 class Laser(object):
@@ -20,15 +17,17 @@ class Laser(object):
     def __new__(cls, iName, *args):
         try:
             pName, driverName = iName.rsplit('.', 1)
+            print('iName = ', iName)
+            print('pName = ', pName)
             package = importlib.import_module('lantz.drivers.legacy.' + pName)
             driver = getattr(package, driverName)
+            print('driver: ', driver)
             laser = driver(*args)
             laser.initialize()
             return driver(*args)
 
         except:
             return mockers.MockLaser()
-
 
 class LinkedLaserCheck(object):
 
@@ -65,6 +64,14 @@ class LinkedLaser(object):
         self.lasers[0].autostart = self.lasers[1].autostart = value
 
     @property
+    def enabled(self):
+        return self.lasers[0].enabled
+
+    @enabled.setter
+    def enabled(self, value):
+        self.lasers[0].enabled = self.lasers[1].enabled = value
+
+    @property
     def power(self):
         return self.lasers[0].power + self.lasers[1].power
 
@@ -84,10 +91,71 @@ class LinkedLaser(object):
     def digital_mod(self, value):
         self.lasers[0].digital_mod = self.lasers[1].digital_mod = value
 
+    def enter_mod_mode(self):
+        self.lasers[0].enter_mod_mode()
+        self.lasers[1].enter_mod_mode()
+
+    def changeEdit(self):
+        [self.lasers[i].changeEdit() for i in [0, 1]]
+
+    def query(self, value):
+        [self.lasers[i].query(value) for i in [0, 1]]
+
     def finalize(self):
         self.lasers[0].finalize()
         self.lasers[1].finalize()
 
+
+class LaserTTL(object):
+    def __init__(self, line):
+        self.line = line
+
+        #Nidaq task
+        self.digital_mod = False
+
+        self.enabled = False
+
+    @property
+    def enabled(self):
+        return self._enabled
+
+    @enabled.setter
+    def enabled(self, value):
+        if value:
+            self.dotask.write(np.ones(100, dtype=bool), auto_start=True)
+            self.dotask.wait_until_done()
+            self.dotask.stop()
+        else:
+            self.dotask.write(np.zeros(100, dtype=bool), auto_start=True)
+            self.dotask.wait_until_done()
+            self.dotask.stop()
+
+        self._enabled = value
+
+    @property
+    def digital_mod(self):
+        return self._digital_mod
+
+    @digital_mod.setter
+    def digital_mod(self, value):
+        if value:
+            print('Closing task in LaserTTL')
+            self.dotask.close()
+        else:
+            self.dotask = nidaqmx.Task('dotaskEnableTTL')
+            self.dotask.do_channels.add_do_chan(lines='Dev1/port0/line%s' % self.line,
+                                                name_to_assign_to_lines='chan')
+
+            self.dotask.timing.cfg_samp_clk_timing(
+               source=r'100kHzTimeBase',
+               rate=100000,
+               sample_mode=nidaqmx.constants.AcquisitionType.FINITE)
+
+    def enter_mod_mode(self):
+        pass
+
+    def query(self, value):
+        pass
 
 class Camera(object):
     """ Buffer class for testing whether the camera is connected. If it's not,
@@ -119,6 +187,7 @@ class PZT(object):
 
     def __new__(cls, iName, port, *args):
         if iName == 'nv401':
+            from lantz.drivers.piezosystemjena.nv401 import nv401
             inst = nv401.via_serial(port)
             return inst
         elif iName == 'mock':
