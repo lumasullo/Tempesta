@@ -7,7 +7,6 @@ Created on Sun Dec 28 13:25:27 2014
 
 import importlib
 import control.mockers as mockers
-import time
 import numpy as np
 import nidaqmx
 
@@ -28,6 +27,7 @@ class Laser(object):
 
         except:
             return mockers.MockLaser()
+
 
 class LinkedLaserCheck(object):
 
@@ -113,7 +113,7 @@ class LaserTTL(object):
     def __init__(self, line):
         self.line = line
 
-        #Nidaq task
+        # Nidaq task
         self.digital_mod = False
 
         self.enabled = False
@@ -146,8 +146,9 @@ class LaserTTL(object):
             self.dotask.close()
         else:
             self.dotask = nidaqmx.Task('dotaskEnableTTL')
-            self.dotask.do_channels.add_do_chan(lines='Dev1/port0/line%s' % self.line,
-                                                name_to_assign_to_lines='chan')
+            self.dotask.do_channels.add_do_chan(
+                lines='Dev1/port0/line%s' % self.line,
+                name_to_assign_to_lines='chan')
 
             self.dotask.timing.cfg_samp_clk_timing(
                source=r'100kHzTimeBase',
@@ -159,6 +160,7 @@ class LaserTTL(object):
 
     def query(self, value):
         pass
+
 
 class Camera(object):
     """ Buffer class for testing whether the camera is connected. If it's not,
@@ -196,6 +198,5 @@ class PZT(object):
         elif iName == 'mock':
             return mockers.MockPZT()
         else:
-            raise ValueError('Enter the right piezo name, if you dont have piezo, you can use "mock"')
-
-
+            raise ValueError('Enter the right piezo name, if you dont have '
+                             'piezo, you can use "mock"')

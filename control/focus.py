@@ -323,7 +323,7 @@ class FocusCalibThread(QtCore.QThread):
 
 #        self.stream = mainwidget.stream
         self.z = focusWidget.z
-        self.focusWidget = focusWidget # mainwidget será FocusLockWidget
+        self.focusWidget = focusWidget  # mainwidget será FocusLockWidget
         self.um = Q_(1, 'micrometer')
 
     def run(self):
