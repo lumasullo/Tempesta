@@ -14,6 +14,10 @@ import logging
 from lantz import Driver
 from lantz import Q_
 
+from lantz import Action, Feat
+
+import time
+
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s',
                     datefmt='%Y-%d-%m %H:%M:%S')
 
@@ -394,4 +398,48 @@ class MockHamamatsu(Driver):
     # Close down the connection to the camera.
     #
     def shutdown(self):
+        pass
+
+
+class MockPZT(Driver):
+    """Mock Driver for the nv401.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.pos = 0
+
+    def query(self, command, *, send_args=(None, None), recv_args=(None, None)):
+        return 'Mock PZT'
+
+    @Feat(units='micrometer')
+    def position(self):
+        return self.pos
+
+    @position.setter
+    def position(self, value):
+        self.pos = value
+
+    @Action()
+    def zero_position(self):
+        self.pos = 0
+
+    @Action(units='micrometer', limits=(100,))
+    def moveAbsolute(self, value):
+        self.pos = value
+
+    @Action(units='micrometer')
+    def moveRelative(self, value):
+        self.pos = self.pos + value
+
+
+class MockWebcam():
+
+    def grab_image(self, **kwargs):
+        img = np.zeros((256, 320))
+        beamCenter = [int(np.random.randn()*10 + 123), int(np.random.randn()*10 + 155)]
+        img[beamCenter[0]-10:beamCenter[0]+10, beamCenter[1]-10:beamCenter[1]+10] = 1
+        return img
+
+    def stop(self):
         pass

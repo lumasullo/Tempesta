@@ -10,6 +10,7 @@ from pyqtgraph.Qt import QtCore, QtGui
 from lantz import Q_
 import nidaqmx
 
+
 class UpdatePowers(QtCore.QObject):
 
     def __init__(self, laserwidget, *args, **kwargs):
@@ -35,18 +36,17 @@ class LaserWidget(QtGui.QFrame):
 
         super().__init__(*args, **kwargs)
 
-#        self.lilalaser, self.exclaser, self.offlaser1, self.offlaser2 = lasers
-
         self.actlaser, self.offlaser, self.exclaser = lasers
         print('Actlaser = ', self.actlaser)
         print('Offlaser = ', self.offlaser)
         print('Exclaser = ', self.exclaser)
+
         self.mW = Q_(1, 'mW')
         self.daq = daq
 
         self.actControl = LaserControl(self.actlaser, '<h3>405<h3>',
-                                        color=(130, 0, 200), prange=(0, 200),
-                                        tickInterval=5, singleStep=0.1)
+                                       color=(130, 0, 200), prange=(0, 200),
+                                       tickInterval=5, singleStep=0.1)
 
         self.offControl = LaserControl(self.offlaser, '<h3>488<h3>',
                                        color=(0, 247, 255), prange=(0, 200),
@@ -54,36 +54,24 @@ class LaserWidget(QtGui.QFrame):
                                        daq=self.daq, port=0)
 
         self.excControl = LaserControlTTL(self.exclaser, '<h3>473<h3>',
-                                       color=(0, 183, 255))
-
-#        self.offControl2 = LaserControl(self.offlaser2, '<h3>488 2<h3>',
-#                                        color=(0, 247, 255), prange=(0, 200),
-#                                        tickInterval=100, singleStep=10,
-#                                        daq=self.daq, port=0)
-
-#        self.offControl = LaserLinkedControl(
-#             [self.offlaser1, self.offlaser2], '<h3>488 Linked<h3>',
-#             color=(0, 247, 255), prange=(0, 200), tickInterval=100,
-#             singleStep=10, daq=self.daq, port=0)
+                                          color=(0, 183, 255))
 
         self.actlaser.autostart = False
         self.offlaser.autostart = False
-#        self.offlaser2.autostart = False
 
         self.controls = (self.actControl, self.offControl, self.excControl)
-#                         self.offControl2, self.offControl)
 
         self.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
         grid = QtGui.QGridLayout()
         self.setLayout(grid)
 
-        self.DigCtrl = DigitalControl(controls=(self.actControl, self.offControl, self.excControl))
+        self.DigCtrl = DigitalControl(controls=(self.actControl,
+                                                self.offControl,
+                                                self.excControl))
 
         grid.addWidget(self.actControl, 0, 0, 4, 1)
         grid.addWidget(self.offControl, 0, 1, 4, 1)
         grid.addWidget(self.excControl, 0, 2, 4, 1)
-#        grid.addWidget(self.offControl2, 0, 3, 4, 1)
-#        grid.addWidget(self.offControl, 0, 4, 4, 1)
         grid.addWidget(self.DigCtrl, 4, 0, 2, 3)
 
         # Current power update routine
@@ -95,16 +83,13 @@ class LaserWidget(QtGui.QFrame):
 
     def closeEvent(self, *args, **kwargs):
         self.updateThread.terminate()
-        self.offlaser.finalize()
         super().closeEvent(*args, **kwargs)
 
 
-# TODO: adapt this to two off lasers
 class DigitalControl(QtGui.QFrame):
 
     def __init__(self, controls, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self.mW = Q_(1, 'mW')
         self.controls = controls
         self.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
@@ -124,7 +109,6 @@ class DigitalControl(QtGui.QFrame):
         self.OffLabel.setStyleSheet(offss)
         excss = "background-color: rgb{}".format((0, 183, 255))
         self.ExcLabel.setStyleSheet(excss)
-
 
         self.DigitalControlButton = QtGui.QPushButton('Digital modulation')
         self.DigitalControlButton.setCheckable(True)
@@ -152,12 +136,10 @@ class DigitalControl(QtGui.QFrame):
 #    def GlobalDigitalMod(self):
 #        if self.DigitalControlButton.isChecked():
 #            for i in np.arange(len(self.lasers)):
-#                powMag = float(self.powers[i])
-#                self.lasers[i].laser.power_sp = powMag * self.mW
+#                self.lasers[i].laser.power_sp = float(self.powers[i]) * self.mW
 #        else:
 #            for i in np.arange(len(self.lasers)):
-#                powMag = float(self.lasers[i].laser.setPointEdit)
-#                self.lasers[i].laser.power_sp = powMag * self.mW
+#                self.lasers[i].laser.power_sp = float(self.lasers[i].laser.setPointEdit) * self.mW
 
     def GlobalDigitalMod(self):
         self.digitalPowers = [float(self.ActPower.text()),
@@ -221,8 +203,8 @@ class DigitalControl(QtGui.QFrame):
 #        self.updateDigPowersButton = QtGui.QPushButton('Update powers')
 #        self.updateDigPowersButton.clicked.connect(self.updateDigitalPowers)
 #
-##        self.startGlobalDigitalModButton = QtGui.QPushButton('START')
-##        self.startGlobalDigitalModButton.clicked.connect(self.startGlobalDigitalMod)
+#        self.startGlobalDigitalModButton = QtGui.QPushButton('START')
+#        self.startGlobalDigitalModButton.clicked.connect(self.startGlobalDigitalMod)
 #
 #        grid = QtGui.QGridLayout()
 #        self.setLayout(grid)
@@ -233,17 +215,17 @@ class DigitalControl(QtGui.QFrame):
 #        grid.addWidget(self.lilaOnLabel, 0, 2)
 #        grid.addWidget(self.lilaOnPower, 1, 2)
 #        grid.addWidget(self.DigitalControlButton, 2, 0)
-##        grid.addWidget(self.updateDigPowersButton, 2, 1)
+#        grid.addWidget(self.updateDigPowersButton, 2, 1)
 #
-##    def GlobalDigitalMod(self):
-##        if self.DigitalControlButton.isChecked():
-##            for i in np.arange(len(self.lasers)):
-##                powMag = float(self.powers[i])
-##                self.lasers[i].laser.power_sp = powMag * self.mW
-##        else:
-##            for i in np.arange(len(self.lasers)):
-##                powMag = float(self.lasers[i].laser.setPointEdit)
-##                self.lasers[i].laser.power_sp = powMag * self.mW
+#    def GlobalDigitalMod(self):
+#        if self.DigitalControlButton.isChecked():
+#            for i in np.arange(len(self.lasers)):
+#                powMag = float(self.powers[i])
+#                self.lasers[i].laser.power_sp = powMag * self.mW
+#        else:
+#            for i in np.arange(len(self.lasers)):
+#                powMag = float(self.lasers[i].laser.setPointEdit)
+#                self.lasers[i].laser.power_sp = powMag * self.mW
 #
 #    def GlobalDigitalMod(self):
 #        self.digitalPowers = [float(self.blueReadoutPower.text()),
@@ -262,7 +244,7 @@ class DigitalControl(QtGui.QFrame):
 #                self.lasers[i].changeEdit()
 #                self.lasers[i].laser.query('cp')
 #
-##                self.lasers[i].laser.enabled = True
+#                self.lasers[i].laser.enabled = True
 #                print('go back to continous')
 #
 #    def updateDigitalPowers(self):
@@ -281,7 +263,6 @@ class LaserControl(QtGui.QFrame):
                  daq=None, port=None, invert=True, modulable=True,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
         self.laser = laser
         self.mW = Q_(1, 'mW')
@@ -372,7 +353,6 @@ class LaserControl(QtGui.QFrame):
         else:
             self.laser.enabled = False
 
-
     def digitalMod(self, tof, power=0):
         if tof:
             self.laser.enter_mod_mode()
@@ -397,6 +377,7 @@ class LaserControl(QtGui.QFrame):
         self.laser.power_sp = float(self.setPointEdit.text()) * self.mW
         self.slider.setValue(self.laser.power_sp.magnitude)
 
+
 class LaserControlTTL(QtGui.QFrame):
 
     def __init__(self, laser, name, color, *args, **kwargs):
@@ -411,7 +392,6 @@ class LaserControlTTL(QtGui.QFrame):
         self.name.setAlignment(QtCore.Qt.AlignCenter)
         self.name.setStyleSheet("font-size:16px")
         self.name.setFixedHeight(40)
-
 
         # ON/OFF button
         self.enableButton = QtGui.QPushButton('ON')
@@ -432,10 +412,10 @@ class LaserControlTTL(QtGui.QFrame):
 #        style = "background-color: rgb{}".format((160, 160, 160))
 #        self.digimodButton.setStyleSheet(style)
 #        self.digimodButton.setCheckable(True)
-##           grid.addWidget(self.digimodButton, 6, 0)
+#           grid.addWidget(self.digimodButton, 6, 0)
 #        self.digimodButton.toggled.connect(self.digitalMod)
 #        # Initial values
-##           self.digimodButton.setChecked(False)
+#           self.digimodButton.setChecked(False)
 
         # Connections
         self.enableButton.toggled.connect(self.toggleLaser)
@@ -448,19 +428,21 @@ class LaserControlTTL(QtGui.QFrame):
         else:
             self.laser.digital_mod = False
             if self.enableButton.isChecked():
-                self.laser.enabled =True
+                self.laser.enabled = True
 
     def toggleLaser(self):
         if self.enableButton.isChecked():
             try:
                 self.laser.enabled = True
             except:
-                print('Cannot enable laser when in mod mode, will enable when switching back')
+                print('Cannot enable laser when in mod mode, '
+                      'will enable when switching back')
         else:
             try:
                 self.laser.enabled = False
             except:
-                print('Cannot disable laser when in mod mode, will disable when switching back')
+                print('Cannot disable laser when in mod mode, '
+                      'will disable when switching back')
 
     def changeEdit(self):
         pass

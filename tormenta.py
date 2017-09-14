@@ -19,9 +19,9 @@ def main():
 
     nidaq = nidaqmx.system.System.local().devices['Dev1']
 
-    with instruments.Laser(cobolt, 'COM5') as actlaser:#, \
-#            instruments.LaserTTL(4) as exclaser:  #, \
-#            instruments.Laser(cobolt, 'COM6') as offlaser:
+    with instruments.Laser(cobolt, 'COM5') as actlaser, \
+            instruments.PZT('nv401', 8) as pzt:
+
         offlaser = instruments.LinkedLaserCheck(cobolt, ['COM7', 'COM4'])
         exclaser = instruments.LaserTTL(0)
         orcaflashV3 = instruments.Camera(0)
@@ -31,7 +31,7 @@ def main():
         print(offlaser.idn)
 
         win = control.TormentaGUI(actlaser, offlaser, exclaser, orcaflashV2,
-                                  orcaflashV3, nidaq)
+                                  orcaflashV3, nidaq, pzt)
         win.show()
 
         app.exec_()

@@ -31,6 +31,7 @@ import control.lasercontrol as lasercontrol
 import control.scanner as scanner
 import control.align as align
 import control.guitools as guitools
+import control.focus as focus
 
 
 # Widget to control image or sequence recording. Recording only possible when
@@ -809,7 +810,11 @@ class TormentaGUI(QtGui.QMainWindow):
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+<<<<<<< HEAD
         self.lasers = [actlaser, offlaser, exclaser] # , offlaser2)
+=======
+        self.lasers = (violetlaser, exclaser, offlaser1, offlaser2)
+>>>>>>> c65be65f0af8ab30fa112d28c8da75d085d3e402
         self.cameras = [orcaflashV2, orcaflashV3]
         self.nidaq = nidaq
         self.orcaflash = self.cameras[0]
@@ -1108,6 +1113,12 @@ class TormentaGUI(QtGui.QMainWindow):
         self.RotalignWidget = align.AlignWidgetXYProject(self)
         RotalignDock.addWidget(self.RotalignWidget)
         dockArea.addDock(RotalignDock, 'above', ZalignDock)
+
+        # Focus Lock widget
+        FocusLockDock = Dock("Focus Lock Tool", size=(1, 1))
+        self.FocusLockWidget = focus.FocusWidget(pzt)
+        FocusLockDock.addWidget(self.FocusLockWidget)
+        dockArea.addDock(FocusLockDock, 'above', RotalignDock)
 
         # Scan Widget
         self.scanxyWidget = scanner.ScanWidget(self.nidaq, self)
