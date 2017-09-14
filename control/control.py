@@ -805,16 +805,11 @@ class TormentaGUI(QtGui.QMainWindow):
     liveviewStarts = QtCore.pyqtSignal()
     liveviewEnds = QtCore.pyqtSignal()
 
-    def __init__(self, actlaser, offlaser, exclaser,  # offlaser2,
-                 orcaflashV2, orcaflashV3, nidaq,
-                 *args, **kwargs):
+    def __init__(self, actlaser, offlaser, exclaser, orcaflashV2, orcaflashV3,
+                 nidaq, pzt, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-<<<<<<< HEAD
-        self.lasers = [actlaser, offlaser, exclaser] # , offlaser2)
-=======
-        self.lasers = (violetlaser, exclaser, offlaser1, offlaser2)
->>>>>>> c65be65f0af8ab30fa112d28c8da75d085d3e402
+        self.lasers = [actlaser, offlaser, exclaser]
         self.cameras = [orcaflashV2, orcaflashV3]
         self.nidaq = nidaq
         self.orcaflash = self.cameras[0]

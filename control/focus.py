@@ -2,13 +2,12 @@
 """
 Created on Wed Oct  1 13:41:48 2014
 
-@authors: Federico Barabas, Luciano Masullo
+@authors: Federico Barabas, Luciano Masullo, Shusei Masuda
 """
 
 import numpy as np
 import time
 import scipy.ndimage as ndi
-from matplotlib import pyplot as plt
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
@@ -16,31 +15,21 @@ import pyqtgraph.ptime as ptime
 
 from lantz import Q_
 
-import control.instruments as instruments
 import control.mockers as mockers
- # , DAQ
 import control.pi as pi
 
-import pandas as pd
-import time
 from instrumental import u
 from instrumental.drivers.cameras.uc480 import UC480_Camera
 
 
 class FocusWidget(QtGui.QFrame):
 
-    # def __init__(self, DAQ, scanZ, main=None, *args, **kwargs):
     def __init__(self, scanZ, main=None, *args, **kwargs):
 
         super().__init__(*args, **kwargs)
         self.setMinimumSize(2, 350)
 
         self.main = main  # main va a ser RecordingWidget de control.py
-#        self.DAQ = DAQ
-#        try:
-#            self.DAQ.streamStop()
-#        except:
-#            pass
         self.z = scanZ
         self.setPoint = 0
         self.calibrationResult = [0, 0]
@@ -51,14 +40,6 @@ class FocusWidget(QtGui.QFrame):
         self.V = Q_(1, 'V')
         self.um = Q_(1, 'um')
         self.nm = Q_(1, 'nm')
-
-        # Thread for getting data from DAQ
-#        self.scansPerS = 20
-#        self.stream = daqStream(DAQ, scansPerS)
-#        self.streamThread = QtCore.QThread()
-#        self.stream.moveToThread(self.streamThread)
-#        self.streamThread.started.connect(self.stream.start)
-#        self.streamThread.start()
 
         # Focus lock widgets
         self.kpEdit = QtGui.QLineEdit('0.008')
@@ -211,7 +192,7 @@ class ProcessDataThread(QtCore.QThread):
 
         default exposureTime: 10 ms
                 vsub: 1024 pix
-                hsub: 1280 pix 
+                hsub: 1280 pix
         """
         try:
             self.webcam = UC480_Camera()

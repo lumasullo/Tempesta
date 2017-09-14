@@ -22,7 +22,7 @@ def main():
     with instruments.Laser(cobolt, 'COM5') as actlaser, \
             instruments.PZT('nv401', 8) as pzt:
 
-        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM7', 'COM4'])
+        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM6', 'COM4'])
         exclaser = instruments.LaserTTL(0)
         orcaflashV3 = instruments.Camera(0)
         orcaflashV2 = instruments.Camera(1)
