@@ -89,9 +89,12 @@ class LinkedLaser(object):
     def digital_mod(self, value):
         self.lasers[0].digital_mod = self.lasers[1].digital_mod = value
 
+    @property
+    def mod_mode(self):
+        return [self.lasers[0].mod_mode, self.lasers[1].mod_mode]
+
     def enter_mod_mode(self):
-        self.lasers[0].enter_mod_mode()
-        self.lasers[1].enter_mod_mode()
+        [self.lasers[i].enter_mod_mode() for i in [0, 1]]
 
     def changeEdit(self):
         [self.lasers[i].changeEdit() for i in [0, 1]]

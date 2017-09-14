@@ -19,18 +19,18 @@ def main():
 
     nidaq = nidaqmx.system.System.local().devices['Dev1']
 
-    with instruments.Laser(cobolt, 'COM5') as violetlaser:#, \
+    with instruments.Laser(cobolt, 'COM5') as actlaser:#, \
 #            instruments.LaserTTL(4) as exclaser:  #, \
 #            instruments.Laser(cobolt, 'COM6') as offlaser:
-        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM6', 'COM4'])
+        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM7', 'COM4'])
         exclaser = instruments.LaserTTL(0)
         orcaflashV3 = instruments.Camera(0)
         orcaflashV2 = instruments.Camera(1)
-        print(violetlaser.idn)
+        print(actlaser.idn)
         print(exclaser.line)
         print(offlaser.idn)
 
-        win = control.TormentaGUI(violetlaser, offlaser, exclaser, orcaflashV2,
+        win = control.TormentaGUI(actlaser, offlaser, exclaser, orcaflashV2,
                                   orcaflashV3, nidaq)
         win.show()
 
