@@ -9,6 +9,8 @@ import importlib
 import control.mockers as mockers
 import numpy as np
 import nidaqmx
+from instrumental.drivers.cameras.uc480 import UC480_Camera
+from lantz.drivers.piezosystemjena.nv401 import nv401
 
 
 class Laser(object):
@@ -192,7 +194,6 @@ class PZT(object):
 
     def __new__(cls, iName, port, *args):
         if iName == 'nv401':
-            from lantz.drivers.piezosystemjena.nv401 import nv401
             inst = nv401.via_serial(port)
             return inst
         elif iName == 'mock':
@@ -200,3 +201,13 @@ class PZT(object):
         else:
             raise ValueError('Enter the right piezo name, if you dont have '
                              'piezo, you can use "mock"')
+
+
+class Webcam(object):
+
+    def __new__(cls):
+        try:
+            webcam = UC480_Camera()
+        except:
+            webcam = mockers.MockWebcam()
+        return webcam

@@ -14,23 +14,21 @@ from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph.ptime as ptime
 
 from lantz import Q_
-
-import control.mockers as mockers
 import control.pi as pi
 
 from instrumental import u
-from instrumental.drivers.cameras.uc480 import UC480_Camera
 
 
 class FocusWidget(QtGui.QFrame):
 
-    def __init__(self, scanZ, main=None, *args, **kwargs):
+    def __init__(self, scanZ, webcam, main=None, *args, **kwargs):
 
         super().__init__(*args, **kwargs)
         self.setMinimumSize(2, 350)
 
         self.main = main  # main va a ser RecordingWidget de control.py
         self.z = scanZ
+        self.webcam = webcam
         self.setPoint = 0
         self.calibrationResult = [0, 0]
         self.locked = False
@@ -56,8 +54,9 @@ class FocusWidget(QtGui.QFrame):
         self.focusDataBox = QtGui.QCheckBox('Save focus data')
 
         # PZT position widgets
-        self.positionLabel = QtGui.QLabel('Position')
-        self.positionEdit = QtGui.QLineEdit(str(self.z.position))
+        self.positionLabel = QtGui.QLabel('Position[um]')
+        self.positionEdit = QtGui.QLineEdit(str(
+            self.z.position).split(' ')[0])
         self.positionSetButton = QtGui.QPushButton('Set')
         self.positionSetButton.clicked.connect(self.movePZT)
 
@@ -67,9 +66,11 @@ class FocusWidget(QtGui.QFrame):
         self.CalibToLabel = QtGui.QLabel('to [um]')
         self.CalibToEdit = QtGui.QLineEdit('51')
         self.focusCalibThread = FocusCalibThread(self)
-        self.focusCalibButton = QtGui.QPushButton('Calibrate')
+        self.focusCalibButton = QtGui.QPushButton('Calib')
+        self.focusCalibButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
+                                            QtGui.QSizePolicy.Expanding)
         self.focusCalibButton.clicked.connect(self.focusCalibThread.start)
-        self.CalibCurveButton = QtGui.QPushButton('See Calibration Curve')
+        self.CalibCurveButton = QtGui.QPushButton('See Calib')
         self.CalibCurveButton.clicked.connect(self.showCalibCurve)
         self.CalibCurveWindow = CaribCurveWindow(self)
         try:
@@ -94,34 +95,36 @@ class FocusWidget(QtGui.QFrame):
         self.setLayout(grid)
         grid.addWidget(self.focusLockGraph, 0, 0, 1, 6)
         grid.addWidget(self.webcamGraph, 0, 6, 1, 3)
-        grid.addWidget(self.focusCalibButton, 1, 0, 1, 2)
-        grid.addWidget(self.calibrationDisplay, 4, 0, 1, 2)
+        grid.addWidget(self.focusCalibButton, 1, 2, 2, 1)
+        grid.addWidget(self.calibrationDisplay, 3, 0, 1, 2)
         grid.addWidget(self.kpLabel, 1, 3)
         grid.addWidget(self.kpEdit, 1, 4)
         grid.addWidget(self.kiLabel, 2, 3)
         grid.addWidget(self.kiEdit, 2, 4)
         grid.addWidget(self.lockButton, 1, 5, 2, 1)
-        grid.addWidget(self.focusDataBox, 1, 2)
-        grid.addWidget(self.CalibFromLabel, 2, 0)
-        grid.addWidget(self.CalibFromEdit, 2, 1)
-        grid.addWidget(self.CalibToLabel, 3, 0)
-        grid.addWidget(self.CalibToEdit, 3, 1)
-        grid.addWidget(self.CalibCurveButton, 5, 0, 1, 2)
+        grid.addWidget(self.focusDataBox, 3, 4, 1, 2)
+        grid.addWidget(self.CalibFromLabel, 1, 0)
+        grid.addWidget(self.CalibFromEdit, 1, 1)
+        grid.addWidget(self.CalibToLabel, 2, 0)
+        grid.addWidget(self.CalibToEdit, 2, 1)
+        grid.addWidget(self.CalibCurveButton, 3, 2)
         grid.addWidget(self.positionLabel, 1, 6)
         grid.addWidget(self.positionEdit, 1, 7)
-        grid.addWidget(self.positionSetButton, 1, 8)
+        grid.addWidget(self.positionSetButton, 2, 6, 1, 2)
 
 #        grid.setColumnMinimumWidth(1, 100)
 #        grid.setColumnMinimumWidth(2, 40)
 #        grid.setColumnMinimumWidth(0, 100)
 
     def movePZT(self):
-        self.z.moveAbsolute(float(self.positionEdit.text().split(' ')[0]) * self.um)
+        self.z.moveAbsolute(float(
+                            self.positionEdit.text().split(' ')[0]) * self.um)
 
     def toggleFocus(self):
         if self.lockButton.isChecked():
             self.setPoint = self.processDataThread.focusSignal
-            self.focusLockGraph.line = self.focusLockGraph.plot.addLine(y=self.setPoint, pen='r')
+            self.focusLockGraph.line = self.focusLockGraph.plot.addLine(
+                                                    y=self.setPoint, pen='r')
             self.PI = pi.PI(self.setPoint,
                             np.float(self.kpEdit.text()),
                             np.float(self.kiEdit.text()))
@@ -149,7 +152,8 @@ class FocusWidget(QtGui.QFrame):
     def exportData(self):
         self.sizeofData = np.size(self.focusLockGraph.savedDataSignal)
         self.savedData = [np.ones(self.sizeofData)*self.setPoint,
-                          self.focusLockGraph.savedDataSignal, self.focusLockGraph.savedDataTime]
+                          self.focusLockGraph.savedDataSignal,
+                          self.focusLockGraph.savedDataTime]
         np.savetxt('{}_focusdata'.format(self.main.filename()), self.savedData)
         self.focusLockGraph.savedDataSignal = []
         self.focusLockGraph.savedDataTime = []
@@ -159,13 +163,16 @@ class FocusWidget(QtGui.QFrame):
             self.mean = self.processDataThread.focusSignal
             self.mean2 = self.processDataThread.focusSignal**2
         else:
-            self.mean += (self.processDataThread.focusSignal - self.mean)/self.n
-            self.mean2 += (self.processDataThread.focusSignal**2 - self.mean2)/self.n
+            self.mean += (self.processDataThread.focusSignal -
+                          self.mean)/self.n
+            self.mean2 += (self.processDataThread.focusSignal**2 -
+                           self.mean2)/self.n
 
         self.std = np.sqrt(self.mean2 - self.mean**2)
 
         self.max_dev = np.max([self.max_dev,
-                              self.processDataThread.focusSignal - self.setPoint])
+                              self.processDataThread.focusSignal -
+                              self.setPoint])
 
         statData = 'std = {}    max_dev = {}'.format(np.round(self.std, 3),
                                                      np.round(self.max_dev, 3))
@@ -194,16 +201,17 @@ class ProcessDataThread(QtCore.QThread):
                 vsub: 1024 pix
                 hsub: 1280 pix
         """
-        try:
-            self.webcam = UC480_Camera()
-        except:
-            self.webcam = mockers.MockWebcam()
-        self.ws = {'vsub': 4,'hsub': 4,
+        self.webcam = self.focusWidget.webcam
+        self.ws = {'vsub': 4, 'hsub': 4,
                    'top': None, 'bot': None,
                    'exposure_time': 10*u.ms}
-        self.image = self.webcam.grab_image(vsub=self.ws['vsub'], hsub=self.ws['hsub'],
-                                              top=self.ws['top'], bot=self.ws['bot'],
-                                              exposure_time=self.ws['exposure_time'])
+        self.image = self.webcam.grab_image(vsub=self.ws['vsub'],
+                                            hsub=self.ws['hsub'],
+                                            top=self.ws['top'],
+                                            bot=self.ws['bot'],
+                                            exposure_time=self.ws[
+                                            'exposure_time'])
+
         self.sensorSize = np.array(self.image.shape)
 
         self.focusSignal = 0
@@ -226,8 +234,13 @@ class ProcessDataThread(QtCore.QThread):
 
     def updateFS(self):
         # update the focus signal
-        self.image = self.webcam.grab_image(vsub=self.ws['vsub'], hsub=self.ws['hsub'],
-                                              top=self.ws['top'], bot=self.ws['bot'])
+        try:
+            self.image = self.webcam.grab_image(vsub=self.ws['vsub'],
+                                                hsub=self.ws['hsub'],
+                                                top=self.ws['top'],
+                                                bot=self.ws['bot'])
+        except:
+            pass
         self.massCenter = np.array(ndi.measurements.center_of_mass(self.image))
         self.massCenter[0] = self.massCenter[0] - self.sensorSize[0] / 2
         self.massCenter[1] = self.massCenter[1] - self.sensorSize[1] / 2
@@ -335,7 +348,8 @@ class FocusCalibThread(QtCore.QThread):
         for x in self.scan_list:
             self.z.moveAbsolute(x * self.um)
             time.sleep(0.5)
-            self.focusCalibSignal = self.focusWidget.processDataThread.focusSignal
+            self.focusCalibSignal = \
+                self.focusWidget.processDataThread.focusSignal
             self.signalData.append(self.focusCalibSignal)
             self.positionData.append(self.z.position.magnitude)
 
@@ -349,9 +363,10 @@ class FocusCalibThread(QtCore.QThread):
         cal = self.poly[0]
         calText = '1 px --> {} nm'.format(np.round(1000/cal, 1))
         self.focusWidget.calibrationDisplay.setText(calText)
+        d = [self.positionData, self.calibrationResult[::-1]]
         self.savedCalibData = [self.positionData,
                                self.signalData,
-                               np.polynomial.polynomial.polyval(self.positionData, self.calibrationResult[::-1])]
+                               np.polynomial.polynomial.polyval(d[0], d[1])]
         np.savetxt('calibrationcurves', self.savedCalibData)
 
 
@@ -387,12 +402,14 @@ class FocusCalibGraph(pg.GraphicsWindow):
         self.signalData = self.focusWidget.focusCalibThread.signalData
         self.positionData = self.focusWidget.focusCalibThread.positionData
         self.poly = self.focusWidget.focusCalibThread.poly
-        self.plot.plot(self.positionData, self.signalData, pen=None, symbol='o')
-        self.plot.plot(self.positionData, np.polyval(self.poly, self.positionData), pen=(0, 0, 255))
+        self.plot.plot(self.positionData,
+                       self.signalData, pen=None, symbol='o')
+        self.plot.plot(self.positionData,
+                       np.polyval(self.poly, self.positionData), pen='r')
 
 
 # class daqStream(QtCore.QObject):
-#     """This stream only takes care of getting data from the Labjack device."""
+#     """This stream only takescare of getting data from the Labjack device."""
 #     """This object is not used in the current version of the focuslock """
 #     def __init__(self, DAQ, scansPerS, *args, **kwargs):
 #
@@ -413,7 +430,8 @@ class FocusCalibGraph(pg.GraphicsWindow):
 #         scanRate = 5000
 #         scansPerRead = int(scanRate/self.scansPerS)
 #         portAddress = self.DAQ.address(self.port)[0]
-#         scanRate = self.DAQ.streamStart(scansPerRead, [portAddress], scanRate)
+#         scanRate = self.DAQ.streamStart(scansPerRead, [portAddress],
+#                                                              scanRate)
 #         self.newData = np.mean(self.DAQ.streamRead()[0])
 #         self.timer = QtCore.QTimer()
 #         self.timer.timeout.connect(self.update)

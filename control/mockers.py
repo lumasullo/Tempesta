@@ -16,8 +16,6 @@ from lantz import Q_
 
 from lantz import Action, Feat
 
-import time
-
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s',
                     datefmt='%Y-%d-%m %H:%M:%S')
 
@@ -409,7 +407,8 @@ class MockPZT(Driver):
         super().__init__()
         self.pos = 0
 
-    def query(self, command, *, send_args=(None, None), recv_args=(None, None)):
+    def query(self, command, *,
+              send_args=(None, None), recv_args=(None, None)):
         return 'Mock PZT'
 
     @Feat(units='micrometer')
@@ -437,8 +436,10 @@ class MockWebcam():
 
     def grab_image(self, **kwargs):
         img = np.zeros((256, 320))
-        beamCenter = [int(np.random.randn()*10 + 123), int(np.random.randn()*10 + 155)]
-        img[beamCenter[0]-10:beamCenter[0]+10, beamCenter[1]-10:beamCenter[1]+10] = 1
+        beamCenter = [int(np.random.randn()*10 + 123),
+                      int(np.random.randn()*10 + 155)]
+        img[beamCenter[0]-10:beamCenter[0]+10,
+            beamCenter[1]-10:beamCenter[1]+10] = 1
         return img
 
     def stop(self):
