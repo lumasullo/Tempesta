@@ -1,5 +1,5 @@
 # Tempesta
-Measurement control and analysis for optical microscopy. Adaption of Fede Barabas' Tormenta software https://github.com/fedebarabas/Tormenta
+Measurement control and analysis for optical microscopy. Adaptation from Fede Barabas' Tormenta software https://github.com/fedebarabas/Tormenta
 
 ### Dependencies
  - numpy
@@ -12,8 +12,8 @@ Measurement control and analysis for optical microscopy. Adaption of Fede Baraba
   - http://www.lfd.uci.edu/~gohlke/pythonlibs/#vlfd
  - lantz
   - https://github.com/hgrecco/lantz
- - nidaqmx
-  - https://github.com/ni/nidaqmx-python/
+ - nidaqmx (https://github.com/ni/nidaqmx-python/)
+  - pip install nidaqmx
 
 ### Authors
  - Andreas Bodén
