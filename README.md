@@ -14,3 +14,9 @@ Measurement control and analysis for optical microscopy. Adaption of Fede Baraba
   - https://github.com/hgrecco/lantz
  - nidaqmx
   - https://github.com/ni/nidaqmx-python/
+
+### Authors
+ - Andreas Bodén
+ - Federico Barabas
+ - Luciano Masullo
+ - Shusei Masuda
