@@ -806,7 +806,7 @@ class TormentaGUI(QtGui.QMainWindow):
     liveviewEnds = QtCore.pyqtSignal()
 
     def __init__(self, actlaser, offlaser, exclaser, orcaflashV2, orcaflashV3,
-                 nidaq, pzt, *args, **kwargs):
+                 nidaq, pzt, webcam, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.lasers = [actlaser, offlaser, exclaser]
@@ -1111,7 +1111,7 @@ class TormentaGUI(QtGui.QMainWindow):
 
         # Focus Lock widget
         FocusLockDock = Dock("Focus Lock Tool", size=(1, 1))
-        self.FocusLockWidget = focus.FocusWidget(pzt)
+        self.FocusLockWidget = focus.FocusWidget(pzt, webcam)
         FocusLockDock.addWidget(self.FocusLockWidget)
         dockArea.addDock(FocusLockDock, 'above', RotalignDock)
 
@@ -1566,6 +1566,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.ZalignWidget.closeEvent(*args, **kwargs)
         self.RotalignWidget.closeEvent(*args, **kwargs)
         self.scanWidget.closeEvent(*args, **kwargs)
+        self.FocusLockWidget.closeEvent(*args, **kwargs)
 #        self.signalWidget.closeEvent(*args, **kwargs)
 
         super().closeEvent(*args, **kwargs)

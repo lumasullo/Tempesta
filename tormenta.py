@@ -19,8 +19,12 @@ def main():
 
     nidaq = nidaqmx.system.System.local().devices['Dev1']
 
+    # You can use 'nv401' or 'mock'
+    pzt_name = 'nv401'
+
     with instruments.Laser(cobolt, 'COM5') as actlaser, \
-            instruments.PZT('nv401', 8) as pzt:
+            instruments.PZT(pzt_name, 8) as pzt, \
+            instruments.Webcam() as webcam:
 
         offlaser = instruments.LinkedLaserCheck(cobolt, ['COM6', 'COM4'])
         exclaser = instruments.LaserTTL(0)
@@ -31,7 +35,7 @@ def main():
         print(offlaser.idn)
 
         win = control.TormentaGUI(actlaser, offlaser, exclaser, orcaflashV2,
-                                  orcaflashV3, nidaq, pzt)
+                                  orcaflashV3, nidaq, pzt, webcam)
         win.show()
 
         app.exec_()
