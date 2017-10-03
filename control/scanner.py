@@ -7,7 +7,6 @@ Created on Wed Mar 30 10:32:36 2016
 
 import numpy as np
 import matplotlib.pyplot as plt
-import copy
 import time
 
 import pyqtgraph as pg
@@ -40,7 +39,8 @@ class ScanWidget(QtGui.QMainWindow):
     def __init__(self, device, main, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.DigModW = QtGui.QMessageBox()
-        self.DigModW.setInformativeText("You need to be in digital modulation to scan")
+        info = "You need to be in digital modulation to scan"
+        self.DigModW.setInformativeText(info)
 
         self.nidaq = device
         self.main = main
@@ -252,7 +252,6 @@ class ScanWidget(QtGui.QMainWindow):
         self.stageScan.setPrimScanDim(dim)
         self.scanParameterChanged('primScanDim')
 
-
     def scanParameterChanged(self, p):
         if p not in ('scanMode', 'primScanDim'):
             if p == 'seqTime':
@@ -382,7 +381,7 @@ class Scanner(QtCore.QObject):
         self.scanTimeW.setInformativeText("Are you sure you want to continue?")
         self.scanTimeW.setStandardButtons(QtGui.QMessageBox.Yes |
                                           QtGui.QMessageBox.No)
-        self.channel_order = ['x', 'y', 'z']
+        self.channelOrder = ['x', 'y', 'z']
 
     def runScan(self):
         scanTime = self.sampsInScan / self.main.sampleRate
@@ -400,12 +399,12 @@ class Scanner(QtCore.QObject):
         for n in AOchans:
             self.aotask.ao_channels.add_ao_voltage_chan(
                     physical_channel='Dev1/ao%s' % n,
-                    name_to_assign_to_channel='chan_%s' % self.channel_order[n],
-                    min_val=minVolt[self.channel_order[n]],
-                    max_val=maxVolt[self.channel_order[n]])
+                    name_to_assign_to_channel='chan_%s' % self.channelOrder[n],
+                    min_val=minVolt[self.channelOrder[n]],
+                    max_val=maxVolt[self.channelOrder[n]])
 
-        fullAOsignal = np.array([self.stageScan.sigDict[self.channel_order[i]]
-                        for i in AOchans])
+        fullAOsignal = np.array([self.stageScan.sigDict[self.channelOrder[i]]
+                                 for i in AOchans])
 
         self.aotask.timing.cfg_samp_clk_timing(
             rate=self.stageScan.sampleRate,
@@ -418,8 +417,8 @@ class Scanner(QtCore.QObject):
         DOchans = range(0, 4)
         for d in DOchans:
             chanstring = 'Dev1/port0/line%s' % d
-            self.dotask.do_channels.add_do_chan(lines=chanstring,
-                                                name_to_assign_to_lines='chan%s' % devs[d])
+            self.dotask.do_channels.add_do_chan(
+                lines=chanstring, name_to_assign_to_lines='chan%s' % devs[d])
 
         fullDOsignal = np.array([self.pxCycle.sigDict[devs[i]]
                                 for i in DOchans])
@@ -431,8 +430,8 @@ class Scanner(QtCore.QObject):
         if self.stageScan.scanMode == 'VOLscan':
             fullDOsignal = np.tile(fullDOsignal,
                                    self.stageScan.VOLscan.cyclesPerSlice)
-            fullDOsignal = np.concatenate((fullDOsignal,
-                                           np.zeros(4, self.stageScan.seqSamps)))
+            fullDOsignal = np.concatenate(
+                (fullDOsignal, np.zeros(4, self.stageScan.seqSamps)))
 
         self.dotask.timing.cfg_samp_clk_timing(
             rate=self.pxCycle.sampleRate,
@@ -475,13 +474,15 @@ class Scanner(QtCore.QObject):
         # correct though, assumes channels are 0, 1 and 2.
         # TODO: Test abort (task function)
         writtenSamps = int(np.round(self.aotask.out_stream.curr_write_pos))
-        chans = [0,1,2]
-        dim = [self.channel_order[i] for i in chans]
+        chans = [0, 1, 2]
+        dim = [self.channelOrder[i] for i in chans]
         finalSamps = [self.stageScan.sigDict[dim[i]][writtenSamps - 1]
                       for i in chans]
         print(finalSamps)
-        returnRamps = np.array([makeRamp(finalSamps[i], 0, self.stageScan.sampleRate)
-                       for i in chans])
+        returnRamps = np.array(
+            [makeRamp(finalSamps[i],
+                      0,
+                      self.stageScan.sampleRate) for i in chans])
 
         self.aotask.stop()
         self.aotask.timing.cfg_samp_clk_timing(
@@ -515,8 +516,8 @@ class LaserCycle():
         DOchans = range(0, 4)
         for d in DOchans:
             chanstring = 'Dev1/port0/line%s' % d
-            self.dotask.do_channels.add_do_chan(lines=chanstring,
-                                                name_to_assign_to_lines='chan%s' % devs[d])
+            self.dotask.do_channels.add_do_chan(
+                lines=chanstring, name_to_assign_to_lines='chan%s' % devs[d])
 
         DOchans = [0, 1, 2, 3]
         fullDOsignal = np.array([self.pxCycle.sigDict[devs[i]]
@@ -635,7 +636,8 @@ class FOVscan():
 
     def update(self, parValues, primScanDim):
         '''Create signals.
-        Signals are first created in units of distance and converted to voltage at the end.'''
+        Signals are first created in units of distance and converted to voltage
+        at the end.'''
         # Create signals
         startX = 0
         startY = 0
@@ -686,7 +688,8 @@ class VOLscan():
         pass
 
     def update(self, parValues, primScanDim):
-        """Updates the VOL-scan signals, units of length are used when creating  the scan signals and is converted to voltages at the end """
+        """Updates the VOL-scan signals, units of length are used when creating
+        the scan signals and is converted to voltages at the end """
         print('Updating VOL scan')
         # Create signals
         startX = 0

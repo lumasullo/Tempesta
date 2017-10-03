@@ -6,6 +6,7 @@ Created on Thu May 21 13:19:31 2015
 """
 from pyqtgraph.Qt import QtGui
 import nidaqmx
+import sys
 
 from control import control
 import control.instruments as instruments
@@ -19,8 +20,9 @@ def main():
 
     nidaq = nidaqmx.system.System.local().devices['Dev1']
 
-    with instruments.Laser(cobolt, 'COM5') as actlaser, \
-            instruments.PZT('nv401', 8) as pzt:
+    with instruments.Laser(cobolt, 'COM10') as actlaser, \
+            instruments.PZT('nv401', 8) as pzt, \
+            instruments.Webcam() as webcam:
 
         offlaser = instruments.LinkedLaserCheck(cobolt, ['COM6', 'COM4'])
         exclaser = instruments.LaserTTL(0)
@@ -31,7 +33,8 @@ def main():
         print(offlaser.idn)
 
         win = control.TormentaGUI(actlaser, offlaser, exclaser, orcaflashV2,
-                                  orcaflashV3, nidaq, pzt)
+                                  orcaflashV3, nidaq, pzt, webcam)
+
         win.show()
 
-        app.exec_()
+        sys.exit(app.exec_())

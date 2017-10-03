@@ -54,8 +54,6 @@ class RecordingWidget(QtGui.QFrame):
 
 #        startdir = r'F:\Tempesta\DefaultDataFolderSSD\%s'
         newfolderpath = os.path.join(r"D:\Data", time.strftime('%Y-%m-%d'))
-        if not os.path.exists(newfolderpath):
-            os.mkdir(newfolderpath)
 
         self.z_stack = []
         self.rec_mode = 1
@@ -328,21 +326,20 @@ class RecordingWidget(QtGui.QFrame):
 
     def snapHDF(self):
         folder = self.folderEdit.text()
-        if os.path.exists(folder):
 
-            image = self.main.image
+        if not os.path.exists(folder):
+            os.mkdir(folder)
 
-            name = os.path.join(folder, self.getFileName())
-            savename = guitools.getUniqueName(name + '.hdf5')
-            store_file = hdf.File(savename)
-            store_file.create_dataset(name=self.dataname, data=image)
-            for item in self.getAttrs():
-                if item[1] is not None:
-                    store_file[self.dataname].attrs[item[0]] = item[1]
-            store_file.close()
+        image = self.main.image
 
-        else:
-            self.folderWarning()
+        name = os.path.join(folder, self.getFileName())
+        savename = guitools.getUniqueName(name + '.hdf5')
+        store_file = hdf.File(savename)
+        store_file.create_dataset(name=self.dataname, data=image)
+        for item in self.getAttrs():
+            if item[1] is not None:
+                store_file[self.dataname].attrs[item[0]] = item[1]
+        store_file.close()
 
     def getFileName(self):
         if self.specifyfile.checkState():
@@ -355,18 +352,16 @@ class RecordingWidget(QtGui.QFrame):
 
     def snapTIFF(self):
         folder = self.folderEdit.text()
-        if os.path.exists(folder):
+        if not os.path.exists(folder):
+            os.mkdir(folder)
 
-            time.sleep(0.01)
-            savename = (os.path.join(folder, self.getFileName()) +
-                        '_snap.tiff')
-            savename = guitools.getUniqueName(savename)
-            tiff.imsave(savename, self.main.latest_image.astype(np.uint16),
-                        description=self.dataname, software='Tormenta')
-            guitools.attrsToTxt(os.path.splitext(savename)[0], self.getAttrs())
-
-        else:
-            self.folderWarning()
+        time.sleep(0.01)
+        savename = (os.path.join(folder, self.getFileName()) +
+                    '_snap.tiff')
+        savename = guitools.getUniqueName(savename)
+        tiff.imsave(savename, self.main.latest_image.astype(np.uint16),
+                    description=self.dataname, software='Tormenta')
+        guitools.attrsToTxt(os.path.splitext(savename)[0], self.getAttrs())
 
     def folderWarning(self):
         root = Tk()
@@ -394,7 +389,9 @@ class RecordingWidget(QtGui.QFrame):
                 ret = self.filesizewar.exec_()
 
             folder = self.folderEdit.text()
-            if os.path.exists(folder) and ret == QtGui.QMessageBox.Yes:
+            if not os.path.exists(folder):
+                os.mkdir(folder)
+            if ret == QtGui.QMessageBox.Yes:
 
                 # Sets Recording widget to not be writable during recording.
                 self.writable = False
@@ -460,9 +457,9 @@ class RecordingWidget(QtGui.QFrame):
                 print(self.recworkers)
                 self.recworkers[ind].pressed = False
 
-# Function called when recording finishes to reset relevent parameters.
-
     def endRecording(self):
+        """ Function called when recording finishes to reset relevent
+        parameters."""
         if self.nr_cameras == 2 and (
                 not self.recworkers[0].done or not self.recworkers[1].done):
             print('In first endRecordig "skip me" if')
@@ -806,7 +803,7 @@ class TormentaGUI(QtGui.QMainWindow):
     liveviewEnds = QtCore.pyqtSignal()
 
     def __init__(self, actlaser, offlaser, exclaser, orcaflashV2, orcaflashV3,
-                 nidaq, pzt, *args, **kwargs):
+                 nidaq, pzt, webcam, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.lasers = [actlaser, offlaser, exclaser]
@@ -1024,14 +1021,17 @@ class TormentaGUI(QtGui.QMainWindow):
         self.vb = imageWidget.addViewBox(row=1, col=1)
         self.vb.setMouseMode(pg.ViewBox.RectMode)
         self.img = pg.ImageItem()
-        self.lut = guitools.cubehelix()
-        self.img.setLookupTable(self.lut)
+#        self.lut = guitools.cubehelix()
+#        self.img.setLookupTable(self.lut)
         self.img.translate(-0.5, -0.5)
 #        self.img.setPxMode(True)
         self.vb.addItem(self.img)
         self.vb.setAspectLocked(True)
         self.hist = pg.HistogramLUTItem(image=self.img)
-#        self.hist.vb.setLimits(yMin=0, yMax=2048)
+        self.hist.vb.setLimits(yMin=0, yMax=66000)
+        self.cubehelixCM = pg.ColorMap(np.arange(0, 1, 1/256),
+                                       guitools.cubehelix().astype(int))
+        self.hist.gradient.setColorMap(self.cubehelixCM)
         imageWidget.addItem(self.hist, row=1, col=2)
         self.ROI = guitools.ROI((0, 0), self.vb, (0, 0),
                                 handlePos=(1, 0), handleCenter=(0, 1),
@@ -1111,7 +1111,7 @@ class TormentaGUI(QtGui.QMainWindow):
 
         # Focus Lock widget
         FocusLockDock = Dock("Focus Lock Tool", size=(1, 1))
-        self.FocusLockWidget = focus.FocusWidget(pzt)
+        self.FocusLockWidget = focus.FocusWidget(pzt, webcam)
         FocusLockDock.addWidget(self.FocusLockWidget)
         dockArea.addDock(FocusLockDock, 'above', RotalignDock)
 
@@ -1566,6 +1566,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.ZalignWidget.closeEvent(*args, **kwargs)
         self.RotalignWidget.closeEvent(*args, **kwargs)
         self.scanWidget.closeEvent(*args, **kwargs)
+        self.FocusLockWidget.closeEvent(*args, **kwargs)
 #        self.signalWidget.closeEvent(*args, **kwargs)
 
         super().closeEvent(*args, **kwargs)

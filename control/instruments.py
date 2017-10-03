@@ -9,6 +9,7 @@ import importlib
 import control.mockers as mockers
 import numpy as np
 import nidaqmx
+from instrumental.drivers.cameras.uc480 import UC480_Camera
 
 
 class Laser(object):
@@ -166,7 +167,7 @@ class Camera(object):
     """ Buffer class for testing whether the camera is connected. If it's not,
     it returns a dummy class for program testing. """
 # TODO:
-    """This was originally (by federico) called from tormenta.py using a "with"
+    """This was originally (by Federico) called from tormenta.py using a "with"
     call, as with the Lasers. But accoring to literature, "with" should be
     used with classes having __enter__ and __exit functions defined.
     For some reason this particular class gives "Error: class is missing
@@ -191,12 +192,21 @@ class Camera(object):
 class PZT(object):
 
     def __new__(cls, iName, port, *args):
-        if iName == 'nv401':
+        try:
             from lantz.drivers.piezosystemjena.nv401 import nv401
             inst = nv401.via_serial(port)
+            inst.initialize()
+            inst.position
             return inst
-        elif iName == 'mock':
+        except:
             return mockers.MockPZT()
-        else:
-            raise ValueError('Enter the right piezo name, if you dont have '
-                             'piezo, you can use "mock"')
+
+
+class Webcam(object):
+
+    def __new__(cls):
+        try:
+            webcam = UC480_Camera()
+        except:
+            webcam = mockers.MockWebcam()
+        return webcam

@@ -8,7 +8,6 @@ Created on Tue Aug 12 11:51:21 2014
 import numpy as np
 from pyqtgraph.Qt import QtCore, QtGui
 from lantz import Q_
-import nidaqmx
 
 
 class UpdatePowers(QtCore.QObject):
