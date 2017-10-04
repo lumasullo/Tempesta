@@ -118,62 +118,65 @@ def savePreset(main, filename=None):
 
     main.presetsMenu.addItem(filename)
 
+
+scanDir = 'E:\Tempesta\Saved_scan_settings'
+
+
 def saveScan(scanWid):
-    
+
         config = configparser.ConfigParser()
         config.optionxform = str
-    
+
         config['Pixel_par_values'] = scanWid.pixel_par_values
         config['Scan_par_values'] = scanWid.scan_par_values
-        config['Modes'] = {'scan_mode': scanWid.Scan_Mode.currentText(), 'scan_or_not': scanWid.scanRadio.isChecked()}
-        fileName = QtGui.QFileDialog.getSaveFileName(scanWid, 'Save scan', 'E:\Tempesta\Saved_scan_settings')
+        config['Modes'] = {'scan_mode': scanWid.Scan_Mode.currentText(),
+                           'scan_or_not': scanWid.scanRadio.isChecked()}
+        fileName = QtGui.QFileDialog.getSaveFileName(scanWid, 'Save scan',
+                                                     scanDir)
         if fileName == '':
             return
-            
+
         with open(fileName, 'w') as configfile:
             config.write(configfile)
 
+
 def loadScan(scanWid):
-    
+
     config = configparser.ConfigParser()
     config.optionxform = str
-    
-    fileName = QtGui.QFileDialog.getOpenFileName(scanWid, 'Load scan', 'E:\Tempesta\Saved_scan_settings')
+
+    fileName = QtGui.QFileDialog.getOpenFileName(scanWid, 'Load scan', scanDir)
     if fileName == '':
         return
-        
+
     config.read(fileName)
-    
+
     for key in scanWid.pixel_par_values:
         scanWid.pixel_par_values[key] = float(config._sections['Pixel_par_values'][key])
         scanWid.pixel_parameters[key].setText(str(1000*float(config._sections['Pixel_par_values'][key])))
-        
+
     for key in scanWid.scan_par_values:
         scanWid.scan_par_values[key] = float(config._sections['Scan_par_values'][key])
         if key == 'sequence_time':
             scanWid.scan_parameters[key].setText(str(1000*float(config._sections['Scan_par_values'][key])))
         else:
             scanWid.scan_parameters[key].setText(config._sections['Scan_par_values'][key])
-    
+
     scanOrNot = (config._sections['Modes']['scan_or_not'] == 'True')
     scanWid.setScanOrNot(scanOrNot)
     if scanOrNot:
         scanWid.scanRadio.setChecked(True)
     else:
         scanWid.contLaserPulsesRadio.setChecked(True)
-    
+
     scan_mode = config._sections['Modes']['scan_mode']
     scanWid.setScanMode(scan_mode)
     scanWid.Scan_Mode.setCurrentIndex(scanWid.Scan_Mode.findText(scan_mode))
-    
+
     scanWid.update_Scan(scanWid.all_devices)
     scanWid.graph.update()
 
-        
-    
-        
-        
-        
+
 def loadPreset(main, filename=None):
 
     tree = main.tree.p
@@ -227,6 +230,41 @@ def loadPreset(main, filename=None):
     tree.param('Gain').param(pag).setValue(float(configCam[pag]))
 
     tree.param('Gain').param('EM gain').setValue(int(configCam['EM gain']))
+
+
+def bestLimits(arr):
+    # Best cmin, cmax algorithm taken from ImageJ routine:
+    # http://cmci.embl.de/documents/120206pyip_cooking/
+    # python_imagej_cookbook#automatic_brightnesscontrast_button
+    pixelCount = arr.size
+    limit = pixelCount/10
+    threshold = pixelCount/5000
+    hist, bin_edges = np.histogram(arr, 256)
+    i = 0
+    found = False
+    count = 0
+    while True:
+        i += 1
+        count = hist[i]
+        if count > limit:
+            count = 0
+        found = count > threshold
+        if found or i >= 255:
+            break
+    hmin = i
+
+    i = 256
+    while True:
+        i -= 1
+        count = hist[i]
+        if count > limit:
+            count = 0
+        found = count > threshold
+        if found or i < 1:
+            break
+    hmax = i
+
+    return bin_edges[hmin], bin_edges[hmax]
 
 
 class TiffConverterThread(QtCore.QThread):
@@ -483,7 +521,7 @@ class ROI(pg.ROI):
     def hide(self, *args, **kwargs):
         super().hide(*args, **kwargs)
         self.label.hide()
-        
+
     def show(self, *args, **kwargs):
         super().show(*args, **kwargs)
         self.label.show()

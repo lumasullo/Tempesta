@@ -20,10 +20,10 @@ def main():
 
     nidaq = nidaqmx.system.System.local().devices['Dev1']
 
-    with instruments.Laser(cobolt, 'COM10') as actlaser, \
+    with instruments.Laser(cobolt, 'COM4') as actlaser, \
             instruments.PZT(8) as pzt, instruments.Webcam() as webcam:
 
-        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM6', 'COM4'])
+        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM5', 'COM10'])
         exclaser = instruments.LaserTTL(0)
         orcaflashV3 = instruments.Camera(0)
         orcaflashV2 = instruments.Camera(1)

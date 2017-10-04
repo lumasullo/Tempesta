@@ -764,6 +764,15 @@ class LVWorker(QtCore.QObject):
         self.f_ind = None  # Should maybe be f_ind
         self.vtimer.start(30)
         print('f_ind when started = ', self.f_ind)
+        time.sleep(0.03)
+
+        # Grab first frame only to set suitable histogram limits
+        self.f_ind = self.orcaflash.newFrames()[-1]
+        frame = self.orcaflash.hcam_data[self.f_ind].getData()
+        self.image = np.reshape(
+            frame, (self.orcaflash.frame_x, self.orcaflash.frame_y), 'F')
+        self.main.latest_images[self.ind] = self.image
+        self.main.hist.setLevels(*guitools.bestLimits(self.image))
 
     def update(self):
 
@@ -989,6 +998,8 @@ class TormentaGUI(QtGui.QMainWindow):
 #        self.crosshairButton = QtGui.QPushButton('Crosshair')
 #        self.crosshairButton.setCheckable(True)
 #        self.crosshairButton.setEnabled(False)
+        self.levelsButton = QtGui.QPushButton('Update Levels')
+        self.levelsButton.pressed.connect(self.autoLevels)
 
         self.viewCtrl = QtGui.QWidget()
         self.viewCtrlLayout = QtGui.QGridLayout()
@@ -1021,10 +1032,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.vb = imageWidget.addViewBox(row=1, col=1)
         self.vb.setMouseMode(pg.ViewBox.RectMode)
         self.img = pg.ImageItem()
-#        self.lut = guitools.cubehelix()
-#        self.img.setLookupTable(self.lut)
         self.img.translate(-0.5, -0.5)
-#        self.img.setPxMode(True)
         self.vb.addItem(self.img)
         self.vb.setAspectLocked(True)
         self.hist = pg.HistogramLUTItem(image=self.img)
@@ -1032,6 +1040,8 @@ class TormentaGUI(QtGui.QMainWindow):
         self.cubehelixCM = pg.ColorMap(np.arange(0, 1, 1/256),
                                        guitools.cubehelix().astype(int))
         self.hist.gradient.setColorMap(self.cubehelixCM)
+        for tick in self.hist.gradient.ticks:
+            tick.hide()
         imageWidget.addItem(self.hist, row=1, col=2)
         self.ROI = guitools.ROI((0, 0), self.vb, (0, 0),
                                 handlePos=(1, 0), handleCenter=(0, 1),
@@ -1135,8 +1145,8 @@ class TormentaGUI(QtGui.QMainWindow):
         layout = QtGui.QGridLayout()
         self.cwidget.setLayout(layout)
         layout.setColumnMinimumWidth(0, 350)
-        layout.setColumnMinimumWidth(2, 600)
-        layout.setColumnMinimumWidth(3, 200)
+#        layout.setColumnMinimumWidth(2, 600)
+        layout.setColumnMinimumWidth(7, 200)
         layout.setRowMinimumHeight(1, 550)
         layout.setRowMinimumHeight(2, 100)
         layout.setRowMinimumHeight(3, 300)
@@ -1145,14 +1155,16 @@ class TormentaGUI(QtGui.QMainWindow):
         layout.addWidget(cameraWidget, 1, 0, 1, 2)
         layout.addWidget(self.viewCtrl, 2, 0, 1, 2)
         layout.addWidget(self.recWidget, 3, 0, 2, 2)
-        layout.addWidget(imageWidget, 0, 2, 5, 1)
-        layout.addWidget(dockArea, 0, 3, 5, 1)
+        layout.addWidget(imageWidget, 1, 2, 4, 4)
+        layout.addWidget(self.levelsButton, 0, 4)
+        layout.addWidget(dockArea, 0, 7, 6, 1)
 
         layout.setRowMinimumHeight(2, 40)
         layout.setColumnMinimumWidth(2, 1000)
 
-    def testfunction(self):
-        pass
+    def autoLevels(self):
+        self.hist.setLevels(*guitools.bestLimits(self.img.image))
+        self.hist.vb.autoRange()
 
     def toggleCamera(self):
         if self.orcaflash == self.cameras[1]:
@@ -1289,12 +1301,14 @@ class TormentaGUI(QtGui.QMainWindow):
         """
 
         binning = self.binPar.value()
-
-        self.changeParameter(
-            lambda: self.cropOrca(binning*self.X0par.value(),
-                                  binning*self.Y0par.value(),
-                                  binning*self.widthPar.value(),
-                                  self.heightPar.value()))
+        width = self.widthPar.value()
+        height = self.heightPar.value()
+        self.changeParameter(lambda: self.cropOrca(binning*self.X0par.value(),
+                                                   binning*self.Y0par.value(),
+                                                   binning*width, height))
+        self.vb.setLimits(xMin=-0.5, xMax=width - 0.5, minXRange=4,
+                          yMin=-0.5, yMax=height - 0.5, minYRange=4)
+        self.vb.setAspectLocked()
         self.updateTimings()
         self.recWidget.filesizeupdate()
         self.ROI.hide()
@@ -1337,7 +1351,6 @@ class TormentaGUI(QtGui.QMainWindow):
                 self.ROI.hide()
 
             elif frameParam.param('Mode').value() == 'Full chip':
-                print('Full chip')
                 self.X0par.setValue(0)
                 self.Y0par.setValue(0)
                 self.widthPar.setValue(2048)
@@ -1347,7 +1360,6 @@ class TormentaGUI(QtGui.QMainWindow):
                 self.ROI.hide()
 
             elif frameParam.param('Mode').value() == 'Microlenses':
-                print('Full chip')
                 self.X0par.setValue(595)
                 self.Y0par.setValue(685)
                 self.widthPar.setValue(600)
@@ -1356,7 +1368,6 @@ class TormentaGUI(QtGui.QMainWindow):
                 self.ROI.hide()
 
             elif frameParam.param('Mode').value() == 'Fast ROI':
-                print('Full chip')
                 self.X0par.setValue(595)
                 self.Y0par.setValue(960)
                 self.widthPar.setValue(600)
@@ -1365,7 +1376,6 @@ class TormentaGUI(QtGui.QMainWindow):
                 self.ROI.hide()
 
             elif frameParam.param('Mode').value() == 'Fast ROI only v2':
-                print('Full chip')
                 self.X0par.setValue(595)
                 self.Y0par.setValue(1000)
                 self.widthPar.setValue(600)
@@ -1374,7 +1384,6 @@ class TormentaGUI(QtGui.QMainWindow):
                 self.ROI.hide()
 
             elif frameParam.param('Mode').value() == 'Minimal line':
-                print('Full chip')
                 self.X0par.setValue(0)
                 self.Y0par.setValue(1020)
                 self.widthPar.setValue(2048)
@@ -1444,10 +1453,6 @@ class TormentaGUI(QtGui.QMainWindow):
         GUI from thread results in issues when interacting with the viewbox
         from GUI. Maybe due to simultaious manipulation of viewbox from GUI and
         thread.'''
-
-        #        self.orcaflash.startAcquisition()
-        #        time.sleep(0.3)
-        #        time.sleep(np.max((5 * self.t_exp_real.magnitude, 1)))
 
         self.updateFrame()
         self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
