@@ -113,7 +113,7 @@ class LinkedLaser(object):
 class LaserTTL(object):
     def __init__(self, line):
         self.line = line
-
+        self.power = None
         # Nidaq task
         self.digital_mod = False
 

@@ -306,16 +306,16 @@ class RecordingWidget(QtGui.QFrame):
             name = re.sub('<[^<]+?>', '', laserControl.name.text())
             attrs.append((name, laserControl.laser.power))
 
-        for key in self.main.scanWidget.scan_par_values:
-            attrs.append((key, self.main.scanWidget.scan_par_values[key]))
+        for key in self.main.scanWidget.scanParValues:
+            attrs.append((key, self.main.scanWidget.scanParValues[key]))
 
         attrs.append(('Scan mode',
                       self.main.scanWidget.scanMode.currentText()))
         attrs.append(('True_if_scanning',
                       self.main.scanWidget.scanRadio.isChecked()))
 
-        for key in self.main.scanWidget.pixel_par_values:
-            attrs.append((key, self.main.scanWidget.pixel_par_values[key]))
+        for key in self.main.scanWidget.pxParValues:
+            attrs.append((key, self.main.scanWidget.pxParValues[key]))
 
         attrs.extend([('element_size_um', [1, 0.066, 0.066]),
                       ('Date', time.strftime("%Y-%m-%d")),
@@ -773,9 +773,9 @@ class LVWorker(QtCore.QObject):
             frame, (self.orcaflash.frame_x, self.orcaflash.frame_y), 'F')
         self.main.latest_images[self.ind] = self.image
         self.main.hist.setLevels(*guitools.bestLimits(self.image))
+        self.main.hist.vb.autoRange()
 
     def update(self):
-
         if self.running:
             self.f_ind = self.orcaflash.newFrames()[-1]
 #            print('f_ind = :', self.f_ind)
@@ -989,16 +989,14 @@ class TormentaGUI(QtGui.QMainWindow):
         self.CamLabel.setStyleSheet("font-size:18px")
 
         # viewBox custom Tools
-#        self.gridButton = QtGui.QPushButton('Grid')
-#        self.gridButton.setCheckable(True)
-#        self.gridButton.setEnabled(False)
-#        self.grid2Button = QtGui.QPushButton('Two-color grid')
-#        self.grid2Button.setCheckable(True)
-#        self.grid2Button.setEnabled(False)
+        self.gridButton = QtGui.QPushButton('Grid')
+        self.gridButton.setCheckable(True)
+        self.gridButton.setEnabled(False)
 #        self.crosshairButton = QtGui.QPushButton('Crosshair')
 #        self.crosshairButton.setCheckable(True)
 #        self.crosshairButton.setEnabled(False)
         self.levelsButton = QtGui.QPushButton('Update Levels')
+        self.levelsButton.setEnabled(False)
         self.levelsButton.pressed.connect(self.autoLevels)
 
         self.viewCtrl = QtGui.QWidget()
@@ -1035,6 +1033,8 @@ class TormentaGUI(QtGui.QMainWindow):
         self.img.translate(-0.5, -0.5)
         self.vb.addItem(self.img)
         self.vb.setAspectLocked(True)
+        self.grid = guitools.Grid(self.vb)
+        self.gridButton.clicked.connect(self.grid.toggle)
         self.hist = pg.HistogramLUTItem(image=self.img)
         self.hist.vb.setLimits(yMin=0, yMax=66000)
         self.cubehelixCM = pg.ColorMap(np.arange(0, 1, 1/256),
@@ -1083,17 +1083,17 @@ class TormentaGUI(QtGui.QMainWindow):
         scanDock.addWidget(self.scanWidget)
         dockArea.addDock(scanDock)
 
-        # Console widget
-        consoleDock = Dock("Console", size=(600, 200))
-        console = ConsoleWidget(namespace={'pg': pg, 'np': np})
-        consoleDock.addWidget(console)
-        dockArea.addDock(consoleDock, 'above', scanDock)
-
         # Line Alignment Tool
         alignmentDock = Dock("Alignment Tool", size=(50, 30))
         self.alignmentWidget = QtGui.QWidget()
         alignmentDock.addWidget(self.alignmentWidget)
         dockArea.addDock(alignmentDock)
+
+        # Console widget
+        consoleDock = Dock("Console", size=(50, 50))
+        console = ConsoleWidget(namespace={'pg': pg, 'np': np})
+        consoleDock.addWidget(console)
+        dockArea.addDock(consoleDock, 'above', alignmentDock)
 
         alignmentLayout = QtGui.QGridLayout()
         self.alignmentWidget.setLayout(alignmentLayout)
@@ -1126,7 +1126,7 @@ class TormentaGUI(QtGui.QMainWindow):
         dockArea.addDock(FocusLockDock, 'above', RotalignDock)
 
         # Scan Widget
-        self.scanxyWidget = scanner.ScanWidget(self.nidaq, self)
+#        self.scanxyWidget = scanner.ScanWidget(self.nidaq, self)
 #        self.scanImageDock = Dock("Image from scanning", size=(300, 300))
 #        self.scanImageDock.addWidget(self.scanxyWidget.display)
 #        dockArea.addDock(self.scanImageDock)
@@ -1156,6 +1156,7 @@ class TormentaGUI(QtGui.QMainWindow):
         layout.addWidget(self.viewCtrl, 2, 0, 1, 2)
         layout.addWidget(self.recWidget, 3, 0, 2, 2)
         layout.addWidget(imageWidget, 1, 2, 4, 4)
+        layout.addWidget(self.gridButton, 0, 3)
         layout.addWidget(self.levelsButton, 0, 4)
         layout.addWidget(dockArea, 0, 7, 6, 1)
 
@@ -1309,6 +1310,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.vb.setLimits(xMin=-0.5, xMax=width - 0.5, minXRange=4,
                           yMin=-0.5, yMax=height - 0.5, minYRange=4)
         self.vb.setAspectLocked()
+        self.grid.update([width, height])
         self.updateTimings()
         self.recWidget.filesizeupdate()
         self.ROI.hide()
@@ -1316,7 +1318,6 @@ class TormentaGUI(QtGui.QMainWindow):
     def updateFrame(self):
         """ Method to change the image frame size and position in the sensor.
         """
-        print('Update frame called')
         frameParam = self.tree.p.param('Image frame')
         if frameParam.param('Mode').value() == 'Custom':
             self.X0par.setWritable(True)
@@ -1455,6 +1456,8 @@ class TormentaGUI(QtGui.QMainWindow):
         thread.'''
 
         self.updateFrame()
+        self.gridButton.setEnabled(True)
+        self.levelsButton.setEnabled(True)
         self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
         self.recWidget.readyToRecord = True
 
@@ -1478,6 +1481,8 @@ class TormentaGUI(QtGui.QMainWindow):
             self.cameras[i].stopAcquisition()
 
         self.viewtimer.stop()
+        self.gridButton.setEnabled(False)
+        self.levelsButton.setEnabled(False)
         self.recWidget.readyToRecord = False
 
         self.img.setImage(

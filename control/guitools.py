@@ -339,27 +339,24 @@ class TiffConverter(QtCore.QObject):
 
 class Grid():
 
-    def __init__(self, viewBox, shape):
+    def __init__(self, viewBox):
 
         self.showed = False
         self.vb = viewBox
-        self.shape = shape
-        pen = QtGui.QPen(QtCore.Qt.yellow, 0.75, QtCore.Qt.DotLine)
-        pen2 = QtGui.QPen(QtCore.Qt.yellow, 1, QtCore.Qt.SolidLine)
+        self.shape = None
+        pen = QtGui.QPen(QtCore.Qt.yellow, 2, QtCore.Qt.DotLine)
+        pen2 = QtGui.QPen(QtCore.Qt.yellow, 2.5, QtCore.Qt.SolidLine)
 
-        self.yline1 = pg.InfiniteLine(pos=0.25*self.shape[0], pen=pen)
-        self.yline2 = pg.InfiniteLine(pos=0.375*self.shape[0], pen=pen)
-        self.yline3 = pg.InfiniteLine(pos=0.50*self.shape[0], pen=pen2)
-        self.yline4 = pg.InfiniteLine(pos=0.625*self.shape[0], pen=pen)
-        self.yline5 = pg.InfiniteLine(pos=0.75*self.shape[0], pen=pen)
-        self.xline1 = pg.InfiniteLine(pos=0.25*self.shape[1], pen=pen, angle=0)
-        self.xline2 = pg.InfiniteLine(pos=0.375*self.shape[1], pen=pen2,
-                                      angle=0)
-        self.xline3 = pg.InfiniteLine(pos=0.50*self.shape[1], pen=pen2,
-                                      angle=0)
-        self.xline4 = pg.InfiniteLine(pos=0.625*self.shape[1], pen=pen2,
-                                      angle=0)
-        self.xline5 = pg.InfiniteLine(pos=0.75*self.shape[1], pen=pen, angle=0)
+        self.yline1 = pg.InfiniteLine(pen=pen)
+        self.yline2 = pg.InfiniteLine(pen=pen)
+        self.yline3 = pg.InfiniteLine(pen=pen2)
+        self.yline4 = pg.InfiniteLine(pen=pen)
+        self.yline5 = pg.InfiniteLine(pen=pen)
+        self.xline1 = pg.InfiniteLine(pen=pen, angle=0)
+        self.xline2 = pg.InfiniteLine(pen=pen2, angle=0)
+        self.xline3 = pg.InfiniteLine(pen=pen2, angle=0)
+        self.xline4 = pg.InfiniteLine(pen=pen2, angle=0)
+        self.xline5 = pg.InfiniteLine(pen=pen, angle=0)
 
     def update(self, shape):
         self.yline1.setPos(0.25*shape[0])

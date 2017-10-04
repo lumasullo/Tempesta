@@ -480,9 +480,8 @@ class Scanner(QtCore.QObject):
                       for i in chans]
         print(finalSamps)
         returnRamps = np.array(
-            [makeRamp(finalSamps[i],
-                      0,
-                      self.stageScan.sampleRate) for i in chans])
+            [makeRamp(
+                finalSamps[i], 0, self.stageScan.sampleRate) for i in chans])
 
         self.aotask.stop()
         self.aotask.timing.cfg_samp_clk_timing(
