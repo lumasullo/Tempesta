@@ -191,7 +191,7 @@ class Camera(object):
 
 class PZT(object):
 
-    def __new__(cls, iName, port, *args):
+    def __new__(cls, port, *args):
         try:
             from lantz.drivers.piezosystemjena.nv401 import nv401
             inst = nv401.via_serial(port)

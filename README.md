@@ -6,11 +6,13 @@ Measurement control and analysis for optical microscopy. Adaptation from Fede Ba
  - scipy
  - h5py
  - PyQt4
- - pyqtgraph dev
-  - https://github.com/pyqtgraph/pyqtgraph
- - tifffile
-  - http://www.lfd.uci.edu/~gohlke/pythonlibs/#vlfd
- - lantz
-  - https://github.com/hgrecco/lantz
+ - pyqtgraph
+ - tifffile 
+ - lantz (https://github.com/hgrecco/lantz)
  - nidaqmx (https://github.com/ni/nidaqmx-python/)
-  - pip install nidaqmx
+
+### Authors
+ - Andreas Bodén
+ - Federico Barabas
+ - Luciano Masullo
+ - Shusei Masuda
