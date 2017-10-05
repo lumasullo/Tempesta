@@ -359,8 +359,9 @@ class RecordingWidget(QtGui.QFrame):
         savename = (os.path.join(folder, self.getFileName()) +
                     '_snap.tiff')
         savename = guitools.getUniqueName(savename)
-        tiff.imsave(savename, self.main.latest_image.astype(np.uint16),
-                    description=self.dataname, software='Tormenta')
+        image = self.main.latest_images[self.main.currCamIdx].astype(np.uint16)
+        tiff.imsave(savename, image, description=self.dataname,
+                    software='Tormenta')
         guitools.attrsToTxt(os.path.splitext(savename)[0], self.getAttrs())
 
     def folderWarning(self):
