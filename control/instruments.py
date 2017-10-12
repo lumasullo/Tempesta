@@ -17,11 +17,8 @@ class Laser(object):
     def __new__(cls, iName, *args):
         try:
             pName, driverName = iName.rsplit('.', 1)
-            print('iName = ', iName)
-            print('pName = ', pName)
             package = importlib.import_module('lantz.drivers.legacy.' + pName)
             driver = getattr(package, driverName)
-            print('driver: ', driver)
             laser = driver(*args)
             laser.initialize()
             return driver(*args)
@@ -105,6 +102,16 @@ class LinkedLaser(object):
     def query(self, value):
         [self.lasers[i].query(value) for i in [0, 1]]
 
+    @property
+    def power_mod(self):
+        """Laser modulated power (mW).
+        """
+        return self.lasers[0].power_mod + self.lasers[1].power_mod
+
+    @power_mod.setter
+    def power_mod(self, value):
+        self.lasers[0].power_mod = self.lasers[1].power_mod = 0.5*value
+
     def finalize(self):
         self.lasers[0].finalize()
         self.lasers[1].finalize()
@@ -180,8 +187,6 @@ class Camera(object):
         try:
             import lantz.drivers.hamamatsu.hamamatsu_camera as hm
             orcaflash = hm.HamamatsuCameraMR(id)
-            print('Initializing Hamamatsu Camera Object, model: ',
-                  orcaflash.camera_model)
             return orcaflash
 
         except:

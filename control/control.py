@@ -779,7 +779,6 @@ class LVWorker(QtCore.QObject):
     def update(self):
         if self.running:
             self.f_ind = self.orcaflash.newFrames()[-1]
-#            print('f_ind = :', self.f_ind)
             frame = self.orcaflash.hcam_data[self.f_ind].getData()
             self.image = np.reshape(
                 frame, (self.orcaflash.frame_x, self.orcaflash.frame_y), 'F')
@@ -815,6 +814,8 @@ class TormentaGUI(QtGui.QMainWindow):
     def __init__(self, actlaser, offlaser, exclaser, orcaflashV2, orcaflashV3,
                  nidaq, pzt, webcam, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.resize(2400, 1300)
 
         self.lasers = [actlaser, offlaser, exclaser]
         self.cameras = [orcaflashV2, orcaflashV3]
@@ -1034,6 +1035,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.img.translate(-0.5, -0.5)
         self.vb.addItem(self.img)
         self.vb.setAspectLocked(True)
+        imageWidget.setAspectLocked(True)
         self.grid = guitools.Grid(self.vb)
         self.gridButton.clicked.connect(self.grid.toggle)
         self.hist = pg.HistogramLUTItem(image=self.img)
@@ -1071,31 +1073,17 @@ class TormentaGUI(QtGui.QMainWindow):
         self.toggleCamera()
         self.adjustFrame()
 
-        # Dock widget
-        dockArea = DockArea()
+        # Illumination dock area
+        illumDockArea = DockArea()
 
+        # Laser dock
         laserDock = Dock("Laser Control", size=(1, 1))
         self.laserWidgets = lasercontrol.LaserWidget(self.lasers, self.nidaq)
         laserDock.addWidget(self.laserWidgets)
-        dockArea.addDock(laserDock)
-
-        scanDock = Dock('Scan')
-        self.scanWidget = scanner.ScanWidget(self.nidaq, self)
-        scanDock.addWidget(self.scanWidget)
-        dockArea.addDock(scanDock)
+        illumDockArea.addDock(laserDock)
 
         # Line Alignment Tool
-        alignmentDock = Dock("Alignment Tool", size=(50, 30))
         self.alignmentWidget = QtGui.QWidget()
-        alignmentDock.addWidget(self.alignmentWidget)
-        dockArea.addDock(alignmentDock)
-
-        # Console widget
-        consoleDock = Dock("Console", size=(50, 50))
-        console = ConsoleWidget(namespace={'pg': pg, 'np': np})
-        consoleDock.addWidget(console)
-        dockArea.addDock(consoleDock, 'above', alignmentDock)
-
         alignmentLayout = QtGui.QGridLayout()
         self.alignmentWidget.setLayout(alignmentLayout)
         self.angleEdit = QtGui.QLineEdit('30')
@@ -1107,24 +1095,42 @@ class TormentaGUI(QtGui.QMainWindow):
         alignmentLayout.addWidget(self.angleEdit, 0, 1)
         alignmentLayout.addWidget(self.alignmentLineMakerButton, 1, 0)
         alignmentLayout.addWidget(self.alignmentCheck, 1, 1)
+        alignmentDock = Dock("Alignment Tool", size=(1, 1))
+        alignmentDock.addWidget(self.alignmentWidget)
+        illumDockArea.addDock(alignmentDock, 'right')
 
-        # Z Align widget
+        # Z align widget
         ZalignDock = Dock("Axial Alignment Tool", size=(1, 1))
         self.ZalignWidget = align.AlignWidgetAverage(self)
         ZalignDock.addWidget(self.ZalignWidget)
-        dockArea.addDock(ZalignDock, 'above', scanDock)
+        illumDockArea.addDock(ZalignDock, 'above', alignmentDock)
 
-        # Z Align widget
+        # Rotational align widget
         RotalignDock = Dock("Rotational Alignment Tool", size=(1, 1))
         self.RotalignWidget = align.AlignWidgetXYProject(self)
         RotalignDock.addWidget(self.RotalignWidget)
-        dockArea.addDock(RotalignDock, 'above', ZalignDock)
+        illumDockArea.addDock(RotalignDock, 'above', alignmentDock)
+
+        # Dock widget
+        dockArea = DockArea()
+
+        # Scanner
+        scanDock = Dock('Scan', size=(1, 1))
+        self.scanWidget = scanner.ScanWidget(self.nidaq, self)
+        scanDock.addWidget(self.scanWidget)
+        dockArea.addDock(scanDock)
 
         # Focus Lock widget
-        FocusLockDock = Dock("Focus Lock Tool", size=(1, 1))
+        FocusLockDock = Dock("Focus Lock", size=(400, 400))
         self.FocusLockWidget = focus.FocusWidget(pzt, webcam)
         FocusLockDock.addWidget(self.FocusLockWidget)
-        dockArea.addDock(FocusLockDock, 'above', RotalignDock)
+        dockArea.addDock(FocusLockDock, 'below', scanDock)
+
+        # Console widget
+        consoleDock = Dock("Console", size=(1, 1))
+        console = ConsoleWidget(namespace={'pg': pg, 'np': np})
+        consoleDock.addWidget(console)
+        dockArea.addDock(consoleDock, 'below', FocusLockDock)
 
         # Scan Widget
 #        self.scanxyWidget = scanner.ScanWidget(self.nidaq, self)
@@ -1146,22 +1152,20 @@ class TormentaGUI(QtGui.QMainWindow):
         layout = QtGui.QGridLayout()
         self.cwidget.setLayout(layout)
         layout.setColumnMinimumWidth(0, 350)
-#        layout.setColumnMinimumWidth(2, 600)
         layout.setColumnMinimumWidth(7, 200)
-        layout.setRowMinimumHeight(1, 550)
-        layout.setRowMinimumHeight(2, 100)
-        layout.setRowMinimumHeight(3, 300)
+        layout.setRowMinimumHeight(1, 350)
+        layout.setRowMinimumHeight(2, 300)
         layout.addWidget(self.presetsMenu, 0, 0)
         layout.addWidget(self.loadPresetButton, 0, 1)
-        layout.addWidget(cameraWidget, 1, 0, 1, 2)
-        layout.addWidget(self.viewCtrl, 2, 0, 1, 2)
-        layout.addWidget(self.recWidget, 3, 0, 2, 2)
-        layout.addWidget(imageWidget, 1, 2, 4, 4)
+        layout.addWidget(cameraWidget, 1, 0, 2, 2)
+        layout.addWidget(self.viewCtrl, 3, 0, 1, 2)
+        layout.addWidget(self.recWidget, 4, 0, 2, 2)
+        layout.addWidget(imageWidget, 1, 2, 5, 4)
         layout.addWidget(self.gridButton, 0, 3)
         layout.addWidget(self.levelsButton, 0, 4)
-        layout.addWidget(dockArea, 0, 7, 6, 1)
+        layout.addWidget(illumDockArea, 0, 7, 2, 1)
+        layout.addWidget(dockArea, 2, 7, 4, 1)
 
-        layout.setRowMinimumHeight(2, 40)
         layout.setColumnMinimumWidth(2, 1000)
 
     def autoLevels(self):

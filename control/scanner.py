@@ -6,11 +6,10 @@ Created on Wed Mar 30 10:32:36 2016
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
 import time
-
 import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
+import matplotlib.pyplot as plt
 import collections
 import nidaqmx
 
@@ -39,8 +38,8 @@ class ScanWidget(QtGui.QMainWindow):
     def __init__(self, device, main, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.DigModW = QtGui.QMessageBox()
-        info = "You need to be in digital modulation to scan"
-        self.DigModW.setInformativeText(info)
+        self.DigModW.setInformativeText(
+            "You need to be in digital modulation to scan")
 
         self.nidaq = device
         self.main = main
@@ -71,10 +70,10 @@ class ScanWidget(QtGui.QMainWindow):
         self.nrFramesPar = QtGui.QLabel()
         self.scanDuration = 0
         self.scanDurationLabel = QtGui.QLabel(str(self.scanDuration))
-        self.stepSizeXYPar = QtGui.QLineEdit('0.05')
+        self.stepSizeXYPar = QtGui.QLineEdit('0.1')
         self.stepSizeXYPar.editingFinished.connect(
             lambda: self.scanParameterChanged('stepSizeXY'))
-        self.stepSizeZPar = QtGui.QLineEdit('0.05')
+        self.stepSizeZPar = QtGui.QLineEdit('1')
         self.stepSizeZPar.editingFinished.connect(
             lambda: self.scanParameterChanged('stepSizeZ'))
         self.sampleRate = 100000
@@ -168,6 +167,9 @@ class ScanWidget(QtGui.QMainWindow):
         self.ScanButton.clicked.connect(self.scanOrAbort)
         self.PreviewButton = QtGui.QPushButton('Preview')
         self.PreviewButton.clicked.connect(self.previewScan)
+        self.continuousCheck = QtGui.QCheckBox('Continuous Scan')
+
+        self.scanImage = ImageWidget()
 
         self.cwidget = QtGui.QWidget()
         self.setCentralWidget(self.cwidget)
@@ -198,28 +200,31 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(self.scanMode, 4, 2)
         grid.addWidget(QtGui.QLabel('Primary scan dim:'), 5, 1)
         grid.addWidget(self.primScanDim, 5, 2)
-        grid.addWidget(self.contLaserPulsesRadio, 6, 0)
+        grid.addWidget(self.contLaserPulsesRadio, 5, 0)
 
-        grid.addWidget(QtGui.QLabel('Sequence Time (ms):'), 8, 0)
-        grid.addWidget(self.seqTimePar, 8, 1)
-        grid.addWidget(QtGui.QLabel('Start (ms):'), 7, 3)
-        grid.addWidget(QtGui.QLabel('End (ms):'), 7, 4)
-        grid.addWidget(QtGui.QLabel('405:'), 8, 2)
-        grid.addWidget(self.start405Par, 8, 3)
-        grid.addWidget(self.end405Par, 8, 4)
-        grid.addWidget(QtGui.QLabel('473:'), 9, 2)
-        grid.addWidget(self.start473Par, 9, 3)
-        grid.addWidget(self.end473Par, 9, 4)
-        grid.addWidget(QtGui.QLabel('488:'), 10, 2)
-        grid.addWidget(self.start488Par, 10, 3)
-        grid.addWidget(self.end488Par, 10, 4)
-        grid.addWidget(QtGui.QLabel('Camera:'), 11, 2)
-        grid.addWidget(self.startCAMPar, 11, 3)
-        grid.addWidget(self.endCAMPar, 11, 4)
+        grid.addWidget(QtGui.QLabel('Sequence Time (ms):'), 7, 0)
+        grid.addWidget(self.seqTimePar, 7, 1)
+        grid.addWidget(QtGui.QLabel('Start (ms):'), 6, 3)
+        grid.addWidget(QtGui.QLabel('End (ms):'), 6, 4)
+        grid.addWidget(QtGui.QLabel('405:'), 7, 2)
+        grid.addWidget(self.start405Par, 7, 3)
+        grid.addWidget(self.end405Par, 7, 4)
+        grid.addWidget(QtGui.QLabel('473:'), 8, 2)
+        grid.addWidget(self.start473Par, 8, 3)
+        grid.addWidget(self.end473Par, 8, 4)
+        grid.addWidget(QtGui.QLabel('488:'), 9, 2)
+        grid.addWidget(self.start488Par, 9, 3)
+        grid.addWidget(self.end488Par, 9, 4)
+        grid.addWidget(QtGui.QLabel('Camera:'), 10, 2)
+        grid.addWidget(self.startCAMPar, 10, 3)
+        grid.addWidget(self.endCAMPar, 10, 4)
 
-        grid.addWidget(self.graph, 14, 0, 1, 5)
-        grid.addWidget(self.PreviewButton, 15, 0)
-        grid.addWidget(self.ScanButton, 15, 1)
+        grid.addWidget(self.graph, 11, 0, 1, 5)
+        self.graph.setFixedHeight(100)
+        grid.addWidget(self.scanImage, 12, 0, 1, 5)
+        grid.addWidget(self.PreviewButton, 13, 0)
+        grid.addWidget(self.ScanButton, 13, 1)
+        grid.addWidget(self.continuousCheck, 13, 2)
 
     @property
     def scanOrNot(self):
@@ -282,9 +287,9 @@ class ScanWidget(QtGui.QMainWindow):
         mx = max(self.scanParValues['sizeX'], self.scanParValues['sizeY'])
         plt.margins(0.1*mx)
         plt.axis('scaled')
-
         plt.xlabel("x axis [µm]")
         plt.ylabel("y axis [µm]")
+        plt.show()
 
     def scanOrAbort(self):
         if not self.scanning:
@@ -306,6 +311,9 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanner.finalizeDone.connect(self.finalizeDone)
             self.scanner.scanDone.connect(self.scanDone)
             self.scanning = True
+
+            self.start_f = self.main.lvworkers[0].f_ind
+
             self.scanner.runScan()
 
         elif self.ScanButton.isChecked():
@@ -322,11 +330,41 @@ class ScanWidget(QtGui.QMainWindow):
         print('in scanDone()')
         self.ScanButton.setEnabled(False)
 
+        if not self.scanner.aborted:
+            self.end_f = self.main.lvworkers[0].f_ind
+            if self.end_f >= self.start_f - 1:
+                f_range = range(self.start_f, self.end_f + 1)
+            else:
+                buffer_size = self.main.cameras[0].number_image_buffers
+                f_range = np.append(range(self.start_f, buffer_size),
+                                    range(0, self.end_f + 1))
+            data = []
+            for j in f_range:
+                data.append(self.main.cameras[0].hcam_data[j].getData())
+            datashape = (
+                len(f_range), self.main.shapes[0][1], self.main.shapes[0][0])
+            reshapeddata = np.reshape(data, datashape, order='C')
+            z_stack = []
+            for j in range(0, len(f_range)):
+                z_stack.append(np.mean(reshapeddata[j, :, :]))
+
+            if not np.floor(np.sqrt(len(z_stack))) == np.sqrt(len(z_stack)):
+                del z_stack[0]
+            imside = int(np.sqrt(np.size(z_stack)))
+            print('Imside = ', imside)
+            z_stack = np.reshape(z_stack, [imside, imside])
+            z_stack[::2] = np.fliplr(z_stack[::2])
+            self.scanImage.img.setImage(z_stack)
+
     def finalizeDone(self):
-        self.ScanButton.setText('Scan')
-        self.ScanButton.setEnabled(True)
-        del self.scanner
-        self.scanning = False
+        if (not self.continuousCheck.isChecked()) or self.scanner.aborted:
+            self.ScanButton.setText('Scan')
+            self.ScanButton.setEnabled(True)
+            del self.scanner
+            self.scanning = False
+        else:
+            self.ScanButton.setEnabled(True)
+            self.prepAndRun()
 
     def updateScan(self, devices):
         self.stageScan.update(self.scanParValues)
@@ -381,9 +419,12 @@ class Scanner(QtCore.QObject):
         self.scanTimeW.setInformativeText("Are you sure you want to continue?")
         self.scanTimeW.setStandardButtons(QtGui.QMessageBox.Yes |
                                           QtGui.QMessageBox.No)
-        self.channelOrder = ['x', 'y', 'z']
+        self.channel_order = ['x', 'y', 'z']
+
+        self.aborted = False
 
     def runScan(self):
+        self.aborted = False
         scanTime = self.sampsInScan / self.main.sampleRate
         ret = QtGui.QMessageBox.Yes
         self.scanTimeW.setText("Scan will take %s seconds" % scanTime)
@@ -398,12 +439,12 @@ class Scanner(QtCore.QObject):
         AOchans = [0, 1, 2]
         for n in AOchans:
             self.aotask.ao_channels.add_ao_voltage_chan(
-                    physical_channel='Dev1/ao%s' % n,
-                    name_to_assign_to_channel='chan_%s' % self.channelOrder[n],
-                    min_val=minVolt[self.channelOrder[n]],
-                    max_val=maxVolt[self.channelOrder[n]])
+                physical_channel='Dev1/ao%s' % n,
+                name_to_assign_to_channel='chan_%s' % self.channel_order[n],
+                min_val=minVolt[self.channel_order[n]],
+                max_val=maxVolt[self.channel_order[n]])
 
-        fullAOsignal = np.array([self.stageScan.sigDict[self.channelOrder[i]]
+        fullAOsignal = np.array([self.stageScan.sigDict[self.channel_order[i]]
                                  for i in AOchans])
 
         self.aotask.timing.cfg_samp_clk_timing(
@@ -451,11 +492,10 @@ class Scanner(QtCore.QObject):
 
     def abort(self):
         print('Aborting scan')
+        self.aborted = True
         self.waiter.stop()
         self.aotask.stop()
-        self.aotask.close()
         self.dotask.stop()
-        self.dotask.close()
         self.finalize()
 
     def finalize(self):
@@ -475,13 +515,13 @@ class Scanner(QtCore.QObject):
         # TODO: Test abort (task function)
         writtenSamps = int(np.round(self.aotask.out_stream.curr_write_pos))
         chans = [0, 1, 2]
-        dim = [self.channelOrder[i] for i in chans]
+        dim = [self.channel_order[i] for i in chans]
         finalSamps = [self.stageScan.sigDict[dim[i]][writtenSamps - 1]
                       for i in chans]
         print(finalSamps)
         returnRamps = np.array(
-            [makeRamp(
-                finalSamps[i], 0, self.stageScan.sampleRate) for i in chans])
+            [makeRamp(finalSamps[i], 0,
+                      self.stageScan.sampleRate) for i in chans])
 
         self.aotask.stop()
         self.aotask.timing.cfg_samp_clk_timing(
@@ -772,6 +812,21 @@ class VOLscan():
         print('Final X: ' + str(fullZprimDimSig[-1]))
         print('Final Y: ' + str(fullZsecDimSig[-1]))
         print('Final Z: ' + str(fullZthirdDimSig[-1]))
+
+
+class ImageWidget(pg.GraphicsLayoutWidget):
+
+    def __init__(self):
+        super().__init__()
+
+        self.vb = self.addViewBox(row=1, col=1)
+        self.img = pg.ImageItem()
+        self.lut = guitools.cubehelix()
+        self.img.setLookupTable(self.lut)
+        self.vb.addItem(self.img)
+        self.vb.setAspectLocked(True)
+        self.hist = pg.HistogramLUTItem(image=self.img)
+        self.addItem(self.hist, row=1, col=2)
 
 
 class PixelCycle():
