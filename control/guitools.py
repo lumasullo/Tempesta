@@ -232,6 +232,15 @@ def loadPreset(main, filename=None):
     tree.param('Gain').param('EM gain').setValue(int(configCam['EM gain']))
 
 
+def mouseMoved(main, pos):
+    if main.vb.sceneBoundingRect().contains(pos):
+        mousePoint = main.vb.mapSceneToView(pos)
+        x, y = int(mousePoint.x()), int(main.shape[1] - mousePoint.y())
+        main.cursorPos.setText('{}, {}'.format(x, y))
+        countsStr = '{} counts'.format(main.image[x, int(mousePoint.y())])
+        main.cursorPosInt.setText(countsStr)
+
+
 def bestLimits(arr):
     # Best cmin, cmax algorithm taken from ImageJ routine:
     # http://cmci.embl.de/documents/120206pyip_cooking/

@@ -485,10 +485,8 @@ class RecordingWidget(QtGui.QFrame):
                     data = np.reshape(data, [imside, imside])
                     data[::2] = np.fliplr(data[::2])
                     plt.figure()
-                    plt.imshow(
-                        data,
-                        interpolation='none',
-                        cmap=plt.get_cmap('afmhot'))
+                    plt.imshow(data, interpolation='none',
+                               cmap=plt.get_cmap('afmhot'))
                 except BaseException:
                     pass
             for i in range(0, self.nr_cameras):
@@ -497,10 +495,7 @@ class RecordingWidget(QtGui.QFrame):
                 # Same as done in Liveviewrun()
                 self.main.lvworkers[ind].reset()
                 self.main.cameras[ind].startAcquisition()
-#            converterFunction = lambda: guitools.TiffConverterThread(
-#                self.savename)
-#            self.main.exportlastAction.triggered.connect(converterFunction)
-#            self.main.exportlastAction.setEnabled(True)
+
             print('After terminating recording thread')
             self.writable = True
             self.readyToRecord = True
@@ -509,7 +504,6 @@ class RecordingWidget(QtGui.QFrame):
             self.main.tree.writable = True
 
             self.main.liveviewButton.setEnabled(True)
-    #        self.main.liveviewStart()
             self.progressBar.setValue(0)
             self.currentTime.setText('0 /')
             self.currentFrame.setText('0 /')
@@ -924,7 +918,7 @@ class TormentaGUI(QtGui.QMainWindow):
 
         # WARNING: This signal is emitted whenever anything about the status of
         # the parameter changes eg is set writable or not.
-        self.applyParam.sigStateChanged.connect(self.applyfcn)
+        self.applyParam.sigStateChanged.connect(self.adjustFrame)
         self.NewROIParam.sigStateChanged.connect(self.updateFrame)
         self.AbortROIParam.sigStateChanged.connect(self.AbortROI)
 
@@ -961,6 +955,8 @@ class TormentaGUI(QtGui.QMainWindow):
         for preset in os.listdir(self.presetDir):
             self.presetsMenu.addItem(preset)
         self.loadPresetButton = QtGui.QPushButton('Load preset')
+        self.loadPresetButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
+                                            QtGui.QSizePolicy.Expanding)
 
         def loadPresetFunction(): return guitools.loadPreset(self)
         self.loadPresetButton.pressed.connect(loadPresetFunction)
@@ -994,13 +990,16 @@ class TormentaGUI(QtGui.QMainWindow):
         self.gridButton = QtGui.QPushButton('Grid')
         self.gridButton.setCheckable(True)
         self.gridButton.setEnabled(False)
+        self.gridButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
+                                      QtGui.QSizePolicy.Expanding)
 #        self.crosshairButton = QtGui.QPushButton('Crosshair')
 #        self.crosshairButton.setCheckable(True)
 #        self.crosshairButton.setEnabled(False)
         self.levelsButton = QtGui.QPushButton('Update Levels')
         self.levelsButton.setEnabled(False)
+        self.levelsButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
+                                        QtGui.QSizePolicy.Expanding)
         self.levelsButton.pressed.connect(self.autoLevels)
-
         self.viewCtrl = QtGui.QWidget()
         self.viewCtrlLayout = QtGui.QGridLayout()
         self.viewCtrl.setLayout(self.viewCtrlLayout)
@@ -1013,6 +1012,7 @@ class TormentaGUI(QtGui.QMainWindow):
 #        self.viewCtrlLayout.addWidget(self.crosshairButton, 1, 2)
 #        self.viewCtrlLayout.addWidget(self.flipperButton, 2, 0, 1, 3)
 
+        # Status bar info
         self.fpsBox = QtGui.QLabel()
         self.fpsBox.setText('0 fps')
         self.statusBar().addPermanentWidget(self.fpsBox)
@@ -1023,6 +1023,8 @@ class TormentaGUI(QtGui.QMainWindow):
         self.cursorPos = QtGui.QLabel()
         self.cursorPos.setText('0, 0')
         self.statusBar().addPermanentWidget(self.cursorPos)
+        self.cursorPosInt = QtGui.QLabel('0 counts', self)
+        self.statusBar().addPermanentWidget(self.cursorPosInt)
 
         # Recording settings widget
         self.recWidget = RecordingWidget(self)
@@ -1185,16 +1187,18 @@ class TormentaGUI(QtGui.QMainWindow):
         self.updateTimings()
         self.expPar.setValue(self.RealExpPar.value())
 
-    def applyfcn(self):
-        print('Apply pressed')
-        self.adjustFrame()
-
     def mouseMoved(self, pos):
         if self.vb.sceneBoundingRect().contains(pos):
+            # Get pointer position
             mousePoint = self.vb.mapSceneToView(pos)
-            x, y = int(mousePoint.x()), int(
-                self.shapes[self.currCamIdx][1] - mousePoint.y())
+            x = int(mousePoint.x())
+            y = int(self.shapes[self.currCamIdx][1] - mousePoint.y())
+
+            # Outputs
             self.cursorPos.setText('{}, {}'.format(x, y))
+            cs = self.lvworkers[self.currCamIdx].image[x, int(mousePoint.y())]
+            countsStr = '{} counts'.format(cs)
+            self.cursorPosInt.setText(countsStr)
 
     def changeParameter(self, function):
         """ This method is used to change those camera properties that need
@@ -1273,8 +1277,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.updateTimings()
 
     def cropOrca(self, hpos, vpos, hsize, vsize):
-        """Method to crop the frame read out by Orcaflash """
-#       Round to closest "divisable by 4" value.
+        """Method to crop the frame read out by Orcaflash. """
         print('cropping camera' + str(self.currCamIdx))
         self.cameras[self.currCamIdx].setPropertyValue('subarray_vpos', 0)
         self.cameras[self.currCamIdx].setPropertyValue('subarray_hpos', 0)
@@ -1283,10 +1286,11 @@ class TormentaGUI(QtGui.QMainWindow):
         self.cameras[self.currCamIdx].setPropertyValue(
             'subarray_hsize', 2048)
 
+        # Round to closest "divisable by 4" value.
         vpos = int(4 * np.ceil(vpos / 4))
         hpos = int(4 * np.ceil(hpos / 4))
-        vsize = int(min(2048 - vpos, 128 * np.ceil(vsize / 128)))
         # V3 camera seems to only be able to take multiples of 128.
+        vsize = int(min(2048 - vpos, 128 * np.ceil(vsize / 128)))
         hsize = int(min(2048 - hpos, 128 * np.ceil(hsize / 128)))
 
         self.cameras[self.currCamIdx].setPropertyValue('subarray_vsize', vsize)
@@ -1298,7 +1302,6 @@ class TormentaGUI(QtGui.QMainWindow):
         self.frameStart = (hpos, vpos)
         # Only place self.shapes is changed
         self.shapes[self.currCamIdx] = (hsize, vsize)
-        print('time after beginning of cropOrca= ', time.time())
         print('orca has been cropped to: ', vpos, hpos, vsize, hsize)
 
     def adjustFrame(self):
@@ -1313,6 +1316,15 @@ class TormentaGUI(QtGui.QMainWindow):
         self.changeParameter(lambda: self.cropOrca(binning*self.X0par.value(),
                                                    binning*self.Y0par.value(),
                                                    binning*width, height))
+
+        # Final shape values might differ from the user-specified one because
+        # of camera limitation x128
+        width, height = self.shapes[self.currCamIdx]
+        self.X0par.setValue(self.frameStart[0])
+        self.Y0par.setValue(self.frameStart[1])
+        self.widthPar.setValue(width)
+        self.heightPar.setValue(height)
+
         self.vb.setLimits(xMin=-0.5, xMax=width - 0.5, minXRange=4,
                           yMin=-0.5, yMax=height - 0.5, minYRange=4)
         self.vb.setAspectLocked()

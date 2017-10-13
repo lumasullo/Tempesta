@@ -55,22 +55,22 @@ class ScanWidget(QtGui.QMainWindow):
 
         self.sampleRateEdit = QtGui.QLineEdit()
 
-        self.sizeXPar = QtGui.QLineEdit('1')
+        self.sizeXPar = QtGui.QLineEdit('2')
         self.sizeXPar.editingFinished.connect(
             lambda: self.scanParameterChanged('sizeX'))
-        self.sizeYPar = QtGui.QLineEdit('1')
+        self.sizeYPar = QtGui.QLineEdit('2')
         self.sizeYPar.editingFinished.connect(
             lambda: self.scanParameterChanged('sizeY'))
         self.sizeZPar = QtGui.QLineEdit('10')
         self.sizeZPar.editingFinished.connect(
             lambda: self.scanParameterChanged('sizeZ'))
-        self.seqTimePar = QtGui.QLineEdit('100')  # ms
+        self.seqTimePar = QtGui.QLineEdit('10')  # ms
         self.seqTimePar.editingFinished.connect(
             lambda: self.scanParameterChanged('seqTime'))
         self.nrFramesPar = QtGui.QLabel()
         self.scanDuration = 0
         self.scanDurationLabel = QtGui.QLabel(str(self.scanDuration))
-        self.stepSizeXYPar = QtGui.QLineEdit('0.1')
+        self.stepSizeXYPar = QtGui.QLineEdit('0.05')
         self.stepSizeXYPar.editingFinished.connect(
             lambda: self.scanParameterChanged('stepSizeXY'))
         self.stepSizeZPar = QtGui.QLineEdit('1')
@@ -337,9 +337,9 @@ class ScanWidget(QtGui.QMainWindow):
                 buffer_size = self.main.cameras[0].number_image_buffers
                 f_range = np.append(range(self.start_f, buffer_size),
                                     range(0, self.end_f + 1))
-            data = []
-            for j in f_range:
-                data.append(self.main.cameras[0].hcam_data[j].getData())
+            data = [self.main.cameras[0].hcam_data[j].getData()
+                    for j in f_range]
+            print(len(data))
             datashape = (
                 len(f_range), self.main.shapes[0][1], self.main.shapes[0][0])
             reshapeddata = np.reshape(data, datashape, order='C')
@@ -519,8 +519,8 @@ class Scanner(QtCore.QObject):
                       for i in chans]
         print(finalSamps)
         returnRamps = np.array(
-            [makeRamp(finalSamps[i], 0,
-                      self.stageScan.sampleRate) for i in chans])
+            [makeRamp(finalSamps[i], 0, self.stageScan.sampleRate)
+             for i in chans])
 
         self.aotask.stop()
         self.aotask.timing.cfg_samp_clk_timing(
