@@ -1077,7 +1077,7 @@ class TormentaGUI(QtGui.QMainWindow):
         illumDockArea = DockArea()
 
         # Laser dock
-        laserDock = Dock("Laser Control", size=(1, 1))
+        laserDock = Dock("Laser Control", size=(300, 1))
         self.laserWidgets = lasercontrol.LaserWidget(self.lasers, self.nidaq)
         laserDock.addWidget(self.laserWidgets)
         illumDockArea.addDock(laserDock)
@@ -1114,23 +1114,23 @@ class TormentaGUI(QtGui.QMainWindow):
         # Dock widget
         dockArea = DockArea()
 
-        # Scanner
-        scanDock = Dock('Scan', size=(1, 1))
-        self.scanWidget = scanner.ScanWidget(self.nidaq, self)
-        scanDock.addWidget(self.scanWidget)
-        dockArea.addDock(scanDock)
-
         # Focus Lock widget
         FocusLockDock = Dock("Focus Lock", size=(400, 400))
         self.FocusLockWidget = focus.FocusWidget(pzt, webcam)
         FocusLockDock.addWidget(self.FocusLockWidget)
-        dockArea.addDock(FocusLockDock, 'below', scanDock)
+        dockArea.addDock(FocusLockDock)
+
+        # Scanner
+        scanDock = Dock('Scan', size=(1, 1))
+        self.scanWidget = scanner.ScanWidget(self.nidaq, self)
+        scanDock.addWidget(self.scanWidget)
+        dockArea.addDock(scanDock, 'below', FocusLockDock)
 
         # Console widget
-        consoleDock = Dock("Console", size=(1, 1))
+#        consoleDock = Dock("Console", size=(1, 1))
         console = ConsoleWidget(namespace={'pg': pg, 'np': np})
-        consoleDock.addWidget(console)
-        dockArea.addDock(consoleDock, 'below', FocusLockDock)
+#        consoleDock.addWidget(console)
+#        dockArea.addDock(consoleDock, 'below', FocusLockDock)
 
         # Scan Widget
 #        self.scanxyWidget = scanner.ScanWidget(self.nidaq, self)
@@ -1160,11 +1160,12 @@ class TormentaGUI(QtGui.QMainWindow):
         layout.addWidget(cameraWidget, 1, 0, 2, 2)
         layout.addWidget(self.viewCtrl, 3, 0, 1, 2)
         layout.addWidget(self.recWidget, 4, 0, 2, 2)
-        layout.addWidget(imageWidget, 1, 2, 5, 4)
+        layout.addWidget(console, 6, 0, 1, 2)
+        layout.addWidget(imageWidget, 1, 2, 6, 4)
         layout.addWidget(self.gridButton, 0, 3)
         layout.addWidget(self.levelsButton, 0, 4)
         layout.addWidget(illumDockArea, 0, 7, 2, 1)
-        layout.addWidget(dockArea, 2, 7, 4, 1)
+        layout.addWidget(dockArea, 2, 7, 5, 1)
 
         layout.setColumnMinimumWidth(2, 1000)
 

@@ -2,7 +2,7 @@
 """
 Created on Wed Mar 30 10:32:36 2016
 
-@author: testaRES
+@authors: Luciano Masullo, Andreas Bodén, Shusei Masuda, Federico Barabas.
 """
 
 import numpy as np
@@ -189,18 +189,17 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(QtGui.QLabel('Step size Z (µm):'), 3, 2)
         grid.addWidget(self.stepSizeZPar, 3, 3)
 
-        grid.addWidget(QtGui.QLabel('Frames in scan:'), 4, 3)
-        grid.addWidget(self.nrFramesPar, 4, 4)
-        grid.addWidget(QtGui.QLabel('Scan duration (s):'), 5, 3)
-        grid.addWidget(self.scanDurationLabel, 5, 4)
-        grid.setColumnMinimumWidth(4, 50)
+        grid.addWidget(QtGui.QLabel('Number of frames:'), 9, 0)
+        grid.addWidget(self.nrFramesPar, 9, 1)
+        grid.addWidget(QtGui.QLabel('Duration (s):'), 10, 0)
+        grid.addWidget(self.scanDurationLabel, 10, 1)
 
-        grid.addWidget(self.scanRadio, 4, 0)
-        grid.addWidget(QtGui.QLabel('Scan mode:'), 4, 1)
-        grid.addWidget(self.scanMode, 4, 2)
-        grid.addWidget(QtGui.QLabel('Primary scan dim:'), 5, 1)
-        grid.addWidget(self.primScanDim, 5, 2)
-        grid.addWidget(self.contLaserPulsesRadio, 5, 0)
+        grid.addWidget(self.scanRadio, 0, 2)
+        grid.addWidget(QtGui.QLabel('Mode:'), 1, 5)
+        grid.addWidget(self.scanMode, 1, 6)
+        grid.addWidget(QtGui.QLabel('Primary dimension:'), 2, 5)
+        grid.addWidget(self.primScanDim, 2, 6)
+        grid.addWidget(self.contLaserPulsesRadio, 0, 3)
 
         grid.addWidget(QtGui.QLabel('Sequence Time (ms):'), 7, 0)
         grid.addWidget(self.seqTimePar, 7, 1)
@@ -219,9 +218,9 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(self.startCAMPar, 10, 3)
         grid.addWidget(self.endCAMPar, 10, 4)
 
-        grid.addWidget(self.graph, 11, 0, 1, 5)
+        grid.addWidget(self.graph, 11, 0, 1, 7)
         self.graph.setFixedHeight(100)
-        grid.addWidget(self.scanImage, 12, 0, 1, 5)
+        grid.addWidget(self.scanImage, 12, 0, 1, 7)
         grid.addWidget(self.PreviewButton, 13, 0)
         grid.addWidget(self.ScanButton, 13, 1)
         grid.addWidget(self.continuousCheck, 13, 2)
@@ -826,6 +825,11 @@ class ImageWidget(pg.GraphicsLayoutWidget):
         self.vb.addItem(self.img)
         self.vb.setAspectLocked(True)
         self.hist = pg.HistogramLUTItem(image=self.img)
+        self.cubehelixCM = pg.ColorMap(np.arange(0, 1, 1/256),
+                                       guitools.cubehelix().astype(int))
+        self.hist.gradient.setColorMap(self.cubehelixCM)
+        for tick in self.hist.gradient.ticks:
+            tick.hide()
         self.addItem(self.hist, row=1, col=2)
 
 

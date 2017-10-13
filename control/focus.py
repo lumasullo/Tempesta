@@ -93,8 +93,8 @@ class FocusWidget(QtGui.QFrame):
         self.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
         grid = QtGui.QGridLayout()
         self.setLayout(grid)
-        grid.addWidget(self.focusLockGraph, 0, 0, 1, 9)
-        grid.addWidget(self.webcamGraph, 1, 0, 1, 6)
+        grid.addWidget(self.focusLockGraph, 0, 0, 1, 8)
+        grid.addWidget(self.webcamGraph, 1, 0, 1, 8)
         grid.addWidget(self.focusCalibButton, 2, 2, 2, 1)
         grid.addWidget(self.calibrationDisplay, 4, 0, 1, 2)
         grid.addWidget(self.kpLabel, 2, 3)
@@ -117,8 +117,8 @@ class FocusWidget(QtGui.QFrame):
 #        grid.setColumnMinimumWidth(0, 100)
 
     def movePZT(self):
-        self.z.moveAbsolute(float(
-                            self.positionEdit.text().split(' ')[0]) * self.um)
+        self.z.moveAbsolute(
+            float(self.positionEdit.text().split(' ')[0]) * self.um)
 
     def toggleFocus(self):
         if self.lockButton.isChecked():
