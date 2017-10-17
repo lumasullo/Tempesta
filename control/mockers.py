@@ -432,14 +432,14 @@ class MockPZT(Driver):
         self.pos = self.pos + value
 
 
-class MockWebcam():
+class MockWebcam(Driver):
 
     def grab_image(self, **kwargs):
         img = np.zeros((256, 320))
         beamCenter = [int(np.random.randn()*10 + 123),
                       int(np.random.randn()*10 + 155)]
-        img[beamCenter[0]-10:beamCenter[0]+10,
-            beamCenter[1]-10:beamCenter[1]+10] = 1
+        img[beamCenter[0] - 10:beamCenter[0] + 10,
+            beamCenter[1] - 10:beamCenter[1] + 10] = 1
         return img
 
     def stop(self):

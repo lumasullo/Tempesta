@@ -54,8 +54,6 @@ class RecordingWidget(QtGui.QFrame):
 
 #        startdir = r'F:\Tempesta\DefaultDataFolderSSD\%s'
         newfolderpath = os.path.join(r"D:\Data", time.strftime('%Y-%m-%d'))
-        if not os.path.exists(newfolderpath):
-            os.mkdir(newfolderpath)
 
         self.z_stack = []
         self.rec_mode = 1
@@ -308,16 +306,16 @@ class RecordingWidget(QtGui.QFrame):
             name = re.sub('<[^<]+?>', '', laserControl.name.text())
             attrs.append((name, laserControl.laser.power))
 
-        for key in self.main.scanWidget.scan_par_values:
-            attrs.append((key, self.main.scanWidget.scan_par_values[key]))
+        for key in self.main.scanWidget.scanParValues:
+            attrs.append((key, self.main.scanWidget.scanParValues[key]))
 
         attrs.append(('Scan mode',
                       self.main.scanWidget.scanMode.currentText()))
         attrs.append(('True_if_scanning',
                       self.main.scanWidget.scanRadio.isChecked()))
 
-        for key in self.main.scanWidget.pixel_par_values:
-            attrs.append((key, self.main.scanWidget.pixel_par_values[key]))
+        for key in self.main.scanWidget.pxParValues:
+            attrs.append((key, self.main.scanWidget.pxParValues[key]))
 
         attrs.extend([('element_size_um', [1, 0.066, 0.066]),
                       ('Date', time.strftime("%Y-%m-%d")),
@@ -328,21 +326,20 @@ class RecordingWidget(QtGui.QFrame):
 
     def snapHDF(self):
         folder = self.folderEdit.text()
-        if os.path.exists(folder):
 
-            image = self.main.image
+        if not os.path.exists(folder):
+            os.mkdir(folder)
 
-            name = os.path.join(folder, self.getFileName())
-            savename = guitools.getUniqueName(name + '.hdf5')
-            store_file = hdf.File(savename)
-            store_file.create_dataset(name=self.dataname, data=image)
-            for item in self.getAttrs():
-                if item[1] is not None:
-                    store_file[self.dataname].attrs[item[0]] = item[1]
-            store_file.close()
+        image = self.main.image
 
-        else:
-            self.folderWarning()
+        name = os.path.join(folder, self.getFileName())
+        savename = guitools.getUniqueName(name + '.hdf5')
+        store_file = hdf.File(savename)
+        store_file.create_dataset(name=self.dataname, data=image)
+        for item in self.getAttrs():
+            if item[1] is not None:
+                store_file[self.dataname].attrs[item[0]] = item[1]
+        store_file.close()
 
     def getFileName(self):
         if self.specifyfile.checkState():
@@ -355,18 +352,17 @@ class RecordingWidget(QtGui.QFrame):
 
     def snapTIFF(self):
         folder = self.folderEdit.text()
-        if os.path.exists(folder):
+        if not os.path.exists(folder):
+            os.mkdir(folder)
 
-            time.sleep(0.01)
-            savename = (os.path.join(folder, self.getFileName()) +
-                        '_snap.tiff')
-            savename = guitools.getUniqueName(savename)
-            tiff.imsave(savename, self.main.latest_image.astype(np.uint16),
-                        description=self.dataname, software='Tormenta')
-            guitools.attrsToTxt(os.path.splitext(savename)[0], self.getAttrs())
-
-        else:
-            self.folderWarning()
+        time.sleep(0.01)
+        savename = (os.path.join(folder, self.getFileName()) +
+                    '_snap.tiff')
+        savename = guitools.getUniqueName(savename)
+        image = self.main.latest_images[self.main.currCamIdx].astype(np.uint16)
+        tiff.imsave(savename, image, description=self.dataname,
+                    software='Tormenta')
+        guitools.attrsToTxt(os.path.splitext(savename)[0], self.getAttrs())
 
     def folderWarning(self):
         root = Tk()
@@ -394,7 +390,9 @@ class RecordingWidget(QtGui.QFrame):
                 ret = self.filesizewar.exec_()
 
             folder = self.folderEdit.text()
-            if os.path.exists(folder) and ret == QtGui.QMessageBox.Yes:
+            if not os.path.exists(folder):
+                os.mkdir(folder)
+            if ret == QtGui.QMessageBox.Yes:
 
                 # Sets Recording widget to not be writable during recording.
                 self.writable = False
@@ -460,9 +458,9 @@ class RecordingWidget(QtGui.QFrame):
                 print(self.recworkers)
                 self.recworkers[ind].pressed = False
 
-# Function called when recording finishes to reset relevent parameters.
-
     def endRecording(self):
+        """ Function called when recording finishes to reset relevent
+        parameters."""
         if self.nr_cameras == 2 and (
                 not self.recworkers[0].done or not self.recworkers[1].done):
             print('In first endRecordig "skip me" if')
@@ -487,10 +485,8 @@ class RecordingWidget(QtGui.QFrame):
                     data = np.reshape(data, [imside, imside])
                     data[::2] = np.fliplr(data[::2])
                     plt.figure()
-                    plt.imshow(
-                        data,
-                        interpolation='none',
-                        cmap=plt.get_cmap('afmhot'))
+                    plt.imshow(data, interpolation='none',
+                               cmap=plt.get_cmap('afmhot'))
                 except BaseException:
                     pass
             for i in range(0, self.nr_cameras):
@@ -499,10 +495,7 @@ class RecordingWidget(QtGui.QFrame):
                 # Same as done in Liveviewrun()
                 self.main.lvworkers[ind].reset()
                 self.main.cameras[ind].startAcquisition()
-#            converterFunction = lambda: guitools.TiffConverterThread(
-#                self.savename)
-#            self.main.exportlastAction.triggered.connect(converterFunction)
-#            self.main.exportlastAction.setEnabled(True)
+
             print('After terminating recording thread')
             self.writable = True
             self.readyToRecord = True
@@ -511,7 +504,6 @@ class RecordingWidget(QtGui.QFrame):
             self.main.tree.writable = True
 
             self.main.liveviewButton.setEnabled(True)
-    #        self.main.liveviewStart()
             self.progressBar.setValue(0)
             self.currentTime.setText('0 /')
             self.currentFrame.setText('0 /')
@@ -767,12 +759,20 @@ class LVWorker(QtCore.QObject):
         self.f_ind = None  # Should maybe be f_ind
         self.vtimer.start(30)
         print('f_ind when started = ', self.f_ind)
+        time.sleep(0.03)
+
+        # Grab first frame only to set suitable histogram limits
+        self.f_ind = self.orcaflash.newFrames()[-1]
+        frame = self.orcaflash.hcam_data[self.f_ind].getData()
+        self.image = np.reshape(
+            frame, (self.orcaflash.frame_x, self.orcaflash.frame_y), 'F')
+        self.main.latest_images[self.ind] = self.image
+        self.main.hist.setLevels(*guitools.bestLimits(self.image))
+        self.main.hist.vb.autoRange()
 
     def update(self):
-
         if self.running:
             self.f_ind = self.orcaflash.newFrames()[-1]
-#            print('f_ind = :', self.f_ind)
             frame = self.orcaflash.hcam_data[self.f_ind].getData()
             self.image = np.reshape(
                 frame, (self.orcaflash.frame_x, self.orcaflash.frame_y), 'F')
@@ -808,6 +808,8 @@ class TormentaGUI(QtGui.QMainWindow):
     def __init__(self, actlaser, offlaser, exclaser, orcaflashV2, orcaflashV3,
                  nidaq, pzt, webcam, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.resize(2400, 1300)
 
         self.lasers = [actlaser, offlaser, exclaser]
         self.cameras = [orcaflashV2, orcaflashV3]
@@ -916,7 +918,7 @@ class TormentaGUI(QtGui.QMainWindow):
 
         # WARNING: This signal is emitted whenever anything about the status of
         # the parameter changes eg is set writable or not.
-        self.applyParam.sigStateChanged.connect(self.applyfcn)
+        self.applyParam.sigStateChanged.connect(self.adjustFrame)
         self.NewROIParam.sigStateChanged.connect(self.updateFrame)
         self.AbortROIParam.sigStateChanged.connect(self.AbortROI)
 
@@ -953,6 +955,8 @@ class TormentaGUI(QtGui.QMainWindow):
         for preset in os.listdir(self.presetDir):
             self.presetsMenu.addItem(preset)
         self.loadPresetButton = QtGui.QPushButton('Load preset')
+        self.loadPresetButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
+                                            QtGui.QSizePolicy.Expanding)
 
         def loadPresetFunction(): return guitools.loadPreset(self)
         self.loadPresetButton.pressed.connect(loadPresetFunction)
@@ -983,16 +987,19 @@ class TormentaGUI(QtGui.QMainWindow):
         self.CamLabel.setStyleSheet("font-size:18px")
 
         # viewBox custom Tools
-#        self.gridButton = QtGui.QPushButton('Grid')
-#        self.gridButton.setCheckable(True)
-#        self.gridButton.setEnabled(False)
-#        self.grid2Button = QtGui.QPushButton('Two-color grid')
-#        self.grid2Button.setCheckable(True)
-#        self.grid2Button.setEnabled(False)
+        self.gridButton = QtGui.QPushButton('Grid')
+        self.gridButton.setCheckable(True)
+        self.gridButton.setEnabled(False)
+        self.gridButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
+                                      QtGui.QSizePolicy.Expanding)
 #        self.crosshairButton = QtGui.QPushButton('Crosshair')
 #        self.crosshairButton.setCheckable(True)
 #        self.crosshairButton.setEnabled(False)
-
+        self.levelsButton = QtGui.QPushButton('Update Levels')
+        self.levelsButton.setEnabled(False)
+        self.levelsButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
+                                        QtGui.QSizePolicy.Expanding)
+        self.levelsButton.pressed.connect(self.autoLevels)
         self.viewCtrl = QtGui.QWidget()
         self.viewCtrlLayout = QtGui.QGridLayout()
         self.viewCtrl.setLayout(self.viewCtrlLayout)
@@ -1005,6 +1012,7 @@ class TormentaGUI(QtGui.QMainWindow):
 #        self.viewCtrlLayout.addWidget(self.crosshairButton, 1, 2)
 #        self.viewCtrlLayout.addWidget(self.flipperButton, 2, 0, 1, 3)
 
+        # Status bar info
         self.fpsBox = QtGui.QLabel()
         self.fpsBox.setText('0 fps')
         self.statusBar().addPermanentWidget(self.fpsBox)
@@ -1015,6 +1023,8 @@ class TormentaGUI(QtGui.QMainWindow):
         self.cursorPos = QtGui.QLabel()
         self.cursorPos.setText('0, 0')
         self.statusBar().addPermanentWidget(self.cursorPos)
+        self.cursorPosInt = QtGui.QLabel('0 counts', self)
+        self.statusBar().addPermanentWidget(self.cursorPosInt)
 
         # Recording settings widget
         self.recWidget = RecordingWidget(self)
@@ -1024,14 +1034,19 @@ class TormentaGUI(QtGui.QMainWindow):
         self.vb = imageWidget.addViewBox(row=1, col=1)
         self.vb.setMouseMode(pg.ViewBox.RectMode)
         self.img = pg.ImageItem()
-        self.lut = guitools.cubehelix()
-        self.img.setLookupTable(self.lut)
         self.img.translate(-0.5, -0.5)
-#        self.img.setPxMode(True)
         self.vb.addItem(self.img)
         self.vb.setAspectLocked(True)
+        imageWidget.setAspectLocked(True)
+        self.grid = guitools.Grid(self.vb)
+        self.gridButton.clicked.connect(self.grid.toggle)
         self.hist = pg.HistogramLUTItem(image=self.img)
-#        self.hist.vb.setLimits(yMin=0, yMax=2048)
+        self.hist.vb.setLimits(yMin=0, yMax=66000)
+        self.cubehelixCM = pg.ColorMap(np.arange(0, 1, 1/256),
+                                       guitools.cubehelix().astype(int))
+        self.hist.gradient.setColorMap(self.cubehelixCM)
+        for tick in self.hist.gradient.ticks:
+            tick.hide()
         imageWidget.addItem(self.hist, row=1, col=2)
         self.ROI = guitools.ROI((0, 0), self.vb, (0, 0),
                                 handlePos=(1, 0), handleCenter=(0, 1),
@@ -1060,31 +1075,17 @@ class TormentaGUI(QtGui.QMainWindow):
         self.toggleCamera()
         self.adjustFrame()
 
-        # Dock widget
-        dockArea = DockArea()
+        # Illumination dock area
+        illumDockArea = DockArea()
 
-        laserDock = Dock("Laser Control", size=(1, 1))
+        # Laser dock
+        laserDock = Dock("Laser Control", size=(300, 1))
         self.laserWidgets = lasercontrol.LaserWidget(self.lasers, self.nidaq)
         laserDock.addWidget(self.laserWidgets)
-        dockArea.addDock(laserDock)
-
-        scanDock = Dock('Scan')
-        self.scanWidget = scanner.ScanWidget(self.nidaq, self)
-        scanDock.addWidget(self.scanWidget)
-        dockArea.addDock(scanDock)
-
-        # Console widget
-        consoleDock = Dock("Console", size=(600, 200))
-        console = ConsoleWidget(namespace={'pg': pg, 'np': np})
-        consoleDock.addWidget(console)
-        dockArea.addDock(consoleDock, 'above', scanDock)
+        illumDockArea.addDock(laserDock)
 
         # Line Alignment Tool
-        alignmentDock = Dock("Alignment Tool", size=(50, 30))
         self.alignmentWidget = QtGui.QWidget()
-        alignmentDock.addWidget(self.alignmentWidget)
-        dockArea.addDock(alignmentDock)
-
         alignmentLayout = QtGui.QGridLayout()
         self.alignmentWidget.setLayout(alignmentLayout)
         self.angleEdit = QtGui.QLineEdit('30')
@@ -1096,27 +1097,45 @@ class TormentaGUI(QtGui.QMainWindow):
         alignmentLayout.addWidget(self.angleEdit, 0, 1)
         alignmentLayout.addWidget(self.alignmentLineMakerButton, 1, 0)
         alignmentLayout.addWidget(self.alignmentCheck, 1, 1)
+        alignmentDock = Dock("Alignment Tool", size=(1, 1))
+        alignmentDock.addWidget(self.alignmentWidget)
+        illumDockArea.addDock(alignmentDock, 'right')
 
-        # Z Align widget
+        # Z align widget
         ZalignDock = Dock("Axial Alignment Tool", size=(1, 1))
         self.ZalignWidget = align.AlignWidgetAverage(self)
         ZalignDock.addWidget(self.ZalignWidget)
-        dockArea.addDock(ZalignDock, 'above', scanDock)
+        illumDockArea.addDock(ZalignDock, 'above', alignmentDock)
 
-        # Z Align widget
+        # Rotational align widget
         RotalignDock = Dock("Rotational Alignment Tool", size=(1, 1))
         self.RotalignWidget = align.AlignWidgetXYProject(self)
         RotalignDock.addWidget(self.RotalignWidget)
-        dockArea.addDock(RotalignDock, 'above', ZalignDock)
+        illumDockArea.addDock(RotalignDock, 'above', alignmentDock)
+
+        # Dock widget
+        dockArea = DockArea()
 
         # Focus Lock widget
-        FocusLockDock = Dock("Focus Lock Tool", size=(1, 1))
+        FocusLockDock = Dock("Focus Lock", size=(400, 400))
         self.FocusLockWidget = focus.FocusWidget(pzt, webcam)
         FocusLockDock.addWidget(self.FocusLockWidget)
-        dockArea.addDock(FocusLockDock, 'above', RotalignDock)
+        dockArea.addDock(FocusLockDock)
+
+        # Scanner
+        scanDock = Dock('Scan', size=(1, 1))
+        self.scanWidget = scanner.ScanWidget(self.nidaq, self)
+        scanDock.addWidget(self.scanWidget)
+        dockArea.addDock(scanDock, 'below', FocusLockDock)
+
+        # Console widget
+#        consoleDock = Dock("Console", size=(1, 1))
+        console = ConsoleWidget(namespace={'pg': pg, 'np': np})
+#        consoleDock.addWidget(console)
+#        dockArea.addDock(consoleDock, 'below', FocusLockDock)
 
         # Scan Widget
-        self.scanxyWidget = scanner.ScanWidget(self.nidaq, self)
+#        self.scanxyWidget = scanner.ScanWidget(self.nidaq, self)
 #        self.scanImageDock = Dock("Image from scanning", size=(300, 300))
 #        self.scanImageDock.addWidget(self.scanxyWidget.display)
 #        dockArea.addDock(self.scanImageDock)
@@ -1135,24 +1154,28 @@ class TormentaGUI(QtGui.QMainWindow):
         layout = QtGui.QGridLayout()
         self.cwidget.setLayout(layout)
         layout.setColumnMinimumWidth(0, 350)
-        layout.setColumnMinimumWidth(2, 600)
-        layout.setColumnMinimumWidth(3, 200)
-        layout.setRowMinimumHeight(1, 550)
-        layout.setRowMinimumHeight(2, 100)
-        layout.setRowMinimumHeight(3, 300)
+        layout.setColumnMinimumWidth(7, 200)
+        layout.setRowMinimumHeight(1, 350)
+        layout.setRowMinimumHeight(2, 300)
         layout.addWidget(self.presetsMenu, 0, 0)
         layout.addWidget(self.loadPresetButton, 0, 1)
-        layout.addWidget(cameraWidget, 1, 0, 1, 2)
-        layout.addWidget(self.viewCtrl, 2, 0, 1, 2)
-        layout.addWidget(self.recWidget, 3, 0, 2, 2)
-        layout.addWidget(imageWidget, 0, 2, 5, 1)
-        layout.addWidget(dockArea, 0, 3, 5, 1)
+        layout.addWidget(cameraWidget, 1, 0, 2, 2)
+        layout.addWidget(self.viewCtrl, 3, 0, 1, 2)
+        layout.addWidget(self.recWidget, 4, 0, 2, 2)
+        layout.addWidget(console, 6, 0, 1, 2)
+        layout.addWidget(imageWidget, 1, 2, 6, 4)
+        layout.addWidget(self.gridButton, 0, 3)
+        layout.addWidget(self.levelsButton, 0, 4)
+        layout.addWidget(illumDockArea, 0, 7, 2, 1)
+        layout.addWidget(dockArea, 2, 7, 5, 1)
 
-        layout.setRowMinimumHeight(2, 40)
         layout.setColumnMinimumWidth(2, 1000)
 
-    def testfunction(self):
-        pass
+        self.toggleCamera()
+
+    def autoLevels(self):
+        self.hist.setLevels(*guitools.bestLimits(self.img.image))
+        self.hist.vb.autoRange()
 
     def toggleCamera(self):
         if self.orcaflash == self.cameras[1]:
@@ -1166,16 +1189,18 @@ class TormentaGUI(QtGui.QMainWindow):
         self.updateTimings()
         self.expPar.setValue(self.RealExpPar.value())
 
-    def applyfcn(self):
-        print('Apply pressed')
-        self.adjustFrame()
-
     def mouseMoved(self, pos):
         if self.vb.sceneBoundingRect().contains(pos):
+            # Get pointer position
             mousePoint = self.vb.mapSceneToView(pos)
-            x, y = int(mousePoint.x()), int(
-                self.shapes[self.currCamIdx][1] - mousePoint.y())
+            x = int(mousePoint.x())
+            y = int(self.shapes[self.currCamIdx][1] - mousePoint.y())
+
+            # Outputs
             self.cursorPos.setText('{}, {}'.format(x, y))
+            cs = self.lvworkers[self.currCamIdx].image[x, int(mousePoint.y())]
+            countsStr = '{} counts'.format(cs)
+            self.cursorPosInt.setText(countsStr)
 
     def changeParameter(self, function):
         """ This method is used to change those camera properties that need
@@ -1195,7 +1220,7 @@ class TormentaGUI(QtGui.QMainWindow):
             print('Changing to internal trigger')
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
-                    'trigSource', 1))
+                    'trigger_source', 1))
 #            self.RealExpPar.Enable(True)
 #            self.EffFRPar.Enable(True)
 
@@ -1203,7 +1228,7 @@ class TormentaGUI(QtGui.QMainWindow):
             print('Changing to external start trigger')
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
-                    'trigSource', 2))
+                    'trigger_source', 2))
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
                     'trigger_mode', 6))
@@ -1216,7 +1241,7 @@ class TormentaGUI(QtGui.QMainWindow):
             print('Changing to external trigger')
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
-                    'trigSource', 2))
+                    'trigger_source', 2))
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
                     'trigger_mode', 1))
@@ -1254,8 +1279,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.updateTimings()
 
     def cropOrca(self, hpos, vpos, hsize, vsize):
-        """Method to crop the frame read out by Orcaflash """
-#       Round to closest "divisable by 4" value.
+        """Method to crop the frame read out by Orcaflash. """
         print('cropping camera' + str(self.currCamIdx))
         self.cameras[self.currCamIdx].setPropertyValue('subarray_vpos', 0)
         self.cameras[self.currCamIdx].setPropertyValue('subarray_hpos', 0)
@@ -1264,11 +1288,16 @@ class TormentaGUI(QtGui.QMainWindow):
         self.cameras[self.currCamIdx].setPropertyValue(
             'subarray_hsize', 2048)
 
+        # Round to closest "divisable by 4" value.
         vpos = int(4 * np.ceil(vpos / 4))
         hpos = int(4 * np.ceil(hpos / 4))
-        vsize = int(min(2048 - vpos, 128 * np.ceil(vsize / 128)))
         # V3 camera seems to only be able to take multiples of 128.
-        hsize = int(min(2048 - hpos, 128 * np.ceil(hsize / 128)))
+        # vsize = int(min(2048 - vpos, 128 * np.ceil(vsize / 128)))
+        # hsize = int(min(2048 - hpos, 128 * np.ceil(hsize / 128)))
+
+        minroi = 64
+        vsize = int(min(2048 - vpos, minroi * np.ceil(vsize / minroi)))
+        hsize = int(min(2048 - hpos, minroi * np.ceil(hsize / minroi)))
 
         self.cameras[self.currCamIdx].setPropertyValue('subarray_vsize', vsize)
         self.cameras[self.currCamIdx].setPropertyValue('subarray_hsize', hsize)
@@ -1279,7 +1308,6 @@ class TormentaGUI(QtGui.QMainWindow):
         self.frameStart = (hpos, vpos)
         # Only place self.shapes is changed
         self.shapes[self.currCamIdx] = (hsize, vsize)
-        print('time after beginning of cropOrca= ', time.time())
         print('orca has been cropped to: ', vpos, hpos, vsize, hsize)
 
     def adjustFrame(self):
@@ -1289,12 +1317,24 @@ class TormentaGUI(QtGui.QMainWindow):
         """
 
         binning = self.binPar.value()
+        width = self.widthPar.value()
+        height = self.heightPar.value()
+        self.changeParameter(lambda: self.cropOrca(binning*self.X0par.value(),
+                                                   binning*self.Y0par.value(),
+                                                   binning*width, height))
 
-        self.changeParameter(
-            lambda: self.cropOrca(binning*self.X0par.value(),
-                                  binning*self.Y0par.value(),
-                                  binning*self.widthPar.value(),
-                                  self.heightPar.value()))
+        # Final shape values might differ from the user-specified one because
+        # of camera limitation x128
+        width, height = self.shapes[self.currCamIdx]
+        self.X0par.setValue(self.frameStart[0])
+        self.Y0par.setValue(self.frameStart[1])
+        self.widthPar.setValue(width)
+        self.heightPar.setValue(height)
+
+        self.vb.setLimits(xMin=-0.5, xMax=width - 0.5, minXRange=4,
+                          yMin=-0.5, yMax=height - 0.5, minYRange=4)
+        self.vb.setAspectLocked()
+        self.grid.update([width, height])
         self.updateTimings()
         self.recWidget.filesizeupdate()
         self.ROI.hide()
@@ -1302,7 +1342,6 @@ class TormentaGUI(QtGui.QMainWindow):
     def updateFrame(self):
         """ Method to change the image frame size and position in the sensor.
         """
-        print('Update frame called')
         frameParam = self.tree.p.param('Image frame')
         if frameParam.param('Mode').value() == 'Custom':
             self.X0par.setWritable(True)
@@ -1337,7 +1376,6 @@ class TormentaGUI(QtGui.QMainWindow):
                 self.ROI.hide()
 
             elif frameParam.param('Mode').value() == 'Full chip':
-                print('Full chip')
                 self.X0par.setValue(0)
                 self.Y0par.setValue(0)
                 self.widthPar.setValue(2048)
@@ -1347,7 +1385,6 @@ class TormentaGUI(QtGui.QMainWindow):
                 self.ROI.hide()
 
             elif frameParam.param('Mode').value() == 'Microlenses':
-                print('Full chip')
                 self.X0par.setValue(595)
                 self.Y0par.setValue(685)
                 self.widthPar.setValue(600)
@@ -1356,7 +1393,6 @@ class TormentaGUI(QtGui.QMainWindow):
                 self.ROI.hide()
 
             elif frameParam.param('Mode').value() == 'Fast ROI':
-                print('Full chip')
                 self.X0par.setValue(595)
                 self.Y0par.setValue(960)
                 self.widthPar.setValue(600)
@@ -1365,7 +1401,6 @@ class TormentaGUI(QtGui.QMainWindow):
                 self.ROI.hide()
 
             elif frameParam.param('Mode').value() == 'Fast ROI only v2':
-                print('Full chip')
                 self.X0par.setValue(595)
                 self.Y0par.setValue(1000)
                 self.widthPar.setValue(600)
@@ -1374,7 +1409,6 @@ class TormentaGUI(QtGui.QMainWindow):
                 self.ROI.hide()
 
             elif frameParam.param('Mode').value() == 'Minimal line':
-                print('Full chip')
                 self.X0par.setValue(0)
                 self.Y0par.setValue(1020)
                 self.widthPar.setValue(2048)
@@ -1445,11 +1479,9 @@ class TormentaGUI(QtGui.QMainWindow):
         from GUI. Maybe due to simultaious manipulation of viewbox from GUI and
         thread.'''
 
-        #        self.orcaflash.startAcquisition()
-        #        time.sleep(0.3)
-        #        time.sleep(np.max((5 * self.t_exp_real.magnitude, 1)))
-
         self.updateFrame()
+        self.gridButton.setEnabled(True)
+        self.levelsButton.setEnabled(True)
         self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
         self.recWidget.readyToRecord = True
 
@@ -1473,6 +1505,8 @@ class TormentaGUI(QtGui.QMainWindow):
             self.cameras[i].stopAcquisition()
 
         self.viewtimer.stop()
+        self.gridButton.setEnabled(False)
+        self.levelsButton.setEnabled(False)
         self.recWidget.readyToRecord = False
 
         self.img.setImage(

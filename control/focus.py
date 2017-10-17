@@ -93,32 +93,32 @@ class FocusWidget(QtGui.QFrame):
         self.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
         grid = QtGui.QGridLayout()
         self.setLayout(grid)
-        grid.addWidget(self.focusLockGraph, 0, 0, 1, 6)
-        grid.addWidget(self.webcamGraph, 0, 6, 1, 3)
-        grid.addWidget(self.focusCalibButton, 1, 2, 2, 1)
-        grid.addWidget(self.calibrationDisplay, 3, 0, 1, 2)
-        grid.addWidget(self.kpLabel, 1, 3)
-        grid.addWidget(self.kpEdit, 1, 4)
-        grid.addWidget(self.kiLabel, 2, 3)
-        grid.addWidget(self.kiEdit, 2, 4)
-        grid.addWidget(self.lockButton, 1, 5, 2, 1)
-        grid.addWidget(self.focusDataBox, 3, 4, 1, 2)
-        grid.addWidget(self.CalibFromLabel, 1, 0)
-        grid.addWidget(self.CalibFromEdit, 1, 1)
-        grid.addWidget(self.CalibToLabel, 2, 0)
-        grid.addWidget(self.CalibToEdit, 2, 1)
-        grid.addWidget(self.CalibCurveButton, 3, 2)
-        grid.addWidget(self.positionLabel, 1, 6)
-        grid.addWidget(self.positionEdit, 1, 7)
-        grid.addWidget(self.positionSetButton, 2, 6, 1, 2)
+        grid.addWidget(self.focusLockGraph, 0, 0, 1, 8)
+        grid.addWidget(self.webcamGraph, 1, 0, 1, 8)
+        grid.addWidget(self.focusCalibButton, 2, 2, 2, 1)
+        grid.addWidget(self.calibrationDisplay, 4, 0, 1, 2)
+        grid.addWidget(self.kpLabel, 2, 3)
+        grid.addWidget(self.kpEdit, 2, 4)
+        grid.addWidget(self.kiLabel, 3, 3)
+        grid.addWidget(self.kiEdit, 3, 4)
+        grid.addWidget(self.lockButton, 2, 5, 2, 1)
+        grid.addWidget(self.focusDataBox, 4, 4, 1, 2)
+        grid.addWidget(self.CalibFromLabel, 2, 0)
+        grid.addWidget(self.CalibFromEdit, 2, 1)
+        grid.addWidget(self.CalibToLabel, 3, 0)
+        grid.addWidget(self.CalibToEdit, 3, 1)
+        grid.addWidget(self.CalibCurveButton, 4, 2)
+        grid.addWidget(self.positionLabel, 2, 6)
+        grid.addWidget(self.positionEdit, 2, 7)
+        grid.addWidget(self.positionSetButton, 3, 6, 1, 2)
 
 #        grid.setColumnMinimumWidth(1, 100)
 #        grid.setColumnMinimumWidth(2, 40)
 #        grid.setColumnMinimumWidth(0, 100)
 
     def movePZT(self):
-        self.z.moveAbsolute(float(
-                            self.positionEdit.text().split(' ')[0]) * self.um)
+        self.z.moveAbsolute(
+            float(self.positionEdit.text().split(' ')[0]) * self.um)
 
     def toggleFocus(self):
         if self.lockButton.isChecked():
@@ -234,13 +234,13 @@ class ProcessDataThread(QtCore.QThread):
 
     def updateFS(self):
         # update the focus signal
-        try:
-            self.image = self.webcam.grab_image(vsub=self.ws['vsub'],
-                                                hsub=self.ws['hsub'],
-                                                top=self.ws['top'],
-                                                bot=self.ws['bot'])
-        except:
-            pass
+#        try:
+#            self.image = self.webcam.grab_image(vsub=self.ws['vsub'],
+#                                                hsub=self.ws['hsub'],
+#                                                top=self.ws['top'],
+#                                                bot=self.ws['bot'])
+#        except:
+#            pass
         self.massCenter = np.array(ndi.measurements.center_of_mass(self.image))
         self.massCenter[0] = self.massCenter[0] - self.sensorSize[0] / 2
         self.massCenter[1] = self.massCenter[1] - self.sensorSize[1] / 2

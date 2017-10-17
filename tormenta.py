@@ -6,6 +6,7 @@ Created on Thu May 21 13:19:31 2015
 """
 from pyqtgraph.Qt import QtGui
 import nidaqmx
+import sys
 
 from control import control
 import control.instruments as instruments
@@ -15,27 +16,25 @@ def main():
 
     app = QtGui.QApplication([])
 
-    cobolt = 'cobolt.cobolt0601.Cobolt0601'
+    cobolt = 'cobolt.cobolt0601.Cobolt0601_f2'
 
     nidaq = nidaqmx.system.System.local().devices['Dev1']
 
-    # You can use 'nv401' or 'mock'
-    pzt_name = 'nv401'
+    with instruments.Laser(cobolt, 'COM4') as actlaser, \
+            instruments.PZT(8) as pzt, instruments.Webcam() as webcam:
 
-    with instruments.Laser(cobolt, 'COM5') as actlaser, \
-            instruments.PZT(pzt_name, 8) as pzt, \
-            instruments.Webcam() as webcam:
-
-        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM6', 'COM4'])
+        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM5', 'COM10'])
         exclaser = instruments.LaserTTL(0)
-        orcaflashV3 = instruments.Camera(0)
-        orcaflashV2 = instruments.Camera(1)
+        orcaflashV3 = instruments.Camera(1)
+        orcaflashV2 = instruments.Camera(0)
         print(actlaser.idn)
         print(exclaser.line)
         print(offlaser.idn)
+        print(orcaflashV3.camera_model)
+        print(orcaflashV2.camera_model)
 
         win = control.TormentaGUI(actlaser, offlaser, exclaser, orcaflashV2,
                                   orcaflashV3, nidaq, pzt, webcam)
         win.show()
 
-        app.exec_()
+        sys.exit(app.exec_())

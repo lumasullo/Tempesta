@@ -10,7 +10,6 @@ import control.mockers as mockers
 import numpy as np
 import nidaqmx
 from instrumental.drivers.cameras.uc480 import UC480_Camera
-from lantz.drivers.piezosystemjena.nv401 import nv401
 
 
 class Laser(object):
@@ -18,11 +17,8 @@ class Laser(object):
     def __new__(cls, iName, *args):
         try:
             pName, driverName = iName.rsplit('.', 1)
-            print('iName = ', iName)
-            print('pName = ', pName)
             package = importlib.import_module('lantz.drivers.legacy.' + pName)
             driver = getattr(package, driverName)
-            print('driver: ', driver)
             laser = driver(*args)
             laser.initialize()
             return driver(*args)
@@ -106,6 +102,16 @@ class LinkedLaser(object):
     def query(self, value):
         [self.lasers[i].query(value) for i in [0, 1]]
 
+    @property
+    def power_mod(self):
+        """Laser modulated power (mW).
+        """
+        return self.lasers[0].power_mod + self.lasers[1].power_mod
+
+    @power_mod.setter
+    def power_mod(self, value):
+        self.lasers[0].power_mod = self.lasers[1].power_mod = 0.5*value
+
     def finalize(self):
         self.lasers[0].finalize()
         self.lasers[1].finalize()
@@ -114,7 +120,7 @@ class LinkedLaser(object):
 class LaserTTL(object):
     def __init__(self, line):
         self.line = line
-
+        self.power = None
         # Nidaq task
         self.digital_mod = False
 
@@ -168,7 +174,7 @@ class Camera(object):
     """ Buffer class for testing whether the camera is connected. If it's not,
     it returns a dummy class for program testing. """
 # TODO:
-    """This was originally (by federico) called from tormenta.py using a "with"
+    """This was originally (by Federico) called from tormenta.py using a "with"
     call, as with the Lasers. But accoring to literature, "with" should be
     used with classes having __enter__ and __exit functions defined.
     For some reason this particular class gives "Error: class is missing
@@ -181,8 +187,6 @@ class Camera(object):
         try:
             import lantz.drivers.hamamatsu.hamamatsu_camera as hm
             orcaflash = hm.HamamatsuCameraMR(id)
-            print('Initializing Hamamatsu Camera Object, model: ',
-                  orcaflash.camera_model)
             return orcaflash
 
         except:
@@ -192,15 +196,15 @@ class Camera(object):
 
 class PZT(object):
 
-    def __new__(cls, iName, port, *args):
-        if iName == 'nv401':
+    def __new__(cls, port, *args):
+        try:
+            from lantz.drivers.piezosystemjena.nv401 import nv401
             inst = nv401.via_serial(port)
+            inst.initialize()
+            inst.position
             return inst
-        elif iName == 'mock':
+        except:
             return mockers.MockPZT()
-        else:
-            raise ValueError('Enter the right piezo name, if you dont have '
-                             'piezo, you can use "mock"')
 
 
 class Webcam(object):
