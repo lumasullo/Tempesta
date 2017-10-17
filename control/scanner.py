@@ -38,7 +38,8 @@ class ScanWidget(QtGui.QMainWindow):
     def __init__(self, device, main, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.DigModW = QtGui.QMessageBox()
-        self.DigModW.setInformativeText("You need to be in digital modulation to scan")
+        self.DigModW.setInformativeText(
+            "You need to be in digital modulation to scan")
 
         self.nidaq = device
         self.main = main
@@ -54,16 +55,16 @@ class ScanWidget(QtGui.QMainWindow):
 
         self.sampleRateEdit = QtGui.QLineEdit()
 
-        self.sizeXPar = QtGui.QLineEdit('1')
+        self.sizeXPar = QtGui.QLineEdit('2')
         self.sizeXPar.editingFinished.connect(
             lambda: self.scanParameterChanged('sizeX'))
-        self.sizeYPar = QtGui.QLineEdit('1')
+        self.sizeYPar = QtGui.QLineEdit('2')
         self.sizeYPar.editingFinished.connect(
             lambda: self.scanParameterChanged('sizeY'))
         self.sizeZPar = QtGui.QLineEdit('10')
         self.sizeZPar.editingFinished.connect(
             lambda: self.scanParameterChanged('sizeZ'))
-        self.seqTimePar = QtGui.QLineEdit('100')  # ms
+        self.seqTimePar = QtGui.QLineEdit('10')  # ms
         self.seqTimePar.editingFinished.connect(
             lambda: self.scanParameterChanged('seqTime'))
         self.nrFramesPar = QtGui.QLabel()
@@ -224,6 +225,41 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(self.ScanButton, 14, 1)
         grid.addWidget(self.continuousCheck, 14, 2)
 
+#        grid.addWidget(QtGui.QLabel('Number of frames:'), 9, 0)
+#        grid.addWidget(self.nrFramesPar, 9, 1)
+#        grid.addWidget(QtGui.QLabel('Duration (s):'), 10, 0)
+#        grid.addWidget(self.scanDurationLabel, 10, 1)
+
+#        grid.addWidget(self.scanRadio, 0, 2)
+#        grid.addWidget(QtGui.QLabel('Mode:'), 1, 5)
+#        grid.addWidget(self.scanMode, 1, 6)
+#        grid.addWidget(QtGui.QLabel('Primary dimension:'), 2, 5)
+#        grid.addWidget(self.primScanDim, 2, 6)
+#        grid.addWidget(self.contLaserPulsesRadio, 0, 3)
+
+#        grid.addWidget(QtGui.QLabel('Sequence Time (ms):'), 7, 0)
+#        grid.addWidget(self.seqTimePar, 7, 1)
+#        grid.addWidget(QtGui.QLabel('Start (ms):'), 6, 3)
+#        grid.addWidget(QtGui.QLabel('End (ms):'), 6, 4)
+#        grid.addWidget(QtGui.QLabel('405:'), 7, 2)
+#        grid.addWidget(self.start405Par, 7, 3)
+#        grid.addWidget(self.end405Par, 7, 4)
+#        grid.addWidget(QtGui.QLabel('473:'), 8, 2)
+#        grid.addWidget(self.start473Par, 8, 3)
+#        grid.addWidget(self.end473Par, 8, 4)
+#        grid.addWidget(QtGui.QLabel('488:'), 9, 2)
+#        grid.addWidget(self.start488Par, 9, 3)
+#        grid.addWidget(self.end488Par, 9, 4)
+#        grid.addWidget(QtGui.QLabel('Camera:'), 10, 2)
+#        grid.addWidget(self.startCAMPar, 10, 3)
+#        grid.addWidget(self.endCAMPar, 10, 4)
+
+#        grid.addWidget(self.graph, 11, 0, 1, 7)
+#        self.graph.setFixedHeight(100)
+#        grid.addWidget(self.scanImage, 12, 0, 1, 7)
+#        grid.addWidget(self.PreviewButton, 13, 0)
+#        grid.addWidget(self.ScanButton, 13, 1)
+#        grid.addWidget(self.continuousCheck, 13, 2)
 
     @property
     def scanOrNot(self):
@@ -255,7 +291,6 @@ class ScanWidget(QtGui.QMainWindow):
     def setPrimScanDim(self, dim):
         self.stageScan.setPrimScanDim(dim)
         self.scanParameterChanged('primScanDim')
-
 
     def scanParameterChanged(self, p):
         if p not in ('scanMode', 'primScanDim'):
@@ -313,7 +348,6 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanning = True
 
             self.start_f = self.main.lvworkers[0].f_ind
-            print(self.start_f)
 
             self.scanner.runScan()
 
@@ -334,7 +368,6 @@ class ScanWidget(QtGui.QMainWindow):
         if not self.scanner.aborted:
             time.sleep(0.1)
             self.end_f = self.main.lvworkers[0].f_ind
-            print(self.end_f)
             if self.end_f >= self.start_f - 1:
                 f_range = range(self.start_f, self.end_f + 1)
             else:
@@ -475,8 +508,7 @@ class Scanner(QtCore.QObject):
             fullDOsignal = np.tile(fullDOsignal,
                                    self.stageScan.VOLscan.cyclesPerSlice)
             fullDOsignal = np.concatenate(
-                (fullDOsignal,
-                 np.zeros(4, self.stageScan.seqSamps)))
+                (fullDOsignal, np.zeros(4, self.stageScan.seqSamps)))
 
         self.dotask.timing.cfg_samp_clk_timing(
             rate=self.pxCycle.sampleRate,
@@ -518,13 +550,14 @@ class Scanner(QtCore.QObject):
         # correct though, assumes channels are 0, 1 and 2.
         # TODO: Test abort (task function)
         writtenSamps = int(np.round(self.aotask.out_stream.curr_write_pos))
-        chans = [0,1,2]
+        chans = [0, 1, 2]
         dim = [self.channel_order[i] for i in chans]
         finalSamps = [self.stageScan.sigDict[dim[i]][writtenSamps - 1]
                       for i in chans]
         print(finalSamps)
-        returnRamps = np.array([makeRamp(finalSamps[i], 0, self.stageScan.sampleRate)
-                       for i in chans])
+        returnRamps = np.array(
+            [makeRamp(finalSamps[i], 0, self.stageScan.sampleRate)
+             for i in chans])
 
         self.aotask.stop()
         self.aotask.timing.cfg_samp_clk_timing(
@@ -558,8 +591,8 @@ class LaserCycle():
         DOchans = range(0, 4)
         for d in DOchans:
             chanstring = 'Dev1/port0/line%s' % d
-            self.dotask.do_channels.add_do_chan(lines=chanstring,
-                                                name_to_assign_to_lines='chan%s' % devs[d])
+            self.dotask.do_channels.add_do_chan(
+                lines=chanstring, name_to_assign_to_lines='chan%s' % devs[d])
 
         DOchans = [0, 1, 2, 3]
         fullDOsignal = np.array([self.pxCycle.sigDict[devs[i]]
@@ -678,7 +711,8 @@ class FOVscan():
 
     def update(self, parValues, primScanDim):
         '''Create signals.
-        Signals are first created in units of distance and converted to voltage at the end.'''
+        Signals are first created in units of distance and converted to voltage
+        at the end.'''
         # Create signals
         startX = 0
         startY = 0
@@ -729,7 +763,8 @@ class VOLscan():
         pass
 
     def update(self, parValues, primScanDim):
-        """Updates the VOL-scan signals, units of length are used when creating  the scan signals and is converted to voltages at the end """
+        """Updates the VOL-scan signals, units of length are used when creating
+        the scan signals and is converted to voltages at the end """
         print('Updating VOL scan')
         # Create signals
         startX = 0
@@ -830,6 +865,8 @@ class ImageWidget(pg.GraphicsLayoutWidget):
         self.cubehelixCM = pg.ColorMap(np.arange(0, 1, 1/256),
                                        guitools.cubehelix().astype(int))
         self.hist.gradient.setColorMap(self.cubehelixCM)
+        for tick in self.hist.gradient.ticks:
+            tick.hide()
         self.addItem(self.hist, row=1, col=2)
 
 

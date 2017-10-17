@@ -1292,9 +1292,6 @@ class TormentaGUI(QtGui.QMainWindow):
         vpos = int(4 * np.ceil(vpos / 4))
         hpos = int(4 * np.ceil(hpos / 4))
         # V3 camera seems to only be able to take multiples of 128.
-        # vsize = int(min(2048 - vpos, 128 * np.ceil(vsize / 128)))
-        # hsize = int(min(2048 - hpos, 128 * np.ceil(hsize / 128)))
-
         minroi = 64
         vsize = int(min(2048 - vpos, minroi * np.ceil(vsize / minroi)))
         hsize = int(min(2048 - hpos, minroi * np.ceil(hsize / minroi)))
