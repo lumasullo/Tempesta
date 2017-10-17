@@ -1171,6 +1171,8 @@ class TormentaGUI(QtGui.QMainWindow):
 
         layout.setColumnMinimumWidth(2, 1000)
 
+        self.toggleCamera()
+
     def autoLevels(self):
         self.hist.setLevels(*guitools.bestLimits(self.img.image))
         self.hist.vb.autoRange()
@@ -1218,7 +1220,7 @@ class TormentaGUI(QtGui.QMainWindow):
             print('Changing to internal trigger')
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
-                    'trigSource', 1))
+                    'trigger_source', 1))
 #            self.RealExpPar.Enable(True)
 #            self.EffFRPar.Enable(True)
 
@@ -1226,7 +1228,7 @@ class TormentaGUI(QtGui.QMainWindow):
             print('Changing to external start trigger')
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
-                    'trigSource', 2))
+                    'trigger_source', 2))
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
                     'trigger_mode', 6))
@@ -1239,7 +1241,7 @@ class TormentaGUI(QtGui.QMainWindow):
             print('Changing to external trigger')
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
-                    'trigSource', 2))
+                    'trigger_source', 2))
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
                     'trigger_mode', 1))
@@ -1290,8 +1292,9 @@ class TormentaGUI(QtGui.QMainWindow):
         vpos = int(4 * np.ceil(vpos / 4))
         hpos = int(4 * np.ceil(hpos / 4))
         # V3 camera seems to only be able to take multiples of 128.
-        vsize = int(min(2048 - vpos, 128 * np.ceil(vsize / 128)))
-        hsize = int(min(2048 - hpos, 128 * np.ceil(hsize / 128)))
+        minroi = 64
+        vsize = int(min(2048 - vpos, minroi * np.ceil(vsize / minroi)))
+        hsize = int(min(2048 - hpos, minroi * np.ceil(hsize / minroi)))
 
         self.cameras[self.currCamIdx].setPropertyValue('subarray_vsize', vsize)
         self.cameras[self.currCamIdx].setPropertyValue('subarray_hsize', hsize)
