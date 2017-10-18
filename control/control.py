@@ -1218,7 +1218,7 @@ class TormentaGUI(QtGui.QMainWindow):
             print('Changing to internal trigger')
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
-                    'trigSource', 1))
+                    'trigger_source', 1))
 #            self.RealExpPar.Enable(True)
 #            self.EffFRPar.Enable(True)
 
@@ -1226,7 +1226,7 @@ class TormentaGUI(QtGui.QMainWindow):
             print('Changing to external start trigger')
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
-                    'trigSource', 2))
+                    'trigger_source', 2))
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
                     'trigger_mode', 6))
@@ -1239,7 +1239,7 @@ class TormentaGUI(QtGui.QMainWindow):
             print('Changing to external trigger')
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
-                    'trigSource', 2))
+                    'trigger_source', 2))
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
                     'trigger_mode', 1))
