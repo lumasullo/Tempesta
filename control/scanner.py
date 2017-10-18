@@ -70,7 +70,7 @@ class ScanWidget(QtGui.QMainWindow):
         self.nrFramesPar = QtGui.QLabel()
         self.scanDuration = 0
         self.scanDurationLabel = QtGui.QLabel(str(self.scanDuration))
-        self.stepSizeXYPar = QtGui.QLineEdit('0.05')
+        self.stepSizeXYPar = QtGui.QLineEdit('0.1')
         self.stepSizeXYPar.editingFinished.connect(
             lambda: self.scanParameterChanged('stepSizeXY'))
         self.stepSizeZPar = QtGui.QLineEdit('1')
@@ -189,41 +189,77 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(QtGui.QLabel('Step size Z (µm):'), 3, 2)
         grid.addWidget(self.stepSizeZPar, 3, 3)
 
-        grid.addWidget(QtGui.QLabel('Number of frames:'), 9, 0)
-        grid.addWidget(self.nrFramesPar, 9, 1)
-        grid.addWidget(QtGui.QLabel('Duration (s):'), 10, 0)
-        grid.addWidget(self.scanDurationLabel, 10, 1)
+        grid.addWidget(QtGui.QLabel('Frames in scan:'), 4, 3)
+        grid.addWidget(self.nrFramesPar, 4, 4)
+        grid.addWidget(QtGui.QLabel('Scan duration (s):'), 5, 3)
+        grid.addWidget(self.scanDurationLabel, 5, 4)
+        grid.setColumnMinimumWidth(4, 50)
 
-        grid.addWidget(self.scanRadio, 0, 2)
-        grid.addWidget(QtGui.QLabel('Mode:'), 1, 5)
-        grid.addWidget(self.scanMode, 1, 6)
-        grid.addWidget(QtGui.QLabel('Primary dimension:'), 2, 5)
-        grid.addWidget(self.primScanDim, 2, 6)
-        grid.addWidget(self.contLaserPulsesRadio, 0, 3)
+        grid.addWidget(self.scanRadio, 4, 0)
+        grid.addWidget(QtGui.QLabel('Scan mode:'), 4, 1)
+        grid.addWidget(self.scanMode, 4, 2)
+        grid.addWidget(QtGui.QLabel('Primary scan dim:'), 5, 1)
+        grid.addWidget(self.primScanDim, 5, 2)
+        grid.addWidget(self.contLaserPulsesRadio, 6, 0)
 
-        grid.addWidget(QtGui.QLabel('Sequence Time (ms):'), 7, 0)
-        grid.addWidget(self.seqTimePar, 7, 1)
-        grid.addWidget(QtGui.QLabel('Start (ms):'), 6, 3)
-        grid.addWidget(QtGui.QLabel('End (ms):'), 6, 4)
-        grid.addWidget(QtGui.QLabel('405:'), 7, 2)
-        grid.addWidget(self.start405Par, 7, 3)
-        grid.addWidget(self.end405Par, 7, 4)
-        grid.addWidget(QtGui.QLabel('473:'), 8, 2)
-        grid.addWidget(self.start473Par, 8, 3)
-        grid.addWidget(self.end473Par, 8, 4)
-        grid.addWidget(QtGui.QLabel('488:'), 9, 2)
-        grid.addWidget(self.start488Par, 9, 3)
-        grid.addWidget(self.end488Par, 9, 4)
-        grid.addWidget(QtGui.QLabel('Camera:'), 10, 2)
-        grid.addWidget(self.startCAMPar, 10, 3)
-        grid.addWidget(self.endCAMPar, 10, 4)
+        grid.addWidget(QtGui.QLabel('Sequence Time (ms):'), 8, 0)
+        grid.addWidget(self.seqTimePar, 8, 1)
+        grid.addWidget(QtGui.QLabel('Start (ms):'), 7, 3)
+        grid.addWidget(QtGui.QLabel('End (ms):'), 7, 4)
+        grid.addWidget(QtGui.QLabel('405:'), 8, 2)
+        grid.addWidget(self.start405Par, 8, 3)
+        grid.addWidget(self.end405Par, 8, 4)
+        grid.addWidget(QtGui.QLabel('473:'), 9, 2)
+        grid.addWidget(self.start473Par, 9, 3)
+        grid.addWidget(self.end473Par, 9, 4)
+        grid.addWidget(QtGui.QLabel('488:'), 10, 2)
+        grid.addWidget(self.start488Par, 10, 3)
+        grid.addWidget(self.end488Par, 10, 4)
+        grid.addWidget(QtGui.QLabel('Camera:'), 11, 2)
+        grid.addWidget(self.startCAMPar, 11, 3)
+        grid.addWidget(self.endCAMPar, 11, 4)
 
-        grid.addWidget(self.graph, 11, 0, 1, 7)
-        self.graph.setFixedHeight(100)
-        grid.addWidget(self.scanImage, 12, 0, 1, 7)
-        grid.addWidget(self.PreviewButton, 13, 0)
-        grid.addWidget(self.ScanButton, 13, 1)
-        grid.addWidget(self.continuousCheck, 13, 2)
+        grid.addWidget(self.graph, 12, 0, 1, 5)
+        grid.addWidget(self.scanImage, 13, 0, 1, 5)
+        grid.addWidget(self.PreviewButton, 14, 0)
+        grid.addWidget(self.ScanButton, 14, 1)
+        grid.addWidget(self.continuousCheck, 14, 2)
+
+#        grid.addWidget(QtGui.QLabel('Number of frames:'), 9, 0)
+#        grid.addWidget(self.nrFramesPar, 9, 1)
+#        grid.addWidget(QtGui.QLabel('Duration (s):'), 10, 0)
+#        grid.addWidget(self.scanDurationLabel, 10, 1)
+
+#        grid.addWidget(self.scanRadio, 0, 2)
+#        grid.addWidget(QtGui.QLabel('Mode:'), 1, 5)
+#        grid.addWidget(self.scanMode, 1, 6)
+#        grid.addWidget(QtGui.QLabel('Primary dimension:'), 2, 5)
+#        grid.addWidget(self.primScanDim, 2, 6)
+#        grid.addWidget(self.contLaserPulsesRadio, 0, 3)
+
+#        grid.addWidget(QtGui.QLabel('Sequence Time (ms):'), 7, 0)
+#        grid.addWidget(self.seqTimePar, 7, 1)
+#        grid.addWidget(QtGui.QLabel('Start (ms):'), 6, 3)
+#        grid.addWidget(QtGui.QLabel('End (ms):'), 6, 4)
+#        grid.addWidget(QtGui.QLabel('405:'), 7, 2)
+#        grid.addWidget(self.start405Par, 7, 3)
+#        grid.addWidget(self.end405Par, 7, 4)
+#        grid.addWidget(QtGui.QLabel('473:'), 8, 2)
+#        grid.addWidget(self.start473Par, 8, 3)
+#        grid.addWidget(self.end473Par, 8, 4)
+#        grid.addWidget(QtGui.QLabel('488:'), 9, 2)
+#        grid.addWidget(self.start488Par, 9, 3)
+#        grid.addWidget(self.end488Par, 9, 4)
+#        grid.addWidget(QtGui.QLabel('Camera:'), 10, 2)
+#        grid.addWidget(self.startCAMPar, 10, 3)
+#        grid.addWidget(self.endCAMPar, 10, 4)
+
+#        grid.addWidget(self.graph, 11, 0, 1, 7)
+#        self.graph.setFixedHeight(100)
+#        grid.addWidget(self.scanImage, 12, 0, 1, 7)
+#        grid.addWidget(self.PreviewButton, 13, 0)
+#        grid.addWidget(self.ScanButton, 13, 1)
+#        grid.addWidget(self.continuousCheck, 13, 2)
 
     @property
     def scanOrNot(self):
@@ -330,6 +366,7 @@ class ScanWidget(QtGui.QMainWindow):
         self.ScanButton.setEnabled(False)
 
         if not self.scanner.aborted:
+            time.sleep(0.1)
             self.end_f = self.main.lvworkers[0].f_ind
             if self.end_f >= self.start_f - 1:
                 f_range = range(self.start_f, self.end_f + 1)
@@ -337,11 +374,11 @@ class ScanWidget(QtGui.QMainWindow):
                 buffer_size = self.main.cameras[0].number_image_buffers
                 f_range = np.append(range(self.start_f, buffer_size),
                                     range(0, self.end_f + 1))
-            data = [self.main.cameras[0].hcam_data[j].getData()
-                    for j in f_range]
-            print(len(data))
-            datashape = (
-                len(f_range), self.main.shapes[0][1], self.main.shapes[0][0])
+            data = []
+            for j in f_range:
+                data.append(self.main.cameras[0].hcam_data[j].getData())
+            datashape = (len(f_range), self.main.shapes[0][1], self.main.shapes[0][0])
+            print(datashape)
             reshapeddata = np.reshape(data, datashape, order='C')
             z_stack = []
             for j in range(0, len(f_range)):
@@ -444,7 +481,7 @@ class Scanner(QtCore.QObject):
                 max_val=maxVolt[self.channel_order[n]])
 
         fullAOsignal = np.array([self.stageScan.sigDict[self.channel_order[i]]
-                                 for i in AOchans])
+                                for i in AOchans])
 
         self.aotask.timing.cfg_samp_clk_timing(
             rate=self.stageScan.sampleRate,
