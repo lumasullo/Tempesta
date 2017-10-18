@@ -127,9 +127,9 @@ def saveScan(scanWid):
         config = configparser.ConfigParser()
         config.optionxform = str
 
-        config['Pixel_par_values'] = scanWid.pixel_par_values
-        config['Scan_par_values'] = scanWid.scan_par_values
-        config['Modes'] = {'scan_mode': scanWid.Scan_Mode.currentText(),
+        config['pxParValues'] = scanWid.pxParValues
+        config['scanParValues'] = scanWid.scanParValues
+        config['Modes'] = {'scanMode': scanWid.scanMode.currentText(),
                            'scan_or_not': scanWid.scanRadio.isChecked()}
         fileName = QtGui.QFileDialog.getSaveFileName(scanWid, 'Save scan',
                                                      scanDir)
@@ -151,16 +151,20 @@ def loadScan(scanWid):
 
     config.read(fileName)
 
-    for key in scanWid.pixel_par_values:
-        scanWid.pixel_par_values[key] = float(config._sections['Pixel_par_values'][key])
-        scanWid.pixel_parameters[key].setText(str(1000*float(config._sections['Pixel_par_values'][key])))
+    for key in scanWid.pxParValues:
+        scanWid.pxParValues[key] = float(config._sections['pxParValues'][key])
+        scanWid.pxParameters[key].setText(
+            str(1000*float(config._sections['pxParValues'][key])))
 
-    for key in scanWid.scan_par_values:
-        scanWid.scan_par_values[key] = float(config._sections['Scan_par_values'][key])
-        if key == 'sequence_time':
-            scanWid.scan_parameters[key].setText(str(1000*float(config._sections['Scan_par_values'][key])))
+    for key in scanWid.scanParValues:
+        value = config._sections['scanParValues'][key]
+        scanWid.scanParValues[key] = float(value)
+        if key == 'seqTime':
+            scanWid.scanPar[key].setText(
+                str(1000*float(config._sections['scanParValues'][key])))
         else:
-            scanWid.scan_parameters[key].setText(config._sections['Scan_par_values'][key])
+            scanWid.scanPar[key].setText(
+                config._sections['scanParValues'][key])
 
     scanOrNot = (config._sections['Modes']['scan_or_not'] == 'True')
     scanWid.setScanOrNot(scanOrNot)
@@ -169,11 +173,11 @@ def loadScan(scanWid):
     else:
         scanWid.contLaserPulsesRadio.setChecked(True)
 
-    scan_mode = config._sections['Modes']['scan_mode']
-    scanWid.setScanMode(scan_mode)
-    scanWid.Scan_Mode.setCurrentIndex(scanWid.Scan_Mode.findText(scan_mode))
+    scanMode = config._sections['Modes']['scanMode']
+    scanWid.setScanMode(scanMode)
+    scanWid.scanMode.setCurrentIndex(scanWid.scanMode.findText(scanMode))
 
-    scanWid.update_Scan(scanWid.all_devices)
+    scanWid.updateScan(scanWid.allDevices)
     scanWid.graph.update()
 
 

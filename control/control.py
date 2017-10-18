@@ -479,14 +479,15 @@ class RecordingWidget(QtGui.QFrame):
                 try:
                     data = self.recworkers[ind].z_stack
                     if not np.floor(np.sqrt(len(data))) == np.sqrt(len(data)):
-                        del data[0]
+                        del data[-1]
+
                     imside = int(np.sqrt(np.size(data)))
                     print('Imside = ', imside)
                     data = np.reshape(data, [imside, imside])
                     data[::2] = np.fliplr(data[::2])
                     plt.figure()
-                    plt.imshow(data, interpolation='none',
-                               cmap=plt.get_cmap('afmhot'))
+                    plt.imshow(
+                       data, interpolation='none', cmap=plt.get_cmap('afmhot'))
                 except BaseException:
                     pass
             for i in range(0, self.nr_cameras):
@@ -588,9 +589,7 @@ class RecWorker(QtCore.QObject):
         print('Start_f = :', start_f)
         print('End_f = :', end_f)
         f_ind = len(f_range)
-        data = []
-        for i in f_range:
-            data.append(self.camera.hcam_data[i].getData())
+        data = [self.camera.hcam_data[i].getData() for i in f_range]
 
         # Adapted for ImageJ data read shape
         datashape = (f_ind, self.shape[1], self.shape[0])
@@ -606,9 +605,8 @@ class RecWorker(QtCore.QObject):
         dataset[...] = reshapeddata
         elapsed = time.time() - t
         print('Data written, time to write: ', elapsed)
-        self.z_stack = []
-        for i in range(0, f_ind):
-            self.z_stack.append(np.mean(reshapeddata[i, :, :]))
+        self.z_stack = [
+            np.mean(reshapeddata[i, :, :]) for i in range(0, f_ind)]
 
         self.Z_projection = np.flipud(np.sum(reshapeddata, 0))
         # Saving parameters
@@ -936,7 +934,7 @@ class TormentaGUI(QtGui.QMainWindow):
         # Acquisition signals
         acquisParam = self.tree.p.param('Acquisition mode')
         self.trigsourceparam = acquisParam.param('Trigger source')
-        self.trigsourceparam.sigValueChanged.connect(self.ChangeTriggerSource)
+        self.trigsourceparam.sigValueChanged.connect(self.changeTriggerSource)
 
         # Camera settings widget
         cameraWidget = QtGui.QFrame()
@@ -1213,8 +1211,8 @@ class TormentaGUI(QtGui.QMainWindow):
             function()
             self.liveviewRun()
 
-    def ChangeTriggerSource(self):
-        print('In ChangeTriggerSource with parameter value: ',
+    def changeTriggerSource(self):
+        print('In changeTriggerSource with parameter value: ',
               self.trigsourceparam.value())
         if self.trigsourceparam.value() == 'Internal trigger':
             print('Changing to internal trigger')

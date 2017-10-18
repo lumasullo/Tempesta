@@ -37,6 +37,7 @@ class ScanWidget(QtGui.QMainWindow):
     The rest of the functions contain mosly GUI related code.'''
     def __init__(self, device, main, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         self.DigModW = QtGui.QMessageBox()
         self.DigModW.setInformativeText(
             "You need to be in digital modulation to scan")
@@ -64,7 +65,7 @@ class ScanWidget(QtGui.QMainWindow):
         self.sizeZPar = QtGui.QLineEdit('10')
         self.sizeZPar.editingFinished.connect(
             lambda: self.scanParameterChanged('sizeZ'))
-        self.seqTimePar = QtGui.QLineEdit('10')  # ms
+        self.seqTimePar = QtGui.QLineEdit('10')     # ms
         self.seqTimePar.editingFinished.connect(
             lambda: self.scanParameterChanged('seqTime'))
         self.nrFramesPar = QtGui.QLabel()
@@ -152,6 +153,7 @@ class ScanWidget(QtGui.QMainWindow):
         self.pxCycle = PixelCycle(self.sampleRate)
         self.graph = GraphFrame(self.pxCycle)
         self.graph.plot.getAxis('bottom').setScale(1000/self.sampleRate)
+        self.graph.setFixedHeight(100)
         self.updateScan(self.allDevices)
         self.scanParameterChanged('seqTime')
 
@@ -169,7 +171,12 @@ class ScanWidget(QtGui.QMainWindow):
         self.PreviewButton.clicked.connect(self.previewScan)
         self.continuousCheck = QtGui.QCheckBox('Continuous Scan')
 
+        # Crosshair
         self.scanImage = ImageWidget()
+        self.crosshair = guitools.Crosshair(self.scanImage.vb)
+        self.crossButton = QtGui.QPushButton('Cross')
+        self.crossButton.setCheckable(True)
+        self.crossButton.pressed.connect(self.crosshair.toggle)
 
         self.cwidget = QtGui.QWidget()
         self.setCentralWidget(self.cwidget)
@@ -189,77 +196,43 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(QtGui.QLabel('Step size Z (µm):'), 3, 2)
         grid.addWidget(self.stepSizeZPar, 3, 3)
 
-        grid.addWidget(QtGui.QLabel('Frames in scan:'), 4, 3)
-        grid.addWidget(self.nrFramesPar, 4, 4)
-        grid.addWidget(QtGui.QLabel('Scan duration (s):'), 5, 3)
-        grid.addWidget(self.scanDurationLabel, 5, 4)
-        grid.setColumnMinimumWidth(4, 50)
+        grid.addWidget(QtGui.QLabel('Number of frames:'), 9, 0)
+        grid.addWidget(self.nrFramesPar, 9, 1)
+        grid.addWidget(QtGui.QLabel('Duration (s):'), 10, 0)
+        grid.addWidget(self.scanDurationLabel, 10, 1)
 
-        grid.addWidget(self.scanRadio, 4, 0)
-        grid.addWidget(QtGui.QLabel('Scan mode:'), 4, 1)
-        grid.addWidget(self.scanMode, 4, 2)
-        grid.addWidget(QtGui.QLabel('Primary scan dim:'), 5, 1)
-        grid.addWidget(self.primScanDim, 5, 2)
-        grid.addWidget(self.contLaserPulsesRadio, 6, 0)
+        grid.addWidget(self.scanRadio, 0, 2)
+        grid.addWidget(QtGui.QLabel('Mode:'), 1, 5)
+        grid.addWidget(self.scanMode, 1, 6)
+        grid.addWidget(QtGui.QLabel('Primary dimension:'), 2, 5)
+        grid.addWidget(self.primScanDim, 2, 6)
+        grid.addWidget(self.contLaserPulsesRadio, 0, 3)
 
-        grid.addWidget(QtGui.QLabel('Sequence Time (ms):'), 8, 0)
-        grid.addWidget(self.seqTimePar, 8, 1)
-        grid.addWidget(QtGui.QLabel('Start (ms):'), 7, 3)
-        grid.addWidget(QtGui.QLabel('End (ms):'), 7, 4)
-        grid.addWidget(QtGui.QLabel('405:'), 8, 2)
-        grid.addWidget(self.start405Par, 8, 3)
-        grid.addWidget(self.end405Par, 8, 4)
-        grid.addWidget(QtGui.QLabel('473:'), 9, 2)
-        grid.addWidget(self.start473Par, 9, 3)
-        grid.addWidget(self.end473Par, 9, 4)
-        grid.addWidget(QtGui.QLabel('488:'), 10, 2)
-        grid.addWidget(self.start488Par, 10, 3)
-        grid.addWidget(self.end488Par, 10, 4)
-        grid.addWidget(QtGui.QLabel('Camera:'), 11, 2)
-        grid.addWidget(self.startCAMPar, 11, 3)
-        grid.addWidget(self.endCAMPar, 11, 4)
+        grid.addWidget(QtGui.QLabel('Start (ms):'), 6, 3)
+        grid.addWidget(QtGui.QLabel('End (ms):'), 6, 4)
+        grid.addWidget(QtGui.QLabel('Sequence Time (ms):'), 7, 0)
+        grid.addWidget(self.seqTimePar, 7, 1)
+        grid.addWidget(QtGui.QLabel('405:'), 7, 2)
+        grid.addWidget(self.start405Par, 7, 3)
+        grid.addWidget(self.end405Par, 7, 4)
+        grid.addWidget(QtGui.QLabel('473:'), 8, 2)
+        grid.addWidget(self.start473Par, 8, 3)
+        grid.addWidget(self.end473Par, 8, 4)
+        grid.addWidget(QtGui.QLabel('488:'), 9, 2)
+        grid.addWidget(self.start488Par, 9, 3)
+        grid.addWidget(self.end488Par, 9, 4)
+        grid.addWidget(QtGui.QLabel('Camera:'), 10, 2)
+        grid.addWidget(self.startCAMPar, 10, 3)
+        grid.addWidget(self.endCAMPar, 10, 4)
 
-        grid.addWidget(self.graph, 12, 0, 1, 5)
-        grid.addWidget(self.scanImage, 13, 0, 1, 5)
+        grid.addWidget(self.graph, 11, 0, 1, 7)
+        grid.addWidget(self.crossButton, 12, 0)
+        grid.addWidget(self.scanImage, 12, 1, 2, 7)
         grid.addWidget(self.PreviewButton, 14, 0)
         grid.addWidget(self.ScanButton, 14, 1)
         grid.addWidget(self.continuousCheck, 14, 2)
 
-#        grid.addWidget(QtGui.QLabel('Number of frames:'), 9, 0)
-#        grid.addWidget(self.nrFramesPar, 9, 1)
-#        grid.addWidget(QtGui.QLabel('Duration (s):'), 10, 0)
-#        grid.addWidget(self.scanDurationLabel, 10, 1)
-
-#        grid.addWidget(self.scanRadio, 0, 2)
-#        grid.addWidget(QtGui.QLabel('Mode:'), 1, 5)
-#        grid.addWidget(self.scanMode, 1, 6)
-#        grid.addWidget(QtGui.QLabel('Primary dimension:'), 2, 5)
-#        grid.addWidget(self.primScanDim, 2, 6)
-#        grid.addWidget(self.contLaserPulsesRadio, 0, 3)
-
-#        grid.addWidget(QtGui.QLabel('Sequence Time (ms):'), 7, 0)
-#        grid.addWidget(self.seqTimePar, 7, 1)
-#        grid.addWidget(QtGui.QLabel('Start (ms):'), 6, 3)
-#        grid.addWidget(QtGui.QLabel('End (ms):'), 6, 4)
-#        grid.addWidget(QtGui.QLabel('405:'), 7, 2)
-#        grid.addWidget(self.start405Par, 7, 3)
-#        grid.addWidget(self.end405Par, 7, 4)
-#        grid.addWidget(QtGui.QLabel('473:'), 8, 2)
-#        grid.addWidget(self.start473Par, 8, 3)
-#        grid.addWidget(self.end473Par, 8, 4)
-#        grid.addWidget(QtGui.QLabel('488:'), 9, 2)
-#        grid.addWidget(self.start488Par, 9, 3)
-#        grid.addWidget(self.end488Par, 9, 4)
-#        grid.addWidget(QtGui.QLabel('Camera:'), 10, 2)
-#        grid.addWidget(self.startCAMPar, 10, 3)
-#        grid.addWidget(self.endCAMPar, 10, 4)
-
-#        grid.addWidget(self.graph, 11, 0, 1, 7)
-#        self.graph.setFixedHeight(100)
-#        grid.addWidget(self.scanImage, 12, 0, 1, 7)
-#        grid.addWidget(self.PreviewButton, 13, 0)
-#        grid.addWidget(self.ScanButton, 13, 1)
-#        grid.addWidget(self.continuousCheck, 13, 2)
+        grid.setRowMinimumHeight(4, 20)
 
     @property
     def scanOrNot(self):
@@ -377,20 +350,30 @@ class ScanWidget(QtGui.QMainWindow):
             data = []
             for j in f_range:
                 data.append(self.main.cameras[0].hcam_data[j].getData())
-            datashape = (len(f_range), self.main.shapes[0][1], self.main.shapes[0][0])
+            datashape = (len(f_range),
+                         self.main.shapes[0][1],
+                         self.main.shapes[0][0])
             print(datashape)
             reshapeddata = np.reshape(data, datashape, order='C')
-            z_stack = []
-            for j in range(0, len(f_range)):
-                z_stack.append(np.mean(reshapeddata[j, :, :]))
+            z_stack = [
+                np.mean(reshapeddata[j, :, :]) for j in range(0, len(f_range))]
 
             if not np.floor(np.sqrt(len(z_stack))) == np.sqrt(len(z_stack)):
                 del z_stack[0]
+
             imside = int(np.sqrt(np.size(z_stack)))
             print('Imside = ', imside)
             z_stack = np.reshape(z_stack, [imside, imside])
             z_stack[::2] = np.fliplr(z_stack[::2])
             self.scanImage.img.setImage(z_stack)
+            shape = z_stack.shape
+            self.scanImage.vb.setLimits(
+                xMin=-0.5, xMax=shape[0] - 0.5, minXRange=4,
+                yMin=-0.5, yMax=shape[1] - 0.5, minYRange=4)
+            self.scanImage.vb.setAspectLocked()
+            self.scanImage.hist.setLevels(
+                *guitools.bestLimits(self.scanImage.img.image))
+            self.scanImage.hist.vb.autoRange()
 
     def finalizeDone(self):
         if (not self.continuousCheck.isChecked()) or self.scanner.aborted:
@@ -554,7 +537,6 @@ class Scanner(QtCore.QObject):
         dim = [self.channel_order[i] for i in chans]
         finalSamps = [self.stageScan.sigDict[dim[i]][writtenSamps - 1]
                       for i in chans]
-        print(finalSamps)
         returnRamps = np.array(
             [makeRamp(finalSamps[i], 0, self.stageScan.sampleRate)
              for i in chans])
@@ -862,9 +844,10 @@ class ImageWidget(pg.GraphicsLayoutWidget):
         self.vb.addItem(self.img)
         self.vb.setAspectLocked(True)
         self.hist = pg.HistogramLUTItem(image=self.img)
-        self.cubehelixCM = pg.ColorMap(np.arange(0, 1, 1/256),
-                                       guitools.cubehelix().astype(int))
+        self.cubehelixCM = pg.ColorMap(
+           np.arange(0, 1, 1/256), guitools.cubehelix().astype(int))
         self.hist.gradient.setColorMap(self.cubehelixCM)
+        self.hist.vb.setLimits(yMin=0, yMax=66000)
         for tick in self.hist.gradient.ticks:
             tick.hide()
         self.addItem(self.hist, row=1, col=2)
