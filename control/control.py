@@ -143,8 +143,6 @@ class RecordingWidget(QtGui.QFrame):
         recGrid = QtGui.QGridLayout()
         self.setLayout(recGrid)
 
-        # Graphically adding the labels and fields etc to the gui.
-        # Four numbers specify row, column, rowspan and columnspan.
         recGrid.addWidget(recTitle, 0, 0, 1, 3)
         recGrid.addWidget(QtGui.QLabel('Folder'), 2, 0)
         recGrid.addWidget(self.showZgraph, 1, 0)
@@ -543,8 +541,7 @@ class RecWorker(QtCore.QObject):
         # Find what the index of the first recorded frame will be
         last_f = self.lvworker.f_ind
         if last_f is None:
-            # If camera has not recorded any frames yet, start index will be
-            # zero
+            # If camera has not recorded any frames yet, start index will be 0
             start_f = 0
         else:
             # index of first frame is one more then provious frame.
@@ -583,8 +580,8 @@ class RecWorker(QtCore.QObject):
             f_range = range(start_f, end_f + 1)
         else:
             buffer_size = self.camera.number_image_buffers
-            f_range = np.append(range(start_f, buffer_size),
-                                range(0, end_f + 1))
+            f_range = np.append(
+                range(start_f, buffer_size), range(0, end_f + 1))
 
         print('Start_f = :', start_f)
         print('End_f = :', end_f)
@@ -984,20 +981,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.CamLabel = QtGui.QLabel('OrcaFlash V2')
         self.CamLabel.setStyleSheet("font-size:18px")
 
-        # viewBox custom Tools
-        self.gridButton = QtGui.QPushButton('Grid')
-        self.gridButton.setCheckable(True)
-        self.gridButton.setEnabled(False)
-        self.gridButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
-                                      QtGui.QSizePolicy.Expanding)
-#        self.crosshairButton = QtGui.QPushButton('Crosshair')
-#        self.crosshairButton.setCheckable(True)
-#        self.crosshairButton.setEnabled(False)
-        self.levelsButton = QtGui.QPushButton('Update Levels')
-        self.levelsButton.setEnabled(False)
-        self.levelsButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
-                                        QtGui.QSizePolicy.Expanding)
-        self.levelsButton.pressed.connect(self.autoLevels)
+        # Liveview control buttons
         self.viewCtrl = QtGui.QWidget()
         self.viewCtrlLayout = QtGui.QGridLayout()
         self.viewCtrl.setLayout(self.viewCtrlLayout)
@@ -1036,8 +1020,6 @@ class TormentaGUI(QtGui.QMainWindow):
         self.vb.addItem(self.img)
         self.vb.setAspectLocked(True)
         imageWidget.setAspectLocked(True)
-        self.grid = guitools.Grid(self.vb)
-        self.gridButton.clicked.connect(self.grid.toggle)
         self.hist = pg.HistogramLUTItem(image=self.img)
         self.hist.vb.setLimits(yMin=0, yMax=66000)
         self.cubehelixCM = pg.ColorMap(np.arange(0, 1, 1/256),
@@ -1066,6 +1048,28 @@ class TormentaGUI(QtGui.QMainWindow):
         self.yProfile.rotate(90)
         imageWidget.ci.layout.setColumnMaximumWidth(0, 40)
         yPlot.setYLink(self.vb)
+
+        # viewBox custom Tools
+        self.grid = guitools.Grid(self.vb)
+        self.gridButton = QtGui.QPushButton('Grid')
+        self.gridButton.setCheckable(True)
+        self.gridButton.setEnabled(False)
+        self.gridButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
+                                      QtGui.QSizePolicy.Expanding)
+        self.gridButton.clicked.connect(self.grid.toggle)
+        self.crosshair = guitools.Crosshair(self.vb)
+        self.crosshairButton = QtGui.QPushButton('Crosshair')
+        self.crosshairButton.setCheckable(True)
+        self.crosshairButton.setEnabled(False)
+        self.crosshairButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
+                                           QtGui.QSizePolicy.Expanding)
+        self.crosshairButton.pressed.connect(self.crosshair.toggle)
+
+        self.levelsButton = QtGui.QPushButton('Update Levels')
+        self.levelsButton.setEnabled(False)
+        self.levelsButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
+                                        QtGui.QSizePolicy.Expanding)
+        self.levelsButton.pressed.connect(self.autoLevels)
 
         # Initial camera configuration taken from the parameter tree
         self.orcaflash.setPropertyValue('exposure_time', self.expPar.value())
@@ -1162,8 +1166,9 @@ class TormentaGUI(QtGui.QMainWindow):
         layout.addWidget(self.recWidget, 4, 0, 2, 2)
         layout.addWidget(console, 6, 0, 1, 2)
         layout.addWidget(imageWidget, 1, 2, 6, 4)
-        layout.addWidget(self.gridButton, 0, 3)
-        layout.addWidget(self.levelsButton, 0, 4)
+        layout.addWidget(self.crosshairButton, 0, 3)
+        layout.addWidget(self.gridButton, 0, 4)
+        layout.addWidget(self.levelsButton, 0, 5)
         layout.addWidget(illumDockArea, 0, 7, 2, 1)
         layout.addWidget(dockArea, 2, 7, 5, 1)
 
@@ -1475,6 +1480,7 @@ class TormentaGUI(QtGui.QMainWindow):
         thread.'''
 
         self.updateFrame()
+        self.crosshairButton.setEnabled(True)
         self.gridButton.setEnabled(True)
         self.levelsButton.setEnabled(True)
         self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
@@ -1500,6 +1506,7 @@ class TormentaGUI(QtGui.QMainWindow):
             self.cameras[i].stopAcquisition()
 
         self.viewtimer.stop()
+        self.crosshairButton.setEnabled(False)
         self.gridButton.setEnabled(False)
         self.levelsButton.setEnabled(False)
         self.recWidget.readyToRecord = False

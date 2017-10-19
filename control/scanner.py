@@ -44,7 +44,10 @@ class ScanWidget(QtGui.QMainWindow):
 
         self.nidaq = device
         self.main = main
-        self.allDevices = ['405', '473', '488', 'CAM']
+
+        # The port order in the NIDAQ follows this same order
+        # We chose to follow the temporal sequence order
+        self.allDevices = ['405', '488', '473', 'CAM']
         self.saveScanBtn = QtGui.QPushButton('Save Scan')
 
         def saveScanFcn(): return guitools.saveScan(self)
@@ -105,48 +108,48 @@ class ScanWidget(QtGui.QMainWindow):
                               'stepSizeXY': float(self.stepSizeXYPar.text()),
                               'stepSizeZ': float(self.stepSizeZPar.text())}
 
+        self.start405Par = QtGui.QLineEdit('0')
+        self.start405Par.editingFinished.connect(
+            lambda: self.pxParameterChanged('start405'))
         self.start488Par = QtGui.QLineEdit('0')
         self.start488Par.editingFinished.connect(
             lambda: self.pxParameterChanged('start488'))
         self.start473Par = QtGui.QLineEdit('0')
         self.start473Par.editingFinished.connect(
             lambda: self.pxParameterChanged('start473'))
-        self.start405Par = QtGui.QLineEdit('0')
-        self.start405Par.editingFinished.connect(
-            lambda: self.pxParameterChanged('start405'))
         self.startCAMPar = QtGui.QLineEdit('0')
         self.startCAMPar.editingFinished.connect(
             lambda: self.pxParameterChanged('startCAM'))
 
+        self.end405Par = QtGui.QLineEdit('0')
+        self.end405Par.editingFinished.connect(
+            lambda: self.pxParameterChanged('end405'))
         self.end488Par = QtGui.QLineEdit('0')
         self.end488Par.editingFinished.connect(
             lambda: self.pxParameterChanged('end488'))
         self.end473Par = QtGui.QLineEdit('0')
         self.end473Par.editingFinished.connect(
             lambda: self.pxParameterChanged('end473'))
-        self.end405Par = QtGui.QLineEdit('0')
-        self.end405Par.editingFinished.connect(
-            lambda: self.pxParameterChanged('end405'))
         self.endCAMPar = QtGui.QLineEdit('0')
         self.endCAMPar.editingFinished.connect(
             lambda: self.pxParameterChanged('endCAM'))
 
         self.pxParameters = {'start405': self.start405Par,
-                             'start473': self.start473Par,
                              'start488': self.start488Par,
+                             'start473': self.start473Par,
                              'startCAM': self.startCAMPar,
+                             'end405': self.end405Par,
                              'end488': self.end488Par,
                              'end473': self.end473Par,
-                             'end405': self.end405Par,
                              'endCAM': self.endCAMPar}
 
         self.pxParValues = {'start405': 0.001*float(self.start405Par.text()),
-                            'start473': 0.001*float(self.start473Par.text()),
                             'start488': 0.001*float(self.start488Par.text()),
+                            'start473': 0.001*float(self.start473Par.text()),
                             'startCAM': 0.001*float(self.startCAMPar.text()),
+                            'end405': 0.001*float(self.end405Par.text()),
                             'end488': 0.001*float(self.end488Par.text()),
                             'end473': 0.001*float(self.end473Par.text()),
-                            'end405': 0.001*float(self.end405Par.text()),
                             'endCAM': 0.001*float(self.endCAMPar.text())}
 
         self.stageScan = StageScan(self.sampleRate)
@@ -171,8 +174,9 @@ class ScanWidget(QtGui.QMainWindow):
         self.PreviewButton.clicked.connect(self.previewScan)
         self.continuousCheck = QtGui.QCheckBox('Continuous Scan')
 
-        # Crosshair
         self.scanImage = ImageWidget()
+
+        # Crosshair
         self.crosshair = guitools.Crosshair(self.scanImage.vb)
         self.crossButton = QtGui.QPushButton('Cross')
         self.crossButton.setCheckable(True)
@@ -215,19 +219,19 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(QtGui.QLabel('405:'), 7, 2)
         grid.addWidget(self.start405Par, 7, 3)
         grid.addWidget(self.end405Par, 7, 4)
-        grid.addWidget(QtGui.QLabel('473:'), 8, 2)
-        grid.addWidget(self.start473Par, 8, 3)
-        grid.addWidget(self.end473Par, 8, 4)
-        grid.addWidget(QtGui.QLabel('488:'), 9, 2)
-        grid.addWidget(self.start488Par, 9, 3)
-        grid.addWidget(self.end488Par, 9, 4)
+        grid.addWidget(QtGui.QLabel('488:'), 8, 2)
+        grid.addWidget(self.start488Par, 8, 3)
+        grid.addWidget(self.end488Par, 8, 4)
+        grid.addWidget(QtGui.QLabel('473:'), 9, 2)
+        grid.addWidget(self.start473Par, 9, 3)
+        grid.addWidget(self.end473Par, 9, 4)
         grid.addWidget(QtGui.QLabel('Camera:'), 10, 2)
         grid.addWidget(self.startCAMPar, 10, 3)
         grid.addWidget(self.endCAMPar, 10, 4)
 
         grid.addWidget(self.graph, 11, 0, 1, 7)
-        grid.addWidget(self.crossButton, 12, 0)
-        grid.addWidget(self.scanImage, 12, 1, 2, 7)
+        grid.addWidget(self.crossButton, 14, 3)
+        grid.addWidget(self.scanImage, 12, 0, 2, 7)
         grid.addWidget(self.PreviewButton, 14, 0)
         grid.addWidget(self.ScanButton, 14, 1)
         grid.addWidget(self.continuousCheck, 14, 2)
@@ -314,8 +318,8 @@ class ScanWidget(QtGui.QMainWindow):
         if self.scanRadio.isChecked():
             self.stageScan.update(self.scanParValues)
             self.ScanButton.setText('Abort')
-            self.scanner = Scanner(self.nidaq, self.stageScan,
-                                   self.pxCycle, self)
+            self.scanner = Scanner(
+               self.nidaq, self.stageScan, self.pxCycle, self)
             self.scanner.finalizeDone.connect(self.finalizeDone)
             self.scanner.scanDone.connect(self.scanDone)
             self.scanning = True
@@ -342,34 +346,31 @@ class ScanWidget(QtGui.QMainWindow):
             time.sleep(0.1)
             self.end_f = self.main.lvworkers[0].f_ind
             if self.end_f >= self.start_f - 1:
-                f_range = range(self.start_f, self.end_f + 1)
+                fRange = range(self.start_f, self.end_f + 1)
             else:
                 buffer_size = self.main.cameras[0].number_image_buffers
-                f_range = np.append(range(self.start_f, buffer_size),
-                                    range(0, self.end_f + 1))
-            data = []
-            for j in f_range:
-                data.append(self.main.cameras[0].hcam_data[j].getData())
-            datashape = (len(f_range),
-                         self.main.shapes[0][1],
-                         self.main.shapes[0][0])
+                fRange = np.append(
+                   range(self.start_f, buffer_size), range(0, self.end_f + 1))
+
+            data = [
+                self.main.cameras[0].hcam_data[j].getData() for j in fRange]
+            print('len(data)', len(data))
+
+            datashape = (
+                len(fRange), self.main.shapes[0][1], self.main.shapes[0][0])
             print(datashape)
             reshapeddata = np.reshape(data, datashape, order='C')
             z_stack = [
-                np.mean(reshapeddata[j, :, :]) for j in range(0, len(f_range))]
+                np.mean(reshapeddata[j, :, :]) for j in range(0, len(fRange))]
 
             if not np.floor(np.sqrt(len(z_stack))) == np.sqrt(len(z_stack)):
                 del z_stack[0]
 
             imside = int(np.sqrt(np.size(z_stack)))
             print('Imside = ', imside)
-            z_stack = np.reshape(z_stack, [imside, imside])
+            z_stack = np.reshape(np.array(z_stack), [imside, imside])
             z_stack[::2] = np.fliplr(z_stack[::2])
             self.scanImage.img.setImage(z_stack)
-            shape = z_stack.shape
-            self.scanImage.vb.setLimits(
-                xMin=-0.5, xMax=shape[0] - 0.5, minXRange=4,
-                yMin=-0.5, yMax=shape[1] - 0.5, minYRange=4)
             self.scanImage.vb.setAspectLocked()
             self.scanImage.hist.setLevels(
                 *guitools.bestLimits(self.scanImage.img.image))
@@ -480,16 +481,16 @@ class Scanner(QtCore.QObject):
             self.dotask.do_channels.add_do_chan(
                 lines=chanstring, name_to_assign_to_lines='chan%s' % devs[d])
 
-        fullDOsignal = np.array([self.pxCycle.sigDict[devs[i]]
-                                for i in DOchans])
+        fullDOsignal = np.array(
+            [self.pxCycle.sigDict[devs[i]] for i in DOchans])
 
         """If doing VOLume scan, the time needed for the stage to move
         between z-planes needs to be filled with zeros/False. This time is
         equal to one "sequence-time". To do so we first have to repeat the
         sequence for the whole scan in one plane and then append with zeros."""
         if self.stageScan.scanMode == 'VOLscan':
-            fullDOsignal = np.tile(fullDOsignal,
-                                   self.stageScan.VOLscan.cyclesPerSlice)
+            fullDOsignal = np.tile(
+                fullDOsignal, self.stageScan.VOLscan.cyclesPerSlice)
             fullDOsignal = np.concatenate(
                 (fullDOsignal, np.zeros(4, self.stageScan.seqSamps)))
 
@@ -858,8 +859,8 @@ class PixelCycle():
     takes a parameter_values dict and updates the signal accordingly.'''
     def __init__(self, sampleRate):
         self.sigDict = collections.OrderedDict([('405', []),
-                                                ('473', []),
                                                 ('488', []),
+                                                ('473', []),
                                                 ('CAM', [])])
         self.sampleRate = sampleRate
         self.cycleSamps = None
@@ -889,8 +890,8 @@ class GraphFrame(pg.GraphicsWindow):
         self.plot.setYRange(0, 1)
         self.plot.showGrid(x=False, y=False)
         self.plotSigDict = {'405': self.plot.plot(pen=pg.mkPen(130, 0, 200)),
-                            '473': self.plot.plot(pen=pg.mkPen(0, 183, 255)),
                             '488': self.plot.plot(pen=pg.mkPen(0, 247, 255)),
+                            '473': self.plot.plot(pen=pg.mkPen(0, 183, 255)),
                             'CAM': self.plot.plot(pen='w')}
         self.resize(600, 200)
 
