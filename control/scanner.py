@@ -339,7 +339,6 @@ class ScanWidget(QtGui.QMainWindow):
             del self.lasercycle
 
     def scanDone(self):
-        print('in scanDone()')
         self.ScanButton.setEnabled(False)
 
         if not self.scanner.aborted:
@@ -354,21 +353,19 @@ class ScanWidget(QtGui.QMainWindow):
 
             data = [
                 self.main.cameras[0].hcam_data[j].getData() for j in fRange]
-            print('len(data)', len(data))
 
             datashape = (
                 len(fRange), self.main.shapes[0][1], self.main.shapes[0][0])
-            print(datashape)
             reshapeddata = np.reshape(data, datashape, order='C')
             z_stack = [
                 np.mean(reshapeddata[j, :, :]) for j in range(0, len(fRange))]
 
-            if not np.floor(np.sqrt(len(z_stack))) == np.sqrt(len(z_stack)):
+            expShape = [self.scanner.stageScan.FOVscan.stepsX,
+                        self.scanner.stageScan.FOVscan.stepsY]
+            if not len(z_stack) == np.prod(expShape):
                 del z_stack[0]
 
-            imside = int(np.sqrt(np.size(z_stack)))
-            print('Imside = ', imside)
-            z_stack = np.reshape(np.array(z_stack), [imside, imside])
+            z_stack = np.reshape(np.array(z_stack), expShape)
             z_stack[::2] = np.fliplr(z_stack[::2])
             self.scanImage.img.setImage(z_stack)
             self.scanImage.vb.setAspectLocked()
@@ -697,8 +694,7 @@ class FOVscan():
         Signals are first created in units of distance and converted to voltage
         at the end.'''
         # Create signals
-        startX = 0
-        startY = 0
+        startX = startY = 0
         sizeX = parValues['sizeX']
         sizeY = parValues['sizeY']
         stepSizeX = parValues['stepSizeXY']
@@ -712,18 +708,25 @@ class FOVscan():
         rowSamps = self.stepsX * self.seqSamps
 
         LTRramp = makeRamp(startX, sizeX, rowSamps)
-        RTLramp = LTRramp[::-1]
 
-        Xsig = []
-        Ysig = []
-        newValue = startY
-        for i in range(0, self.stepsY):
-            if i % 2 == 0:
-                Xsig = np.concatenate((Xsig, LTRramp))
-            else:
-                Xsig = np.concatenate((Xsig, RTLramp))
-            Ysig = np.concatenate((Ysig, newValue*np.ones(rowSamps)))
-            newValue = newValue + self.corrStepSize
+#        # Back and forth scanning. This code could be optimized by using tile
+#        RTLramp = LTRramp[::-1]
+#        newValue = startY
+#        Xsig = LTRramp
+#        Ysig = startY*np.ones(rowSamps)
+#        for i in range(1, self.stepsY):
+#            newValue += self.corrStepSize
+#            if i % 2 == 0:
+#                Xsig = np.concatenate((Xsig, LTRramp))
+#            else:
+#                Xsig = np.concatenate((Xsig, RTLramp))
+#            Ysig = np.concatenate((Ysig, newValue*np.ones(rowSamps)))
+
+        # Unidirectional scanning
+        Xsig = np.tile(LTRramp, self.stepsY)
+        Yval = startY
+        Yval += np.array([i*self.corrStepSize for i in np.arange(self.stepsY)])
+        Ysig = np.repeat(Yval, rowSamps)
 
         self.sigDict['x'] = Xsig / convFactors['x']
         self.sigDict['y'] = Ysig / convFactors['y']

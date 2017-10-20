@@ -989,10 +989,6 @@ class TormentaGUI(QtGui.QMainWindow):
         self.viewCtrlLayout.addWidget(self.resolftRecButton, 1, 0, 1, 3)
         self.viewCtrlLayout.addWidget(self.ToggleCamButton, 2, 0, 1, 2)
         self.viewCtrlLayout.addWidget(self.CamLabel, 2, 2, 1, 1)
-#        self.viewCtrlLayout.addWidget(self.gridButton, 1, 0)
-#        self.viewCtrlLayout.addWidget(self.grid2Button, 1, 1)
-#        self.viewCtrlLayout.addWidget(self.crosshairButton, 1, 2)
-#        self.viewCtrlLayout.addWidget(self.flipperButton, 2, 0, 1, 3)
 
         # Status bar info
         self.fpsBox = QtGui.QLabel()
@@ -1276,9 +1272,6 @@ class TormentaGUI(QtGui.QMainWindow):
     def setExposure(self):
         """ Method to change the exposure time setting."""
         self.orcaflash.setPropertyValue('exposure_time', self.expPar.value())
-        print('Exp time set to:',
-              self.orcaflash.getPropertyValue('exposure_time'))
-
         self.updateTimings()
 
     def cropOrca(self, hpos, vpos, hsize, vsize):
@@ -1476,10 +1469,9 @@ class TormentaGUI(QtGui.QMainWindow):
         QThread resulted in QTimer not functioning in the thread. Image is now
         also saved as latest_image in TormentaGUI class since setting image in
         GUI from thread results in issues when interacting with the viewbox
-        from GUI. Maybe due to simultaious manipulation of viewbox from GUI and
-        thread.'''
+        from GUI. Maybe due to simultaneous manipulation of viewbox from GUI
+        and thread.'''
 
-        self.updateFrame()
         self.crosshairButton.setEnabled(True)
         self.gridButton.setEnabled(True)
         self.levelsButton.setEnabled(True)
