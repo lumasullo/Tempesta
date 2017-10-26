@@ -159,6 +159,7 @@ class MockHamamatsu(Driver):
         self.properties = {}
         self.max_backlog = 0
         self.number_image_buffers = 0
+        self.hcam_data = []
 
         self.s = Q_(1, 's')
 
@@ -377,10 +378,8 @@ class MockHamamatsu(Driver):
         n_buffers = int((2.0 * 1024 * 1024 * 1024) / self.frame_bytes)
         self.number_image_buffers = n_buffers
 
-        self.hcam_data = []
-        for i in range(1, 2):
-            hc_data = HMockCamData(self.frame_x * self.frame_y)
-            self.hcam_data.append(hc_data)
+        self.hcam_data = [HMockCamData(self.frame_x * self.frame_y)
+                          for i in range(1, 2)]
 
         print('size of hcam_data = ', np.size(self.hcam_data))
 

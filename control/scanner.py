@@ -2,7 +2,8 @@
 """
 Created on Wed Mar 30 10:32:36 2016
 
-@authors: Luciano Masullo, Andreas Bodén, Shusei Masuda, Federico Barabas.
+@authors: Luciano Masullo, Andreas Bodén, Shusei Masuda, Federico Barabas,
+    Aurelién Barbotin.
 """
 
 import numpy as np
@@ -38,14 +39,14 @@ class ScanWidget(QtGui.QMainWindow):
     def __init__(self, device, main, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.DigModW = QtGui.QMessageBox()
-        self.DigModW.setInformativeText(
-            "You need to be in digital modulation to scan")
+        self.scanInLiveviewWar = QtGui.QMessageBox()
+        self.scanInLiveviewWar.setInformativeText(
+            "You need to be in liveview to scan")
 
         self.nidaq = device
         self.main = main
 
-        # The port order in the NIDAQ follows this same order
+        # The port order in the NIDAQ follows this same order.
         # We chose to follow the temporal sequence order
         self.allDevices = ['405', '488', '473', 'CAM']
         self.saveScanBtn = QtGui.QPushButton('Save Scan')
@@ -167,11 +168,11 @@ class ScanWidget(QtGui.QMainWindow):
         self.contLaserPulsesRadio.clicked.connect(
             lambda: self.setScanOrNot(False))
 
-        self.ScanButton = QtGui.QPushButton('Scan')
+        self.scanButton = QtGui.QPushButton('Scan')
         self.scanning = False
-        self.ScanButton.clicked.connect(self.scanOrAbort)
-        self.PreviewButton = QtGui.QPushButton('Preview')
-        self.PreviewButton.clicked.connect(self.previewScan)
+        self.scanButton.clicked.connect(self.scanOrAbort)
+        self.previewButton = QtGui.QPushButton('Preview')
+        self.previewButton.clicked.connect(self.previewScan)
         self.continuousCheck = QtGui.QCheckBox('Continuous Scan')
 
         self.scanImage = ImageWidget()
@@ -232,8 +233,8 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(self.graph, 11, 0, 1, 7)
         grid.addWidget(self.crossButton, 14, 3)
         grid.addWidget(self.scanImage, 12, 0, 2, 7)
-        grid.addWidget(self.PreviewButton, 14, 0)
-        grid.addWidget(self.ScanButton, 14, 1)
+        grid.addWidget(self.previewButton, 14, 0)
+        grid.addWidget(self.scanButton, 14, 1)
         grid.addWidget(self.continuousCheck, 14, 2)
 
         grid.setRowMinimumHeight(4, 20)
@@ -245,7 +246,7 @@ class ScanWidget(QtGui.QMainWindow):
     @scanOrNot.setter
     def scanOrNot(self, value):
         self.enableScanPars(value)
-        self.ScanButton.setCheckable(not value)
+        self.scanButton.setCheckable(not value)
 
     def enableScanPars(self, value):
         self.sizeXPar.setEnabled(value)
@@ -254,9 +255,9 @@ class ScanWidget(QtGui.QMainWindow):
         self.scanMode.setEnabled(value)
         self.primScanDim.setEnabled(value)
         if value:
-            self.ScanButton.setText('Scan')
+            self.scanButton.setText('Scan')
         else:
-            self.ScanButton.setText('Run')
+            self.scanButton.setText('Run')
 
     def setScanOrNot(self, value):
         self.scanOrNot = value
@@ -305,19 +306,24 @@ class ScanWidget(QtGui.QMainWindow):
 
     def scanOrAbort(self):
         if not self.scanning:
-            if self.main.laserWidgets.DigCtrl.DigitalControlButton.isChecked():
+            m = self.main
+            m.laserWidgets.DigCtrl.DigitalControlButton.setChecked(True)
+            m.trigsourceparam.setValue('External "frame-trigger"')
+            time.sleep(1)
+            try:
+                self.main.lvworkers[0].f_ind
                 self.prepAndRun()
-            else:
-                self.DigModW.exec_()
+            except AttributeError:
+                self.scanInLiveviewWar.exec_()
         else:
             self.scanner.abort()
 
     def prepAndRun(self):
-        ''' Only called if scanner is not running (See scanOrAbort funciton).
+        ''' Only called if scanner is not running (See scanOrAbort function).
         '''
         if self.scanRadio.isChecked():
             self.stageScan.update(self.scanParValues)
-            self.ScanButton.setText('Abort')
+            self.scanButton.setText('Abort')
             self.scanner = Scanner(
                self.nidaq, self.stageScan, self.pxCycle, self)
             self.scanner.finalizeDone.connect(self.finalizeDone)
@@ -328,18 +334,18 @@ class ScanWidget(QtGui.QMainWindow):
 
             self.scanner.runScan()
 
-        elif self.ScanButton.isChecked():
+        elif self.scanButton.isChecked():
             self.lasercycle = LaserCycle(self.nidaq, self.pxCycle)
-            self.ScanButton.setText('Stop')
+            self.scanButton.setText('Stop')
             self.lasercycle.run()
 
         else:
             self.lasercycle.stop()
-            self.ScanButton.setText('Run')
+            self.scanButton.setText('Run')
             del self.lasercycle
 
     def scanDone(self):
-        self.ScanButton.setEnabled(False)
+        self.scanButton.setEnabled(False)
 
         if not self.scanner.aborted:
             time.sleep(0.1)
@@ -375,12 +381,12 @@ class ScanWidget(QtGui.QMainWindow):
 
     def finalizeDone(self):
         if (not self.continuousCheck.isChecked()) or self.scanner.aborted:
-            self.ScanButton.setText('Scan')
-            self.ScanButton.setEnabled(True)
+            self.scanButton.setText('Scan')
+            self.scanButton.setEnabled(True)
             del self.scanner
             self.scanning = False
         else:
-            self.ScanButton.setEnabled(True)
+            self.scanButton.setEnabled(True)
             self.prepAndRun()
 
     def updateScan(self, devices):
@@ -407,13 +413,22 @@ class WaitThread(QtCore.QThread):
             self.task.wait_until_done(nidaqmx.constants.WAIT_INFINITELY)
         self.wait = True
         self.waitdoneSignal.emit()
-        print(self.task.name + ' is done')
 
     def stop(self):
         self.wait = False
 
 
 class Scanner(QtCore.QObject):
+    """This class plays the role of interface between the software and the
+    hardware. It writes the different signals to the electronic cards and
+    manages the timing of a scan.
+
+    :param nidaqmx.Device device: NiDaq card
+    :param StageScan stageScan: object containing the analog signals to drive
+    the stage
+    :param PixelCycle pxCycle: object containing the digital signals to
+    drive the lasers at each pixel acquisition
+    :param ScanWidget main: main scan GUI."""
 
     scanDone = QtCore.pyqtSignal()
     finalizeDone = QtCore.pyqtSignal()
@@ -516,7 +531,6 @@ class Scanner(QtCore.QObject):
         self.finalize()
 
     def finalize(self):
-        print('in finalize')
         self.scanDone.emit()
         # Apparently important, otherwise finalize is called again when next
         # waiting finishes.
@@ -707,26 +721,49 @@ class FOVscan():
         self.corrStepSize = sizeX / self.stepsX
         rowSamps = self.stepsX * self.seqSamps
 
-        LTRramp = makeRamp(startX, sizeX, rowSamps)
+        # Smooth scanning
+        fracRemoved = 0.1
+        nSamplesRamp = int(2 * fracRemoved * rowSamps)
+        nSampsFlat = int((rowSamps - nSamplesRamp))
+        rampAx2 = makeRamp(0, self.corrStepSize, nSamplesRamp)
+        self.freq = self.sampleRate / (rowSamps * 2)
+        # sine scanning
+        sine = np.arange(0, 2*rowSamps*self.stepsY)/(rowSamps*2)*2*np.pi
+        # Sine varies from -1 to 1 so need to divide by 2
+        sine = np.sin(sine) * sizeX / 2
+        newValue = startY
+        Xsig = []
+        Ysig = []
+        for i in range(0, self.stepsY):
+            Ysig = np.concatenate(
+                (Ysig, newValue*np.ones(nSampsFlat), newValue + rampAx2))
+            newValue += self.corrStepSize
+            self.sampsPerLine = 2 * rowSamps
+        # Correction for amplitude:
+        Xsig = sine * ampCorrection(fracRemoved, self.freq)
+        Xsig += startX
 
-#        # Back and forth scanning. This code could be optimized by using tile
+#        LTRramp = makeRamp(startX, sizeX, rowSamps)
+
+#        # Back and forth scanning
 #        RTLramp = LTRramp[::-1]
-#        newValue = startY
 #        Xsig = LTRramp
 #        Ysig = startY*np.ones(rowSamps)
-#        for i in range(1, self.stepsY):
-#            newValue += self.corrStepSize
-#            if i % 2 == 0:
-#                Xsig = np.concatenate((Xsig, LTRramp))
-#            else:
-#                Xsig = np.concatenate((Xsig, RTLramp))
-#            Ysig = np.concatenate((Ysig, newValue*np.ones(rowSamps)))
+#        RTLTRramp = np.concatenate((LTRramp, RTLramp))
+#
+#        if self.stepsY % 2 == 0:
+#            Xsig = np.tile(RTLTRramp, self.stepsY//2)
+#        else:
+#            Xsig = np.tile(RTLTRramp, (self.stepsY - 1)//2)
+#            Xsig = np.concatenate(Xsig, RTLramp)
 
-        # Unidirectional scanning
-        Xsig = np.tile(LTRramp, self.stepsY)
-        Yval = startY
-        Yval += np.array([i*self.corrStepSize for i in np.arange(self.stepsY)])
-        Ysig = np.repeat(Yval, rowSamps)
+#        # Unidirectional scanning
+#        Xsig = np.tile(LTRramp, self.stepsY)
+
+#        Yval = startY
+#        Yval += np.array(
+#            [i*self.corrStepSize for i in np.arange(self.stepsY)])
+#        Ysig = np.repeat(Yval, rowSamps)
 
         self.sigDict['x'] = Xsig / convFactors['x']
         self.sigDict['y'] = Ysig / convFactors['y']
@@ -801,20 +838,14 @@ class VOLscan():
         fullYsig = Ysig
         fullZsig = startZ * np.ones(len(Xsig))
         newValue = startZ + 1
-        XTransition = makeSmoothStep(
-            Xsig[-1], Xsig[0], self.seqSamps)
-        YTransition = makeSmoothStep(
-            Ysig[-1], Ysig[0], self.seqSamps)
-        ZTransition = makeSmoothStep(
-            0, self.corrStepSizeZ, self.seqSamps)
+        XTransition = makeSmoothStep(Xsig[-1], Xsig[0], self.seqSamps)
+        YTransition = makeSmoothStep(Ysig[-1], Ysig[0], self.seqSamps)
+        ZTransition = makeSmoothStep(0, self.corrStepSizeZ, self.seqSamps)
 
         for i in range(1, self.stepsZ - 1):
-            fullXsig = np.concatenate(
-                (fullXsig, XTransition))
-            fullYsig = np.concatenate(
-                (fullYsig, YTransition))
-            fullZsig = np.concatenate(
-                (fullZsig, newValue + ZTransition))
+            fullXsig = np.concatenate((fullXsig, XTransition))
+            fullYsig = np.concatenate((fullYsig, YTransition))
+            fullZsig = np.concatenate((fullZsig, newValue + ZTransition))
 
             fullXsig = np.concatenate((fullXsig, Xsig))
             fullYsig = np.concatenate((fullYsig, Ysig))
@@ -916,6 +947,22 @@ def makeSmoothStep(start, end, samples):
     x = 0.5*(1 - np.cos(x * np.pi))
     signal = start + (end - start) * x
     return signal
+
+
+def ampCorrection(fracRemoved, freq):
+    """corrects the amplitude to take into account the sample we throw away and
+    the response of the stage
+
+    :param float fracRemoved: fraction of a cosine removed at the
+    beginning and end of acquisition of a line
+    :param float freq: scanning frequency in Hz"""
+    cosFactor = 1 / np.cos(np.pi * fracRemoved)
+    coeffs = [3.72521796e-12, -1.27313251e-09, 1.57438425e-07,
+              -7.70042004e-06, 5.38779963e-05, -8.34837794e-04,
+              1.00054532e+00]
+    polynom = np.poly1d(coeffs)
+    freqFactor = 1 / polynom(freq)
+    return freqFactor * cosFactor
 
 
 def distToVoltY(d):

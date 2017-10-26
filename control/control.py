@@ -49,10 +49,9 @@ class RecordingWidget(QtGui.QFrame):
         self.main = main
         self.dataname = 'data'      # In case I need a QLineEdit for this
 
-        self.recworkers = [None, None]
-        self.recthreads = [None, None]
+        self.recworkers = [None] * len(self.main.cameras)
+        self.recthreads = [None] * len(self.main.cameras)
 
-#        startdir = r'F:\Tempesta\DefaultDataFolderSSD\%s'
         newfolderpath = os.path.join(r"D:\Data", time.strftime('%Y-%m-%d'))
 
         self.z_stack = []
@@ -211,7 +210,6 @@ class RecordingWidget(QtGui.QFrame):
         self._writable = value
 
     def specFile(self):
-
         if self.specifyfile.checkState():
             self.filenameEdit.setEnabled(True)
             self.filenameEdit.setText('Filename')
@@ -222,7 +220,6 @@ class RecordingWidget(QtGui.QFrame):
     # Functions for changing between choosing frames or time or "Run until
     # stop" when recording.
     def specFrames(self):
-
         self.numExpositionsEdit.setEnabled(True)
         self.timeToRec.setEnabled(False)
         self.filesizeBar.setEnabled(True)
@@ -253,9 +250,7 @@ class RecordingWidget(QtGui.QFrame):
         else:
             frames = int(self.timeToRec.text()) / self.main.RealExpPar.value()
 
-        self.filesize = 2 * frames * max(
-            self.main.shapes[0][0] * self.main.shapes[0][1],
-            self.main.shapes[1][0] * self.main.shapes[1][1])
+        self.filesize = 2*frames*max([np.prod(s) for s in self.main.shapes])
         # Percentage of 2 GB
         self.filesizeBar.setValue(min(2000000000, self.filesize))
         self.filesizeBar.setFormat(str(self.filesize / 1000))
@@ -628,8 +623,8 @@ class CamParamTree(ParameterTree):
                   "single pixel value.")
 
         # Parameter tree for the camera configuration
-        params = [{'name': 'Camera', 'type': 'str',
-                   'value': orcaflash.camera_id},
+        params = [{'name': 'Model', 'type': 'str',
+                   'value': orcaflash.camera_model.decode("utf-8")},
                   {'name': 'Image frame', 'type': 'group', 'children': [
                       {'name': 'Binning', 'type': 'list',
                        'values': [1, 2, 4], 'tip': BinTip},
@@ -800,45 +795,37 @@ class TormentaGUI(QtGui.QMainWindow):
     liveviewStarts = QtCore.pyqtSignal()
     liveviewEnds = QtCore.pyqtSignal()
 
-    def __init__(self, actlaser, offlaser, exclaser, orcaflashV2, orcaflashV3,
-                 nidaq, pzt, webcam, *args, **kwargs):
+    def __init__(self, actlaser, offlaser, exclaser, cameras, nidaq, pzt,
+                 webcam, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.resize(2400, 1300)
 
         self.lasers = [actlaser, offlaser, exclaser]
-        self.cameras = [orcaflashV2, orcaflashV3]
+        self.cameras = cameras
         self.nidaq = nidaq
         self.orcaflash = self.cameras[0]
 
-        self.changeParameter(
-            lambda: self.cameras[0].setPropertyValue('trigger_polarity', 2))
-        self.changeParameter(
-            lambda: self.cameras[1].setPropertyValue('trigger_polarity', 2))
+        for c in self.cameras:
+            self.changeParameter(
+                lambda: c.setPropertyValue('trigger_polarity', 2))
+            # 3:DELAYED, 5:GLOBAL RESET
+            self.changeParameter(
+                lambda: c.setPropertyValue('trigger_global_exposure', 5))
+            # 1: EGDE, 2: LEVEL, 3:SYNCHREADOUT
+            self.changeParameter(lambda: c.setPropertyValue(
+                'trigger_active', 2))
 
-        # 3:DELAYED, 5:GLOBAL RESET
-        self.changeParameter(
-            lambda: self.cameras[0].setPropertyValue('trigger_global_exposure',
-                                                     5))
-        self.changeParameter(
-            lambda: self.cameras[1].setPropertyValue('trigger_global_exposure',
-                                                     5))
-        # 1: EGDE, 2: LEVEL, 3:SYNCHREADOUT
-        self.changeParameter(lambda: self.cameras[0].setPropertyValue(
-            'trigger_active', 2))
-        self.changeParameter(lambda: self.cameras[1].setPropertyValue(
-            'trigger_active', 2))  # 1: EGDE, 2: LEVEL, 3:SYNCHREADOUT
-        self.shapes = [(self.cameras[0].getPropertyValue('image_height')[0],
-                        self.cameras[0].getPropertyValue('image_width')[0]),
-                       (self.cameras[1].getPropertyValue('image_height')[0],
-                        self.cameras[1].getPropertyValue('image_width')[0])]
+        self.shapes = [(c.getPropertyValue('image_height')[0],
+                        c.getPropertyValue('image_width')[0])
+                       for c in self.cameras]
         self.frameStart = (0, 0)
 
-        self.lvworkers = [None, None]
-        self.lvthreads = [None, None]
+#        self.lvworkers = [None] * len(self.cameras)
+#        self.lvthreads = [None] * len(self.cameras)
         self.currCamIdx = 0
-        self.latest_images = [np.zeros(self.shapes[self.currCamIdx]),
-                              np.zeros(self.shapes[self.currCamIdx])]
+        noImage = np.zeros(self.shapes[self.currCamIdx])
+        self.latest_images = [noImage] * len(self.cameras)
 
         self.s = Q_(1, 's')
         self.lastTime = time.clock()
@@ -848,8 +835,8 @@ class TormentaGUI(QtGui.QMainWindow):
         # Shortcut only
         self.liveviewAction = QtGui.QAction(self)
         self.liveviewAction.setShortcut('Ctrl+Space')
-        QtGui.QShortcut(QtGui.QKeySequence('Ctrl+Space'), self,
-                        self.liveviewKey)
+        QtGui.QShortcut(
+            QtGui.QKeySequence('Ctrl+Space'), self, self.liveviewKey)
         self.liveviewAction.triggered.connect(self.liveviewKey)
         self.liveviewAction.setEnabled(False)
 
@@ -975,11 +962,13 @@ class TormentaGUI(QtGui.QMainWindow):
         self.resolftRecButton.setStyleSheet("font-size:18px")
         self.resolftRecButton.clicked.connect(self.resolftRec)
 
-        self.ToggleCamButton = QtGui.QPushButton('Toggle camera')
-        self.ToggleCamButton.setStyleSheet("font-size:18px")
-        self.ToggleCamButton.clicked.connect(self.toggleCamera)
-        self.CamLabel = QtGui.QLabel('OrcaFlash V2')
-        self.CamLabel.setStyleSheet("font-size:18px")
+        self.toggleCamButton = QtGui.QPushButton('Toggle camera')
+        self.toggleCamButton.setStyleSheet("font-size:18px")
+        self.toggleCamButton.clicked.connect(self.toggleCamera)
+        if len(self.cameras) < 2:
+            self.toggleCamButton.setEnabled(False)
+        self.camLabel = QtGui.QLabel('Hamamatsu0')
+        self.camLabel.setStyleSheet("font-size:18px")
 
         # Liveview control buttons
         self.viewCtrl = QtGui.QWidget()
@@ -987,8 +976,8 @@ class TormentaGUI(QtGui.QMainWindow):
         self.viewCtrl.setLayout(self.viewCtrlLayout)
         self.viewCtrlLayout.addWidget(self.liveviewButton, 0, 0, 1, 3)
         self.viewCtrlLayout.addWidget(self.resolftRecButton, 1, 0, 1, 3)
-        self.viewCtrlLayout.addWidget(self.ToggleCamButton, 2, 0, 1, 2)
-        self.viewCtrlLayout.addWidget(self.CamLabel, 2, 2, 1, 1)
+        self.viewCtrlLayout.addWidget(self.toggleCamButton, 2, 0, 1, 2)
+        self.viewCtrlLayout.addWidget(self.camLabel, 2, 2, 1, 1)
 
         # Status bar info
         self.fpsBox = QtGui.QLabel()
@@ -1070,8 +1059,8 @@ class TormentaGUI(QtGui.QMainWindow):
         # Initial camera configuration taken from the parameter tree
         self.orcaflash.setPropertyValue('exposure_time', self.expPar.value())
         self.adjustFrame()
-        self.toggleCamera()
-        self.adjustFrame()
+#        self.toggleCamera()
+#        self.adjustFrame()
 
         # Illumination dock area
         illumDockArea = DockArea()
@@ -1170,21 +1159,16 @@ class TormentaGUI(QtGui.QMainWindow):
 
         layout.setColumnMinimumWidth(2, 1000)
 
-        self.toggleCamera()
+#        self.toggleCamera()
 
     def autoLevels(self):
         self.hist.setLevels(*guitools.bestLimits(self.img.image))
         self.hist.vb.autoRange()
 
     def toggleCamera(self):
-        if self.orcaflash == self.cameras[1]:
-            self.orcaflash = self.cameras[0]
-            self.CamLabel.setText('OrcaFlash V2')
-        else:
-            self.orcaflash = self.cameras[1]
-            self.CamLabel.setText('OrcaFlash V3')
-
-        self.currCamIdx = np.mod(self.currCamIdx + 1, 2)
+        self.currCamIdx = (self.currCamIdx + 1) % len(self.cameras)
+        self.orcaflash = self.cameras[self.currCamIdx]
+        self.camLabel.setText('Hamamatsu {}'.format(self.currCamIdx))
         self.updateTimings()
         self.expPar.setValue(self.RealExpPar.value())
 
@@ -1213,31 +1197,20 @@ class TormentaGUI(QtGui.QMainWindow):
             self.liveviewRun()
 
     def changeTriggerSource(self):
-        print('In changeTriggerSource with parameter value: ',
-              self.trigsourceparam.value())
         if self.trigsourceparam.value() == 'Internal trigger':
-            print('Changing to internal trigger')
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
                     'trigger_source', 1))
-#            self.RealExpPar.Enable(True)
-#            self.EffFRPar.Enable(True)
 
         elif self.trigsourceparam.value() == 'External "Start-trigger"':
-            print('Changing to external start trigger')
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
                     'trigger_source', 2))
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
                     'trigger_mode', 6))
-            print(self.cameras[self.currCamIdx].getPropertyValue(
-                'trigger_mode'))
-#            self.RealExpPar.Enable(False)
-#            self.EffFRPar.Enable(False)
 
         elif self.trigsourceparam.value() == 'External "frame-trigger"':
-            print('Changing to external trigger')
             self.changeParameter(
                 lambda: self.cameras[self.currCamIdx].setPropertyValue(
                     'trigger_source', 2))
@@ -1342,8 +1315,7 @@ class TormentaGUI(QtGui.QMainWindow):
             self.widthPar.setWritable(True)
             self.heightPar.setWritable(True)
 
-            ROIsize = (int(0.2 * self.vb.viewRect().height()),
-                       int(0.2 * self.vb.viewRect().height()))
+            ROIsize = (64, 64)
             ROIcenter = (int(self.vb.viewRect().center().x()),
                          int(self.vb.viewRect().center().y()))
             ROIpos = (ROIcenter[0] - 0.5 * ROIsize[0],
@@ -1475,10 +1447,12 @@ class TormentaGUI(QtGui.QMainWindow):
         self.crosshairButton.setEnabled(True)
         self.gridButton.setEnabled(True)
         self.levelsButton.setEnabled(True)
-        self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
         self.recWidget.readyToRecord = True
 
-        for i in range(0, 2):
+        self.lvworkers = [None] * len(self.cameras)
+        self.lvthreads = [None] * len(self.cameras)
+
+        for i in np.arange(len(self.cameras)):
             self.lvworkers[i] = LVWorker(self, i, self.cameras[i])
             self.lvthreads[i] = QtCore.QThread()
             self.lvworkers[i].moveToThread(self.lvthreads[i])
@@ -1486,12 +1460,12 @@ class TormentaGUI(QtGui.QMainWindow):
             self.lvthreads[i].start()
             self.viewtimer.start(30)
 
+        self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
         self.liveviewRun()
 
     def liveviewStop(self):
 
-        for i in range(0, 2):
-
+        for i in np.arange(len(self.cameras)):
             self.lvworkers[i].stop()
             self.lvthreads[i].terminate()
             # Turn off camera, close shutter
@@ -1507,21 +1481,15 @@ class TormentaGUI(QtGui.QMainWindow):
             np.zeros(self.shapes[self.currCamIdx]), autoLevels=False)
 
     def liveviewRun(self):
-        #
-        for i in range(0, 2):
+        for i in np.arange(len(self.cameras)):
             # Needed if parameter is changed during liveview since that causes
             # camera to start writing to buffer place zero again.
             self.lvworkers[i].reset()
             self.cameras[i].startAcquisition()
 
-#        time.sleep(0.3)
-#        self.viewtimer.start(0)
-#        self.lvthread.run()
-#        self.lvthread.start()
-
     def liveviewPause(self):
-        for i in range(0, 2):
-            self.cameras[i].stopAcquisition()
+        for c in self.cameras:
+            c.stopAcquisition()
 
     def updateView(self):
         """ Image update while in Liveview mode
@@ -1577,16 +1545,14 @@ class TormentaGUI(QtGui.QMainWindow):
         # Stop running threads
         self.viewtimer.stop()
         try:
-            self.lvthreads[0].terminate()
-            self.lvthreads[1].terminate()
+            for thread in self.lvthreads:
+                thread.terminate()
         except BaseException:
             pass
 
         # Turn off camera, close shutter and flipper
-        self.cameras[0].shutdown()
-        self.cameras[1].shutdown()
-#        if self.signalWidget.running:
-#            self.signalWidget.StartStop()
+        for c in self.cameras:
+            c.shutdown()
 
         self.nidaq.reset_device()
 
@@ -1595,6 +1561,5 @@ class TormentaGUI(QtGui.QMainWindow):
         self.RotalignWidget.closeEvent(*args, **kwargs)
         self.scanWidget.closeEvent(*args, **kwargs)
         self.FocusLockWidget.closeEvent(*args, **kwargs)
-#        self.signalWidget.closeEvent(*args, **kwargs)
 
         super().closeEvent(*args, **kwargs)
