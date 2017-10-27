@@ -451,7 +451,7 @@ class Scanner(QtCore.QObject):
         self.scanTimeW.setInformativeText("Are you sure you want to continue?")
         self.scanTimeW.setStandardButtons(QtGui.QMessageBox.Yes |
                                           QtGui.QMessageBox.No)
-        self.channel_order = ['x', 'y', 'z']
+        self.channelOrder = ['x', 'y', 'z']
 
         self.aborted = False
 
@@ -472,12 +472,12 @@ class Scanner(QtCore.QObject):
         for n in AOchans:
             self.aotask.ao_channels.add_ao_voltage_chan(
                 physical_channel='Dev1/ao%s' % n,
-                name_to_assign_to_channel='chan_%s' % self.channel_order[n],
-                min_val=minVolt[self.channel_order[n]],
-                max_val=maxVolt[self.channel_order[n]])
+                name_to_assign_to_channel='chan_%s' % self.channelOrder[n],
+                min_val=minVolt[self.channelOrder[n]],
+                max_val=maxVolt[self.channelOrder[n]])
 
-        fullAOsignal = np.array([self.stageScan.sigDict[self.channel_order[i]]
-                                for i in AOchans])
+        fullAOsignal = np.array(
+            [self.stageScan.sigDict[self.channelOrder[i]] for i in AOchans])
 
         self.aotask.timing.cfg_samp_clk_timing(
             rate=self.stageScan.sampleRate,
@@ -496,10 +496,20 @@ class Scanner(QtCore.QObject):
         fullDOsignal = np.array(
             [self.pxCycle.sigDict[devs[i]] for i in DOchans])
 
+        """If doing unidirectional scan, the time needed for the stage to move
+        back to the initial x needs to be filled with zeros/False. This time is
+        equal to one "row time". To do so we first have to repeat the
+        sequence for the whole scan in one plane and then append zeros.
+        THIS IS NOW INCOMPATIBLE WITH VOLUMETRIC SCAN."""
+        fullDOsignal = np.tile(fullDOsignal, self.stageScan.FOVscan.stepsX)
+        fullDOsignal = np.concatenate(
+            (fullDOsignal, np.zeros((4, self.stageScan.FOVscan.stepsX))))
+
+        # TODO: adapt this to work with unidirectional scanning (see before)
         """If doing VOLume scan, the time needed for the stage to move
         between z-planes needs to be filled with zeros/False. This time is
         equal to one "sequence-time". To do so we first have to repeat the
-        sequence for the whole scan in one plane and then append with zeros."""
+        sequence for the whole scan in one plane and then append zeros."""
         if self.stageScan.scanMode == 'VOLscan':
             fullDOsignal = np.tile(
                 fullDOsignal, self.stageScan.VOLscan.cyclesPerSlice)
@@ -523,7 +533,6 @@ class Scanner(QtCore.QObject):
         self.waiter.start()
 
     def abort(self):
-        print('Aborting scan')
         self.aborted = True
         self.waiter.stop()
         self.aotask.stop()
@@ -546,9 +555,9 @@ class Scanner(QtCore.QObject):
         # TODO: Test abort (task function)
         writtenSamps = int(np.round(self.aotask.out_stream.curr_write_pos))
         chans = [0, 1, 2]
-        dim = [self.channel_order[i] for i in chans]
-        finalSamps = [self.stageScan.sigDict[dim[i]][writtenSamps - 1]
-                      for i in chans]
+        dim = [self.channelOrder[i] for i in chans]
+        finalSamps = [
+            self.stageScan.sigDict[dim[i]][writtenSamps - 1] for i in chans]
         returnRamps = np.array(
             [makeRamp(finalSamps[i], 0, self.stageScan.sampleRate)
              for i in chans])
@@ -589,8 +598,8 @@ class LaserCycle():
                 lines=chanstring, name_to_assign_to_lines='chan%s' % devs[d])
 
         DOchans = [0, 1, 2, 3]
-        fullDOsignal = np.array([self.pxCycle.sigDict[devs[i]]
-                                for i in DOchans])
+        fullDOsignal = np.array(
+            [self.pxCycle.sigDict[devs[i]] for i in DOchans])
 
         self.dotask.timing.cfg_samp_clk_timing(
            source=r'100kHzTimeBase',
@@ -738,7 +747,6 @@ class FOVscan():
             Ysig = np.concatenate(
                 (Ysig, newValue*np.ones(nSampsFlat), newValue + rampAx2))
             newValue += self.corrStepSize
-            self.sampsPerLine = 2 * rowSamps
         # Correction for amplitude:
         Xsig = sine * ampCorrection(fracRemoved, self.freq)
         Xsig += startX
@@ -892,10 +900,8 @@ class PixelCycle():
     ''' Contains the digital signals for the pixel cycle. The update function
     takes a parameter_values dict and updates the signal accordingly.'''
     def __init__(self, sampleRate):
-        self.sigDict = collections.OrderedDict([('405', []),
-                                                ('488', []),
-                                                ('473', []),
-                                                ('CAM', [])])
+        self.sigDict = collections.OrderedDict(
+            [('405', []), ('488', []), ('473', []), ('CAM', [])])
         self.sampleRate = sampleRate
         self.cycleSamps = None
 
@@ -944,8 +950,7 @@ def makeRamp(start, end, samples):
 
 def makeSmoothStep(start, end, samples):
     x = np.linspace(start, end, num=samples, endpoint=True)
-    x = 0.5*(1 - np.cos(x * np.pi))
-    signal = start + (end - start) * x
+    signal = start + (end - start) * 0.5*(1 - np.cos(x * np.pi))
     return signal
 
 
@@ -963,35 +968,3 @@ def ampCorrection(fracRemoved, freq):
     polynom = np.poly1d(coeffs)
     freqFactor = 1 / polynom(freq)
     return freqFactor * cosFactor
-
-
-def distToVoltY(d):
-    a1 = 0.6524
-    a2 = -0.0175
-    a3 = 0.0004
-    samples = len(d)
-    Vsignal = np.zeros(samples)
-    now = time.time()
-    for i in range(0, samples):
-        V_value = a1 * d[i] + a2 * d[i]**2 + a3 * np.power(d[i], 3)
-        Vsignal[i] = V_value
-
-    elapsed = time.time() - now
-    print('Elapsed time: ', elapsed)
-    return Vsignal
-
-
-def distToVoltX(d):
-    a1 = 0.6149
-    a2 = -0.0146
-    a3 = 0.0003
-    samples = len(d)
-    Vsignal = np.zeros(samples)
-    now = time.time()
-    for i in range(0, samples):
-        V_value = a1 * d[i] + a2 * d[i]**2 + a3 * np.power(d[i], 3)
-        Vsignal[i] = V_value
-
-    elapsed = time.time() - now
-    print('Elapsed time: ', elapsed)
-    return Vsignal

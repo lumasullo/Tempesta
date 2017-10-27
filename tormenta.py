@@ -17,9 +17,6 @@ def main():
     app = QtGui.QApplication([])
 
     cobolt = 'cobolt.cobolt0601.Cobolt0601_f2'
-
-    nidaq = nidaqmx.system.System.local().devices['Dev1']
-
     with instruments.Laser(cobolt, 'COM4') as actlaser, \
             instruments.PZT(8) as pzt, instruments.Webcam() as webcam:
 
@@ -31,6 +28,7 @@ def main():
         print(offlaser.idn)
         print(orcaflashV3.camera_model)
 
+        nidaq = nidaqmx.system.System.local().devices['Dev1']
         win = control.TormentaGUI(actlaser, offlaser, exclaser, [orcaflashV3],
                                   nidaq, pzt, webcam)
         win.show()
