@@ -501,9 +501,13 @@ class Scanner(QtCore.QObject):
         equal to one "row time". To do so we first have to repeat the
         sequence for the whole scan in one plane and then append zeros.
         THIS IS NOW INCOMPATIBLE WITH VOLUMETRIC SCAN."""
+        print(fullDOsignal.shape)
         fullDOsignal = np.tile(fullDOsignal, self.stageScan.FOVscan.stepsX)
+        print(fullDOsignal.shape)
+        print(np.zeros((4, self.stageScan.FOVscan.rowSamps)).shape)
         fullDOsignal = np.concatenate(
-            (fullDOsignal, np.zeros((4, self.stageScan.FOVscan.stepsX))))
+            (fullDOsignal, np.zeros((4, self.stageScan.FOVscan.rowSamps))))
+        # FIXME: NOT DOING WHAT IT SHOULD
 
         # TODO: adapt this to work with unidirectional scanning (see before)
         """If doing VOLume scan, the time needed for the stage to move
@@ -728,16 +732,17 @@ class FOVscan():
         self.stepsZ = 0
         # Step size compatible with width
         self.corrStepSize = sizeX / self.stepsX
-        rowSamps = self.stepsX * self.seqSamps
+        self.rowSamps = self.stepsX * self.seqSamps
 
         # Smooth scanning
         fracRemoved = 0.1
-        nSamplesRamp = int(2 * fracRemoved * rowSamps)
-        nSampsFlat = int((rowSamps - nSamplesRamp))
+        nSamplesRamp = int(2 * fracRemoved * self.rowSamps)
+        nSampsFlat = int((2 * self.rowSamps - nSamplesRamp))
         rampAx2 = makeRamp(0, self.corrStepSize, nSamplesRamp)
-        self.freq = self.sampleRate / (rowSamps * 2)
+        self.freq = self.sampleRate / (self.rowSamps * 2)
         # sine scanning
-        sine = np.arange(0, 2*rowSamps*self.stepsY)/(rowSamps*2)*2*np.pi
+        sine = 2*np.pi*np.arange(0, 2*self.rowSamps*self.stepsY)
+        sine /= (2*self.rowSamps)
         # Sine varies from -1 to 1 so need to divide by 2
         sine = np.sin(sine) * sizeX / 2
         newValue = startY
