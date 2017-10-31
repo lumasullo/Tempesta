@@ -43,6 +43,11 @@ class ScanWidget(QtGui.QMainWindow):
         self.scanInLiveviewWar.setInformativeText(
             "You need to be in liveview to scan")
 
+        self.digModWarning = QtGui.QMessageBox()
+        self.digModWarning.setInformativeText(
+            "You need to be in digital laser modulation and external "
+            "frame-trigger acquisition mode")
+
         self.nidaq = device
         self.main = main
 
@@ -306,15 +311,25 @@ class ScanWidget(QtGui.QMainWindow):
 
     def scanOrAbort(self):
         if not self.scanning:
-            m = self.main
-            m.laserWidgets.DigCtrl.DigitalControlButton.setChecked(True)
-            m.trigsourceparam.setValue('External "frame-trigger"')
-            time.sleep(1)
-            try:
-                self.main.lvworkers[0].f_ind
+            main = self.main
+            lasers = main.laserWidgets
+            mod = (lasers.DigCtrl.DigitalControlButton.isChecked() and
+                   main.trigsourceparam.value() == 'External "frame-trigger"')
+            if mod:
                 self.prepAndRun()
-            except AttributeError:
-                self.scanInLiveviewWar.exec_()
+#            # Good idea but breaks the timing of signals somehow
+#            m = self.main
+#            m.laserWidgets.DigCtrl.DigitalControlButton.setChecked(True)
+#            m.trigsourceparam.setValue('External "frame-trigger"')
+#            time.sleep(1)
+#            try:
+#                self.main.lvworkers[0].f_ind
+#                self.prepAndRun()
+#            except AttributeError:
+#                self.scanInLiveviewWar.exec_()
+            else:
+                self.digModWarning.exec_()
+#                self.scanInLiveviewWar.exec_()
         else:
             self.scanner.abort()
 
@@ -501,13 +516,11 @@ class Scanner(QtCore.QObject):
         equal to one "row time". To do so we first have to repeat the
         sequence for the whole scan in one plane and then append zeros.
         THIS IS NOW INCOMPATIBLE WITH VOLUMETRIC SCAN."""
-        print(fullDOsignal.shape)
         fullDOsignal = np.tile(fullDOsignal, self.stageScan.FOVscan.stepsX)
-        print(fullDOsignal.shape)
-        print(np.zeros((4, self.stageScan.FOVscan.rowSamps)).shape)
         fullDOsignal = np.concatenate(
-            (fullDOsignal, np.zeros((4, self.stageScan.FOVscan.rowSamps))))
-        # FIXME: NOT DOING WHAT IT SHOULD
+            (fullDOsignal,
+             np.zeros((4, self.stageScan.FOVscan.rowSamps), dtype=bool)),
+            axis=1)
 
         # TODO: adapt this to work with unidirectional scanning (see before)
         """If doing VOLume scan, the time needed for the stage to move
