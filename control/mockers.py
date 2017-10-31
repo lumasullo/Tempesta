@@ -96,6 +96,14 @@ class MockLaser(Driver):
         """
         return 0
 
+    @Feat(units='mW')
+    def power_mod(self):
+        return 0
+
+    @power_mod.setter
+    def power_mod(self, value):
+        pass
+
     def query(self, text):
         return 0
 
