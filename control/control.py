@@ -821,8 +821,6 @@ class TormentaGUI(QtGui.QMainWindow):
                        for c in self.cameras]
         self.frameStart = (0, 0)
 
-#        self.lvworkers = [None] * len(self.cameras)
-#        self.lvthreads = [None] * len(self.cameras)
         self.currCamIdx = 0
         noImage = np.zeros(self.shapes[self.currCamIdx])
         self.latest_images = [noImage] * len(self.cameras)
@@ -1179,11 +1177,15 @@ class TormentaGUI(QtGui.QMainWindow):
             x = int(mousePoint.x())
             y = int(self.shapes[self.currCamIdx][1] - mousePoint.y())
 
-            # Outputs
-            self.cursorPos.setText('{}, {}'.format(x, y))
-            cs = self.lvworkers[self.currCamIdx].image[x, int(mousePoint.y())]
-            countsStr = '{} counts'.format(cs)
-            self.cursorPosInt.setText(countsStr)
+            try:
+                # Outputs
+                self.cursorPos.setText('{}, {}'.format(x, y))
+                currCamWorker = self.lvworkers[self.currCamIdx]
+                cs = currCamWorker.image[x, int(mousePoint.y())]
+                countsStr = '{} counts'.format(cs)
+                self.cursorPosInt.setText(countsStr)
+            except AttributeError:
+                pass
 
     def changeParameter(self, function):
         """ This method is used to change those camera properties that need
@@ -1460,7 +1462,6 @@ class TormentaGUI(QtGui.QMainWindow):
             self.lvthreads[i].start()
             self.viewtimer.start(30)
 
-        self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
         self.liveviewRun()
 
     def liveviewStop(self):
@@ -1477,10 +1478,12 @@ class TormentaGUI(QtGui.QMainWindow):
         self.levelsButton.setEnabled(False)
         self.recWidget.readyToRecord = False
 
+        self.vb.scene().sigMouseMoved.disconnect()
         self.img.setImage(
             np.zeros(self.shapes[self.currCamIdx]), autoLevels=False)
 
     def liveviewRun(self):
+        self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
         for i in np.arange(len(self.cameras)):
             # Needed if parameter is changed during liveview since that causes
             # camera to start writing to buffer place zero again.

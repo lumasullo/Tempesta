@@ -384,13 +384,9 @@ class ScanWidget(QtGui.QFrame):
             self.ScanButton.setText('Abort')
             channels_used = [self.stageScan.ax1, self.stageScan.ax2]
             self.positionner.resetChannels(channels_used)
-            self.scanner = Scanner(self.nidaq,
-                                   self.stageScan,
-                                   self.pxCycle,
-                                   self.currAOchan,
-                                   self.currDOchan,
-                                   self.currRecDevice,
-                                   self)
+            self.scanner = Scanner(
+                self.nidaq, self.stageScan, self.pxCycle, self.currAOchan,
+                self.currDOchan, self.currRecDevice, self)
             self.scanner.finalizeDone.connect(self.finalizeDone)
             self.scanner.scanDone.connect(self.scanDone)
             self.scanning = True
