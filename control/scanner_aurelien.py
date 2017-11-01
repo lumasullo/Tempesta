@@ -904,9 +904,8 @@ class StageScan():
         # Sine varies from -1 to 1 so need to divide by 2
         sine = np.sin(sine) * self.size1 / 2
         for i in range(0, self.steps2):
-            sig2 = np.concatenate((sig2,
-                                   newValue*np.ones(nSampsFlat),
-                                   newValue + rampAx2))
+            sig2 = np.concatenate(
+                (sig2, newValue*np.ones(nSampsFlat), newValue + rampAx2))
             newValue = newValue + self.corrStepSize
             self.sampsPerLine = 2 * rowSamps
 

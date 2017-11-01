@@ -150,7 +150,7 @@ class MockHamamatsu(Driver):
 
         self.buffer_index = 0
         self.camera_id = 9999
-        self.camera_model = 'Mock Hamamatsu camera'
+        self.camera_model = b'Mock Hamamatsu camera'
         self.debug = False
         self.frame_x = 500
         self.frame_y = 500
