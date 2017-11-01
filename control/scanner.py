@@ -16,6 +16,9 @@ import nidaqmx
 
 import control.guitools as guitools
 
+from cv2 import TERM_CRITERIA_EPS, TERM_CRITERIA_COUNT, rectangle,\
+    calcOpticalFlowPyrLK, goodFeaturesToTrack, moments
+
 # These dictionnaries contain values specific to the different axis of our
 # piezo motors.
 # For each direction, there are the movements in µm induced by a command of 1V
@@ -166,6 +169,8 @@ class ScanWidget(QtGui.QMainWindow):
         self.updateScan(self.allDevices)
         self.scanParameterChanged('seqTime')
 
+        self.multiScanWgt = MultipleScanWidget()
+
         self.scanRadio = QtGui.QRadioButton('Scan')
         self.scanRadio.clicked.connect(lambda: self.setScanOrNot(True))
         self.scanRadio.setChecked(True)
@@ -180,10 +185,8 @@ class ScanWidget(QtGui.QMainWindow):
         self.previewButton.clicked.connect(self.previewScan)
         self.continuousCheck = QtGui.QCheckBox('Continuous Scan')
 
-        self.scanImage = ImageWidget()
-
         # Crosshair
-        self.crosshair = guitools.Crosshair(self.scanImage.vb)
+        self.crosshair = guitools.Crosshair(self.multiScanWgt.illum_wgt.vb)
         self.crossButton = QtGui.QPushButton('Cross')
         self.crossButton.setCheckable(True)
         self.crossButton.pressed.connect(self.crosshair.toggle)
@@ -236,11 +239,11 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(self.endCAMPar, 10, 4)
 
         grid.addWidget(self.graph, 11, 0, 1, 7)
-        grid.addWidget(self.crossButton, 14, 3)
-        grid.addWidget(self.scanImage, 12, 0, 2, 7)
-        grid.addWidget(self.previewButton, 14, 0)
-        grid.addWidget(self.scanButton, 14, 1)
-        grid.addWidget(self.continuousCheck, 14, 2)
+        grid.addWidget(self.multiScanWgt, 13, 0, 4, 7)
+        grid.addWidget(self.crossButton, 12, 3)
+        grid.addWidget(self.previewButton, 12, 0)
+        grid.addWidget(self.scanButton, 12, 1)
+        grid.addWidget(self.continuousCheck, 12, 2)
 
         grid.setRowMinimumHeight(4, 20)
 
@@ -378,21 +381,10 @@ class ScanWidget(QtGui.QMainWindow):
             datashape = (
                 len(fRange), self.main.shapes[0][1], self.main.shapes[0][0])
             reshapeddata = np.reshape(data, datashape, order='C')
-            z_stack = [
-                np.mean(reshapeddata[j, :, :]) for j in range(0, len(fRange))]
 
-            expShape = [self.scanner.stageScan.FOVscan.stepsX,
-                        self.scanner.stageScan.FOVscan.stepsY]
-            if not len(z_stack) == np.prod(expShape):
-                del z_stack[0]
-
-            z_stack = np.reshape(np.array(z_stack), expShape)
-            z_stack[::2] = np.fliplr(z_stack[::2])
-            self.scanImage.img.setImage(z_stack)
-            self.scanImage.vb.setAspectLocked()
-            self.scanImage.hist.setLevels(
-                *guitools.bestLimits(self.scanImage.img.image))
-            self.scanImage.hist.vb.autoRange()
+            self.multiScanWgt.worker.set_images(reshapeddata[1:])
+            self.multiScanWgt.worker.find_fp()
+            self.multiScanWgt.worker.analyse()
 
     def finalizeDone(self):
         if (not self.continuousCheck.isChecked()) or self.scanner.aborted:
@@ -596,6 +588,310 @@ class Scanner(QtCore.QObject):
         self.dotask.close()
         self.nidaq.reset_device()
         self.finalizeDone.emit()
+
+
+class MultipleScanWidget(QtGui.QMainWindow):
+    def __init__(self):
+        super().__init__()
+
+        # make illumination image widget
+        self.illum_wgt = IllumImageWidget()
+
+        # make worker
+        self.worker = MultiScanWorker(self)
+
+        # make other GUI componentsa
+        self.analysis_btn = QtGui.QPushButton('analyse')
+        self.analysis_btn.clicked.connect(self.worker.analyse)
+        self.analysis_btn.setSizePolicy(QtGui.QSizePolicy.Preferred,
+                                        QtGui.QSizePolicy.Expanding)
+        self.show_beads_btn = QtGui.QPushButton('Show beads')
+        self.show_beads_btn.clicked.connect(self.worker.find_fp)
+        self.quality_label = QtGui.QLabel('Quality level of points')
+        self.quality_edit = QtGui.QLineEdit('0.05')
+        self.quality_edit.editingFinished.connect(self.worker.find_fp)
+        self.win_size_label = QtGui.QLabel('Window size [pix]')
+        self.win_size_edit = QtGui.QLineEdit('10')
+        self.win_size_edit.editingFinished.connect(self.worker.find_fp)
+
+        self.beads_label = QtGui.QLabel('Bead number')
+        self.beads_box = QtGui.QComboBox()
+        self.beads_box.activated.connect(self.change_illum_image)
+        self.change_beads_button = QtGui.QPushButton('Change')
+        self.change_beads_button.clicked.connect(self.next_bead)
+        self.overlay_box = QtGui.QComboBox()
+        self.overlay_box.activated.connect(self.worker.overlay)
+        self.overlay_check = QtGui.QCheckBox('Overlay')
+        self.overlay_check.stateChanged.connect(self.worker.overlay)
+        self.clear_btn = QtGui.QPushButton('Clear')
+        self.clear_btn.clicked.connect(self.clear)
+
+        # construct GUI
+        self.cwidget = QtGui.QWidget()
+        self.setCentralWidget(self.cwidget)
+        grid = QtGui.QGridLayout()
+        self.cwidget.setLayout(grid)
+
+        grid.addWidget(self.illum_wgt, 0, 0, 1, 6)
+
+        grid.addWidget(self.quality_label, 1, 0, 1, 1)
+        grid.addWidget(self.quality_edit, 1, 1, 1, 1)
+        grid.addWidget(self.win_size_label, 2, 0, 1, 1)
+        grid.addWidget(self.win_size_edit, 2, 1, 1, 1)
+        grid.addWidget(self.show_beads_btn, 1, 2, 1, 1)
+        grid.addWidget(self.analysis_btn, 2, 2, 1, 1)
+
+        grid.addWidget(self.beads_label, 1, 3, 1, 1)
+        grid.addWidget(self.beads_box, 1, 4, 1, 1)
+        grid.addWidget(self.change_beads_button, 1, 5, 1, 1)
+        grid.addWidget(self.overlay_check, 2, 3, 1, 1)
+        grid.addWidget(self.overlay_box, 2, 4, 1, 1)
+        grid.addWidget(self.clear_btn, 2, 5, 1, 1)
+
+    def change_illum_image(self):
+        self.worker.delete_label()
+        curr_ind = self.beads_box.currentIndex()
+        self.illum_wgt.update(self.worker.illum_images[curr_ind])
+        self.illum_wgt.vb.autoRange()
+        if self.overlay_check.isChecked():
+            self.illum_wgt.update_back(self.worker.illum_images_back[curr_ind])
+
+    def next_bead(self):
+        self.worker.delete_label()
+        curr_ind = self.beads_box.currentIndex()
+        if len(self.worker.illum_images) == curr_ind + 1:
+            next_ind = 0
+        else:
+            next_ind = curr_ind + 1
+        self.illum_wgt.update(self.worker.illum_images[next_ind])
+        self.beads_box.setCurrentIndex(next_ind)
+        if self.overlay_check.isChecked():
+            self.illum_wgt.update_back(self.worker.illum_images_back[next_ind])
+        self.illum_wgt.vb.autoRange()
+
+    def clear(self):
+        self.worker.illum_images_stocked = []
+        self.overlay_box.clear()
+
+
+class MultiScanWorker(QtCore.QObject):
+    def __init__(self, main_wgt):
+        super().__init__()
+        self.main = main_wgt
+        self.illum_images = []
+        self.illum_images_stocked = []
+        self.labels = []
+
+        # corner detection parameter of Shi-Tomasi
+        self.feature_params = dict(maxCorners=100,
+                                   qualityLevel=0.1,
+                                   minDistance=7,
+                                   blockSize=7)
+        # parameter of Lucas-Kanade method
+        crit = (TERM_CRITERIA_EPS | TERM_CRITERIA_COUNT, 10, 0.03)
+        self.lk_params = dict(winSize=(15, 15),
+                              maxLevel=2,
+                              criteria=crit)
+
+    def set_images(self, images):
+        self.images = images
+
+    def find_fp(self):
+        # find feature points
+        ql = float(self.main.quality_edit.text())
+        self.feature_params['qualityLevel'] = ql
+        self.radius = int(self.main.win_size_edit.text())
+        self.nor_const = 255 / (np.max(self.images))
+        self.f_frame = (self.images[1] * self.nor_const).astype(np.uint8)
+        self.f_feature = goodFeaturesToTrack(self.f_frame, mask=None,
+                                             **self.feature_params)
+
+        # draw feature point window
+        self.delete_label()
+        for i, point in enumerate(self.f_feature):
+            point_x, point_y = point.ravel()
+            frame_rect = rectangle(self.f_frame,
+                                   (int(point_x - self.radius),
+                                    int(point_y - self.radius)),
+                                   (int(point_x + self.radius),
+                                    int(point_y + self.radius)),
+                                   255, 1)
+            self.main.illum_wgt.update(frame_rect)
+            label = pg.TextItem()
+            label.setPos(point_x + self.radius, point_y + self.radius)
+            label.setText(str(i))
+            self.labels.append(label)
+            self.main.illum_wgt.vb.addItem(label)
+        self.main.illum_wgt.vb.autoRange()
+
+    def analyse(self):
+        self.main.beads_box.clear()
+        self.illum_images = []
+
+        self.delete_label()
+
+        # calculate the mean of each roi
+        data_mean = []
+        frame_prev = self.f_frame
+        feature_prev = self.f_feature
+        f_cps = []
+        l_cps = []
+        for i in range(0, len(self.images) - 1):
+            frame_next = (self.images[i + 1] * self.nor_const).astype(np.uint8)
+
+            # find the optical flow
+            feature_next, status, err = calcOpticalFlowPyrLK(frame_prev,
+                                                             frame_next,
+                                                             feature_prev,
+                                                             None,
+                                                             **self.lk_params)
+            good_prev = feature_prev[status == 1]
+            good_next = feature_next[status == 1]
+
+            # calculate the mean of ROI
+            for j, (next_point, prev_point) in enumerate(zip(good_next,
+                                                             good_prev)):
+                prev_x, prev_y = prev_point.ravel()
+                next_x, next_y = next_point.ravel()
+                # process first frame
+                if i == 0:
+                    data_mean.append([])
+                    ave_roi_f = self.mean_roi(frame_prev,
+                                              (int(prev_x), int(prev_y)),
+                                              self.radius)
+                    data_mean[j].append(ave_roi_f)
+                    f_cps.append(self.find_cp(frame_prev,
+                                              (int(prev_x), int(prev_y)),
+                                              self.radius))
+                ave_roi = self.mean_roi(frame_next,
+                                        (int(next_x), int(next_y)),
+                                        self.radius)
+                data_mean[j].append(ave_roi)
+                # record the center point of gravity
+                if i == len(self.images) - 2:
+                    l_cps.append(self.find_cp(frame_next,
+                                              (int(next_x), int(next_y)),
+                                              self.radius))
+            # prepare the next frame
+            frame_prev = frame_next.copy()
+            feature_prev = good_next.reshape(-1, 1, 2)
+
+        # reconstruct the illumination image
+        side = int(np.sqrt(np.size(data_mean[0])))
+        for i in range(len(data_mean)):
+            data_r = np.reshape(data_mean[i], [side, side])
+            data_r[::2] = np.fliplr(data_r[::2])
+            self.illum_images.append(data_r)
+            self.main.beads_box.addItem(str(i))
+        self.illum_images_stocked.append(self.illum_images)
+        self.main.illum_wgt.update(self.illum_images[0])
+        self.main.overlay_box.addItem(str(self.main.overlay_box.count()))
+
+        # make large field of view of illumination image
+        dif = []
+        for i in range(len(f_cps)):
+            dif_x = f_cps[i][0] - l_cps[i][0]
+            dif_y = f_cps[i][1] - l_cps[i][1]
+            dif.append(max(dif_x, dif_y))
+        rate = side / np.average(dif)
+        img_large = np.zeros((int(self.f_frame.shape[0] * rate),
+                              int(self.f_frame.shape[1] * rate)))
+        self.points_large = []
+        for point, illum_image in zip(self.f_feature, self.illum_images):
+            point_x, point_y = point.ravel()
+            point_x = int(point_x * rate)
+            point_y = int(point_y * rate)
+            img_large[point_y:point_y+side, point_x:point_x+side] = illum_image
+            self.points_large.append([point_x, point_y])
+        self.illum_images.append(img_large)
+
+        # update illumination image
+        self.main.illum_wgt.update(img_large)
+        self.main.beads_box.addItem('large field of view')
+        self.main.beads_box.setCurrentIndex(len(self.illum_images)-1)
+        self.main.illum_wgt.vb.autoRange()
+
+    def overlay(self):
+        ind = self.main.overlay_box.currentIndex()
+        self.illum_images_back = []
+
+        # overlay previous image to current image
+        if self.main.overlay_check.isChecked():
+
+            # process the large field of view
+            illum_image_large_pre = self.illum_images[-1].copy()
+            for i, point in enumerate(self.points_large):
+                px = point[0]
+                py = point[1]
+                side = len(self.illum_images[0])
+                illum_image_pre = self.illum_images_stocked[ind][i]
+                illum_image_large_pre[py:py+side, px:px+side] = illum_image_pre
+
+            # process each image
+            for i in range(len(self.illum_images) - 1):
+                illum_image_pre = self.illum_images_stocked[ind][i]
+                self.illum_images_back.append(illum_image_pre)
+
+            self.illum_images_back.append(illum_image_large_pre)
+
+            # update the background image
+            img = self.illum_images_back[self.main.beads_box.currentIndex()]
+            self.main.illum_wgt.update_back(img)
+
+        else:
+            self.illum_images_back = []
+            self.main.illum_wgt.delete_back()
+
+    def delete_label(self):
+        # delete beads label
+        if len(self.labels) != 0:
+            for label in self.labels:
+                self.main.illum_wgt.vb.removeItem(label)
+            self.labels = []
+
+    @staticmethod
+    def mean_roi(array, p, r):
+        roi = array[p[1] - r: p[1] + r, p[0] - r: p[0] + r]
+        return np.average(roi)
+
+    @staticmethod
+    def find_cp(array, point, r):
+        roi = array[point[1] - r:point[1] + r, point[0] - r:point[0] + r]
+        M = moments(roi, False)
+        cx = int(M['m10'] / M['m00'])
+        cy = int(M['m01'] / M['m00'])
+        return [int(cx + point[0] - r), int(cy + point[1] - r)]
+
+
+class IllumImageWidget(pg.GraphicsLayoutWidget):
+
+    def __init__(self):
+        super().__init__()
+
+        self.vb = self.addViewBox(row=1, col=1)
+        self.vb.setAspectLocked(True)
+        self.vb.enableAutoRange()
+
+        self.img = pg.ImageItem()
+        self.vb.addItem(self.img)
+        self.hist = pg.HistogramLUTItem(image=self.img)
+        self.addItem(self.hist, row=1, col=2)
+
+        self.img_back = pg.ImageItem()
+        self.vb.addItem(self.img_back)
+        self.img_back.setZValue(10)
+        self.img_back.setOpacity(0.5)
+        self.hist = pg.HistogramLUTItem(image=self.img_back)
+        self.addItem(self.hist, row=1, col=3)
+
+    def update(self, img):
+        self.img.setImage(img.T)
+
+    def update_back(self, img):
+        self.img_back.setImage(img.T)
+
+    def delete_back(self):
+        self.img_back.clear()
 
 
 class LaserCycle():
@@ -891,27 +1187,6 @@ class VOLscan():
         print('Final X: ' + str(fullZprimDimSig[-1]))
         print('Final Y: ' + str(fullZsecDimSig[-1]))
         print('Final Z: ' + str(fullZthirdDimSig[-1]))
-
-
-class ImageWidget(pg.GraphicsLayoutWidget):
-
-    def __init__(self):
-        super().__init__()
-
-        self.vb = self.addViewBox(row=1, col=1)
-        self.img = pg.ImageItem()
-        self.lut = guitools.cubehelix()
-        self.img.setLookupTable(self.lut)
-        self.vb.addItem(self.img)
-        self.vb.setAspectLocked(True)
-        self.hist = pg.HistogramLUTItem(image=self.img)
-        self.cubehelixCM = pg.ColorMap(
-           np.arange(0, 1, 1/256), guitools.cubehelix().astype(int))
-        self.hist.gradient.setColorMap(self.cubehelixCM)
-        self.hist.vb.setLimits(yMin=0, yMax=66000)
-        for tick in self.hist.gradient.ticks:
-            tick.hide()
-        self.addItem(self.hist, row=1, col=2)
 
 
 class PixelCycle():
