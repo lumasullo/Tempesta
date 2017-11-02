@@ -11,6 +11,7 @@ import time
 import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import collections
 import nidaqmx
 
@@ -506,9 +507,11 @@ class Scanner(QtCore.QObject):
         # Signal for a single line
         lineSig = np.tile(fullDOsig, self.stageScan.FOVscan.stepsX)
         emptySeqs = self.stageScan.FOVscan.stepsX
-        emptySig = np.zeros((4, int(self.stageScan.seqSamps*emptySeqs)),
+        emptySig = np.zeros((4, int(self.stageScan.seqSamps*(emptySeqs + 2))),
                             dtype=bool)
-        fullDOsig = np.concatenate((lineSig, emptySig), axis=1)
+        fullDOsig = np.concatenate((emptySig, lineSig), axis=1)
+#        fullDOsig = np.tile(fullDOsig, self.stageScan.FOVscan.stepsY)
+#        np.concatefullDOsig
 
 #        """If doing unidirectional scan, the time needed for the stage to move
 #        back to the initial x needs to be filled with zeros/False. This time is
@@ -541,9 +544,9 @@ class Scanner(QtCore.QObject):
         self.waiter.waitdoneSignal.connect(self.finalize)
 
         plt.figure()
-        plt.plot(fullDOsig[1])
-        plt.plot(fullAOsig[0][:5*self.stageScan.FOVscan.rowSamps])
-        plt.plot(fullAOsig[1][:5*self.stageScan.FOVscan.rowSamps])
+        plt.plot(0.3*np.tile(fullDOsig[1], self.stageScan.FOVscan.stepsY))
+        plt.plot(fullAOsig[0])
+        plt.plot(fullAOsig[1])
 
         self.aotask.write(fullAOsig, auto_start=False)
         self.dotask.write(fullDOsig, auto_start=False)
@@ -1087,7 +1090,7 @@ class FOVscan():
 #        # Correction for amplitude:
 #        Xsig = sine * ampCorrection(fracRemoved, self.freq)
 #        Xsig += startX
-#
+
 #        # Generate the delay samples in the end of the scan
 #        # elimination of 1/4 period at the beginning
 #        delay = self.sampleRate / self.freq / 2
@@ -1099,27 +1102,26 @@ class FOVscan():
 #        Ysig = np.concatenate((Ysig, Ysig[-1]*np.ones(delay)))
 
         # Ramps in Y axis
-#        Yramp = makeRamp(startY, sizeY, self.colSamps)
-#        Yramps = np.split(Yramp, self.stepsY)
+        Yramp = makeRamp(startY, sizeY, self.colSamps)
+        Yramps = np.split(Yramp, self.stepsY)
 
 #        # Back and forth scanning
 #        Ysig = np.array([np.concatenate((i[0]*np.ones(self.rowSamps), i))
 #                        for i in Yramps])
 
-#        # Unidirectional scanning
-#        Ysig = np.array([np.concatenate((i[0]*np.ones(2*self.rowSamps), i))
-#                        for i in Yramps])
-#
-#        Ysig = Ysig.ravel()
+        # Unidirectional scanning
+        constant = np.ones((2*self.stepsX + 1)*self.seqSamps)
+        Ysig = np.array([np.concatenate((i, i[-1]*constant)) for i in Yramps])
+        Ysig = Ysig.ravel()
+#        Ysig = np.concatenate((Ysig[0]*np.ones(self.seqSamps), Ysig, Yramps[-1][-1]*constant))
 
         LTRramp = makeRamp(startX, sizeX, self.rowSamps)
-
         RTLramp = LTRramp[::-1]
 
-#        LTRramp = np.concatenate((LTRramp, sizeX*np.ones(len(Yramps[0]))))
-#        RTLramp = np.concatenate((RTLramp, startX*np.ones(len(Yramps[0]))))
+        LTRramp = np.concatenate((startX*np.ones(len(Yramps[0])), LTRramp))
+        RTLramp = np.concatenate((sizeX*np.ones(len(Yramps[0])), RTLramp))
 
-        RTLTRramp = np.concatenate((LTRramp, RTLramp))
+        LTRTLramp = np.concatenate((LTRramp, RTLramp))
 
 #        # Back and forth scanning
 #        if self.stepsY % 2 == 0:
@@ -1129,13 +1131,13 @@ class FOVscan():
 #            Xsig = np.concatenate((Xsig, RTLramp))
 
         # Unidirectional scanning
-        Xsig = np.tile(RTLTRramp, self.stepsY)
+        Xsig = np.tile(LTRTLramp, self.stepsY)
 
-        # Square steps in Y axis
-        Yval = startY
-        Yval += np.array(
-            [i*self.corrStepSize for i in np.arange(self.stepsY)])
-        Ysig = np.repeat(Yval, 2*self.rowSamps)
+#        # Square steps in Y axis
+#        Yval = startY
+#        Yval += np.array(
+#            [i*self.corrStepSize for i in np.arange(self.stepsY)])
+#        Ysig = np.repeat(Yval, self.rowSamps)
 
         self.sigDict['x'] = Xsig / convFactors['x']
         self.sigDict['y'] = Ysig / convFactors['y']
@@ -1311,3 +1313,15 @@ def ampCorrection(fracRemoved, freq):
     polynom = np.poly1d(coeffs)
     freqFactor = 1 / polynom(freq)
     return freqFactor * cosFactor
+
+
+def phaseCorr(freq):
+    """models the frequency-dependant phase shift of a Piezoconcept LFSH2
+    stage, x axis(fast)
+
+    :param float freq: frequency of the driving signal"""
+    coeffs = [1.06208989e-09, 4.13293782e-07, -1.65441906e-04,
+              2.35337482e-02, -3.73010981e-02]
+    polynom = np.poly1d(coeffs)
+    phase = polynom(freq)
+    return phase
