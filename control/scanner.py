@@ -11,14 +11,13 @@ import time
 import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 import collections
 import nidaqmx
 
 import control.guitools as guitools
+import control.mpl_to_pyqtgraph as mplToPg
 
-from cv2 import TERM_CRITERIA_EPS, TERM_CRITERIA_COUNT, rectangle,\
-    calcOpticalFlowPyrLK, goodFeaturesToTrack, moments
+from cv2 import rectangle, goodFeaturesToTrack, moments
 
 # These dictionnaries contain values specific to the different axis of our
 # piezo motors.
@@ -698,11 +697,6 @@ class MultiScanWorker(QtCore.QObject):
                                    qualityLevel=0.1,
                                    minDistance=7,
                                    blockSize=7)
-        # parameter of Lucas-Kanade method
-        crit = (TERM_CRITERIA_EPS | TERM_CRITERIA_COUNT, 10, 0.03)
-        self.lk_params = dict(winSize=(15, 15),
-                              maxLevel=2,
-                              criteria=crit)
 
     def set_images(self, images):
         self.images = images
@@ -720,9 +714,9 @@ class MultiScanWorker(QtCore.QObject):
                                     mask=None,
                                     **self.feature_params)
         self.fps_f = np.array([point[0] for point in fps_f])
-        fps_l= goodFeaturesToTrack(self.l_frame,
-                                   mask=None,
-                                   **self.feature_params)
+        fps_l = goodFeaturesToTrack(self.l_frame,
+                                    mask=None,
+                                    **self.feature_params)
         self.fps_l = np.array([point[0] for point in fps_l])
         self.frame_view = (self.f_frame + self.l_frame) / 2
 
@@ -873,6 +867,8 @@ class IllumImageWidget(pg.GraphicsLayoutWidget):
         self.vb.addItem(self.img)
         self.hist = pg.HistogramLUTItem(image=self.img)
         self.hist.gradient.loadPreset('thermal')
+        for tick in self.hist.gradient.ticks:
+            tick.hide()
         self.hist.vb.setLimits(yMin=0, yMax=66000)
         self.addItem(self.hist, row=1, col=2)
 
@@ -882,6 +878,12 @@ class IllumImageWidget(pg.GraphicsLayoutWidget):
         self.img_back.setOpacity(0.5)
         self.hist_back = pg.HistogramLUTItem(image=self.img_back)
         self.hist_back.vb.setLimits(yMin=0, yMax=66000)
+        pos, rgba = zip(*mplToPg.cmapToColormap(plt.get_cmap('Greens_r')))
+        pgColormap = pg.ColorMap(pos, rgba)
+        self.hist_back.gradient.setColorMap(pgColormap)
+        for tick in self.hist_back.gradient.ticks:
+            tick.hide()
+
         self.addItem(self.hist_back, row=1, col=3)
 
     def update(self, img):

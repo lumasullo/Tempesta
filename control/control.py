@@ -27,7 +27,6 @@ import tifffile as tiff     # http://www.lfd.uci.edu/~gohlke/pythonlibs/#vlfd
 from lantz import Q_
 
 import control.lasercontrol as lasercontrol
-# import control.SignalGen as SignalGen
 import control.scanner as scanner
 import control.align as align
 import control.guitools as guitools

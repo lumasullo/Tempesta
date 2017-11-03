@@ -6,14 +6,14 @@ Created on Fri Feb  6 13:20:02 2015
 """
 import os
 import time
-import pyqtgraph as pg
 import numpy as np
 import h5py as hdf
 import tifffile as tiff
 import configparser
 from ast import literal_eval
 
-from PyQt4 import QtCore, QtGui
+import pyqtgraph as pg
+from pyqtgraph.Qt import QtCore, QtGui
 from tkinter import Tk, filedialog, simpledialog
 
 from lantz import Q_
