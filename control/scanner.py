@@ -708,31 +708,42 @@ class MultiScanWorker(QtCore.QObject):
         self.images = images
 
     def find_fp(self):
+        self.main.illum_wgt.delete_back()
         # find feature points
         ql = float(self.main.quality_edit.text())
         self.feature_params['qualityLevel'] = ql
         self.radius = int(self.main.win_size_edit.text())
         self.nor_const = 255 / (np.max(self.images))
         self.f_frame = (self.images[1] * self.nor_const).astype(np.uint8)
-        self.f_feature = goodFeaturesToTrack(self.f_frame, mask=None,
-                                             **self.feature_params)
+        self.l_frame = (self.images[-1] * self.nor_const).astype(np.uint8)
+        fps_f = goodFeaturesToTrack(self.f_frame,
+                                    mask=None,
+                                    **self.feature_params)
+        self.fps_f = np.array([point[0] for point in fps_f])
+        fps_l= goodFeaturesToTrack(self.l_frame,
+                                   mask=None,
+                                   **self.feature_params)
+        self.fps_l = np.array([point[0] for point in fps_l])
+        self.frame_view = (self.f_frame + self.l_frame) / 2
 
         # draw feature point window
         self.delete_label()
-        for i, point in enumerate(self.f_feature):
-            pointX, pointY = point.ravel()
-            frame_rect = rectangle(self.f_frame,
-                                   (int(pointX - self.radius),
-                                    int(pointY - self.radius)),
-                                   (int(pointX + self.radius),
-                                    int(pointY + self.radius)),
-                                   255, 1)
-            self.main.illum_wgt.update(frame_rect)
+        self.centers = []
+        for i, fp_f in enumerate(self.fps_f):
+            distances = [np.linalg.norm(fp_l - fp_f) for fp_l in self.fps_l]
+            ind = np.argmin(distances)
+            center = (fp_f + self.fps_l[ind]) / 2
+            rectangle(self.frame_view,
+                      (int(center[0]-self.radius), int(center[1]-self.radius)),
+                      (int(center[0]+self.radius), int(center[1]+self.radius)),
+                      255, 1)
+            self.centers.append(center)
             label = pg.TextItem()
-            label.setPos(pointX + self.radius, pointY + self.radius)
+            label.setPos(center[0]+self.radius, center[1]+self.radius)
             label.setText(str(i))
             self.labels.append(label)
             self.main.illum_wgt.vb.addItem(label)
+        self.main.illum_wgt.update(self.frame_view)
         self.main.illum_wgt.vb.autoRange()
 
     def analyse(self):
@@ -741,61 +752,30 @@ class MultiScanWorker(QtCore.QObject):
 
         self.delete_label()
 
-        # calculate the mean of each roi
         data_mean = []
-        frame_prev = self.f_frame
-        feature_prev = self.f_feature
-        f_cps = []
-        l_cps = []
-        for i in range(0, len(self.images) - 1):
-            frame_next = (self.images[i + 1] * self.nor_const).astype(np.uint8)
-
-            # find the optical flow
-            feature_next, status, err = calcOpticalFlowPyrLK(frame_prev,
-                                                             frame_next,
-                                                             feature_prev,
-                                                             None,
-                                                             **self.lk_params)
-            good_prev = feature_prev[status == 1]
-            good_next = feature_next[status == 1]
+        cps_f = []
+        cps_l = []
+        for i in range(len(self.centers)):
+            data_mean.append([])
+            # record the center point of gravity
+            cps_f.append(self.find_cp(self.f_frame,
+                                      self.fps_f[i].astype(np.uint16),
+                                      self.radius))
+            cps_l.append(self.find_cp(self.l_frame,
+                                      self.fps_l[i].astype(np.uint16),
+                                      self.radius))
 
             # calculate the mean of ROI
-            for j, (next_point, prev_point) in enumerate(zip(good_next,
-                                                             good_prev)):
-                prev_x, prev_y = prev_point.ravel()
-                next_x, next_y = next_point.ravel()
-                # process first frame
-                if i == 0:
-                    data_mean.append([])
-                    ave_roi_f = self.mean_roi(frame_prev,
-                                              (int(prev_x), int(prev_y)),
-                                              self.radius)
-                    data_mean[j].append(ave_roi_f)
-                    f_cps.append(self.find_cp(frame_prev,
-                                              (int(prev_x), int(prev_y)),
-                                              self.radius))
-                ave_roi = self.mean_roi(frame_next,
-                                        (int(next_x), int(next_y)),
-                                        self.radius)
-                data_mean[j].append(ave_roi)
-                # record the center point of gravity
-                if i == len(self.images) - 2:
-                    l_cps.append(self.find_cp(frame_next,
-                                              (int(next_x), int(next_y)),
-                                              self.radius))
-            # prepare the next frame
-            frame_prev = frame_next.copy()
-            feature_prev = good_next.reshape(-1, 1, 2)
+            for image in self.images:
+                mean = self.mean_roi(image,
+                                     self.centers[i].astype(np.uint16),
+                                     self.radius)
+                data_mean[i].append(mean)
 
         # reconstruct the illumination image
-        stepsX = self.mainScanWid.scanner.stageScan.FOVscan.stepsX
-        stepsY = self.mainScanWid.scanner.stageScan.FOVscan.stepsY
+        imside = int(np.sqrt(np.size(data_mean[0])))
         for i in range(len(data_mean)):
-            data_r = np.reshape(data_mean[i], [stepsX, stepsY])
-
-#            # Bidirectional scanning
-#            data_r[::2] = np.fliplr(data_r[::2])
-
+            data_r = np.reshape(data_mean[i], [imside, imside])
             self.illum_images.append(data_r)
             self.main.beads_box.addItem(str(i))
         self.illum_images_stocked.append(self.illum_images)
@@ -804,26 +784,25 @@ class MultiScanWorker(QtCore.QObject):
 
         # make large field of view of illumination image
         dif = []
-        for i in range(len(f_cps)):
-            dif_x = f_cps[i][0] - l_cps[i][0]
-            dif_y = f_cps[i][1] - l_cps[i][1]
+        for i in range(len(cps_f)):
+            dif_x = cps_f[i][0] - cps_l[i][0]
+            dif_y = cps_f[i][1] - cps_l[i][1]
             dif.append(max(dif_x, dif_y))
-        rate = stepsX / np.average(dif)
-        img_large = np.zeros((int(self.f_frame.shape[0] * rate),
-                              int(self.f_frame.shape[1] * rate)))
+        rate = imside / np.average(dif)
+        img_large = np.zeros((int(self.f_frame.shape[0]*rate),
+                              int(self.f_frame.shape[1]*rate)))
         self.points_large = []
-        for point, illum_image in zip(self.f_feature, self.illum_images):
-            pointX, pointY = point.ravel()
-            pointX = int(pointX * rate)
-            pointY = int(pointY * rate)
-            img_large[pointY:pointY+stepsY, pointX:pointX+stepsX] = illum_image
-            self.points_large.append([pointX, pointY])
+        for point, illum_image in zip(self.fps_f, self.illum_images):
+            px = int(point[0] * rate)
+            py = int(point[1] * rate)
+            img_large[py:py+imside, px:px+imside] = illum_image
+            self.points_large.append([px, py])
         self.illum_images.append(img_large)
 
         # update illumination image
         self.main.illum_wgt.update(img_large)
-        self.main.beads_box.addItem('Large FOV')
-        self.main.beads_box.setCurrentIndex(len(self.illum_images) - 1)
+        self.main.beads_box.addItem('large field of view')
+        self.main.beads_box.setCurrentIndex(len(self.illum_images)-1)
         self.main.illum_wgt.vb.autoRange()
 
         if len(self.illum_images) == 2:
