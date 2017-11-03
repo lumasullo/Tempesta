@@ -29,3 +29,4 @@ Dependencies
  - tifffile 
  - lantz (https://github.com/hgrecco/lantz)
  - nidaqmx (https://github.com/ni/nidaqmx-python/)
+ - opencv2

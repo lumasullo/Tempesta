@@ -762,21 +762,25 @@ class LVWorker(QtCore.QObject):
 
     def update(self):
         if self.running:
-            self.f_ind = self.orcaflash.newFrames()[-1]
-            frame = self.orcaflash.hcam_data[self.f_ind].getData()
-            self.image = np.reshape(
-                frame, (self.orcaflash.frame_x, self.orcaflash.frame_y), 'F')
-            self.main.latest_images[self.ind] = self.image
+            try:
+                self.f_ind = self.orcaflash.newFrames()[-1]
+                frame = self.orcaflash.hcam_data[self.f_ind].getData()
+                self.image = np.reshape(
+                    frame, (self.orcaflash.frame_x, self.orcaflash.frame_y),
+                    'F')
+                self.main.latest_images[self.ind] = self.image
 
-            """Following is causing problems with two cameras..."""
-#            trigSource = self.orcaflash.getPropertyValue('trigSource')[0]
-#            print('Trigger source = ', trigSource)
-#            if trigSource == 1:
-#                if self.mem == 3:
-#                    self.main.trigsourceparam.setValue('Internal trigger')
-#                    self.mem = 0
-#                else:
-#                    self.mem = self.mem + 1
+                """Following is causing problems with two cameras..."""
+    #            trigSource = self.orcaflash.getPropertyValue('trigSource')[0]
+    #            print('Trigger source = ', trigSource)
+    #            if trigSource == 1:
+    #                if self.mem == 3:
+    #                    self.main.trigsourceparam.setValue('Internal trigger')
+    #                    self.mem = 0
+    #                else:
+    #                    self.mem = self.mem + 1
+            except IndexError:
+                pass
 
     def stop(self):
         if self.running:

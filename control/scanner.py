@@ -70,25 +70,25 @@ class ScanWidget(QtGui.QMainWindow):
         self.sampleRateEdit = QtGui.QLineEdit()
 
         self.sizeXPar = QtGui.QLineEdit('2')
-        self.sizeXPar.editingFinished.connect(
+        self.sizeXPar.textChanged.connect(
             lambda: self.scanParameterChanged('sizeX'))
         self.sizeYPar = QtGui.QLineEdit('2')
-        self.sizeYPar.editingFinished.connect(
+        self.sizeYPar.textChanged.connect(
             lambda: self.scanParameterChanged('sizeY'))
         self.sizeZPar = QtGui.QLineEdit('10')
-        self.sizeZPar.editingFinished.connect(
+        self.sizeZPar.textChanged.connect(
             lambda: self.scanParameterChanged('sizeZ'))
         self.seqTimePar = QtGui.QLineEdit('10')     # ms
-        self.seqTimePar.editingFinished.connect(
+        self.seqTimePar.textChanged.connect(
             lambda: self.scanParameterChanged('seqTime'))
         self.nrFramesPar = QtGui.QLabel()
         self.scanDuration = 0
         self.scanDurationLabel = QtGui.QLabel(str(self.scanDuration))
         self.stepSizeXYPar = QtGui.QLineEdit('0.1')
-        self.stepSizeXYPar.editingFinished.connect(
+        self.stepSizeXYPar.textChanged.connect(
             lambda: self.scanParameterChanged('stepSizeXY'))
         self.stepSizeZPar = QtGui.QLineEdit('1')
-        self.stepSizeZPar.editingFinished.connect(
+        self.stepSizeZPar.textChanged.connect(
             lambda: self.scanParameterChanged('stepSizeZ'))
         self.sampleRate = 100000
 
@@ -119,29 +119,29 @@ class ScanWidget(QtGui.QMainWindow):
                               'stepSizeZ': float(self.stepSizeZPar.text())}
 
         self.start405Par = QtGui.QLineEdit('0')
-        self.start405Par.editingFinished.connect(
+        self.start405Par.textChanged.connect(
             lambda: self.pxParameterChanged('start405'))
         self.start488Par = QtGui.QLineEdit('0')
-        self.start488Par.editingFinished.connect(
+        self.start488Par.textChanged.connect(
             lambda: self.pxParameterChanged('start488'))
         self.start473Par = QtGui.QLineEdit('0')
-        self.start473Par.editingFinished.connect(
+        self.start473Par.textChanged.connect(
             lambda: self.pxParameterChanged('start473'))
         self.startCAMPar = QtGui.QLineEdit('0')
-        self.startCAMPar.editingFinished.connect(
+        self.startCAMPar.textChanged.connect(
             lambda: self.pxParameterChanged('startCAM'))
 
         self.end405Par = QtGui.QLineEdit('0')
-        self.end405Par.editingFinished.connect(
+        self.end405Par.textChanged.connect(
             lambda: self.pxParameterChanged('end405'))
         self.end488Par = QtGui.QLineEdit('0')
-        self.end488Par.editingFinished.connect(
+        self.end488Par.textChanged.connect(
             lambda: self.pxParameterChanged('end488'))
         self.end473Par = QtGui.QLineEdit('0')
-        self.end473Par.editingFinished.connect(
+        self.end473Par.textChanged.connect(
             lambda: self.pxParameterChanged('end473'))
         self.endCAMPar = QtGui.QLineEdit('0')
-        self.endCAMPar.editingFinished.connect(
+        self.endCAMPar.textChanged.connect(
             lambda: self.pxParameterChanged('endCAM'))
 
         self.pxParameters = {'start405': self.start405Par,
@@ -170,7 +170,7 @@ class ScanWidget(QtGui.QMainWindow):
         self.updateScan(self.allDevices)
         self.scanParameterChanged('seqTime')
 
-        self.multiScanWgt = MultipleScanWidget()
+        self.multiScanWgt = MultipleScanWidget(self)
 
         self.scanRadio = QtGui.QRadioButton('Scan')
         self.scanRadio.clicked.connect(lambda: self.setScanOrNot(True))
@@ -292,8 +292,7 @@ class ScanWidget(QtGui.QMainWindow):
             self.graph.update(self.allDevices)
         self.stageScan.updateFrames(self.scanParValues)
         self.nrFramesPar.setText(str(self.stageScan.frames))
-        self.scanDuration = (self.stageScan.frames *
-                             self.scanParValues['seqTime'])
+        self.scanDuration = 0.001*self.scanParValues['seqTime']/self.sampleRate
         self.scanDurationLabel.setText(str(np.round(self.scanDuration, 2)))
 
     def pxParameterChanged(self, p):
@@ -504,25 +503,16 @@ class Scanner(QtCore.QObject):
         fullDOsig = np.array(
             [self.pxCycle.sigDict[devs[i]] for i in DOchans])
 
+        """When doing unidirectional scan, the time needed for the stage to
+        move back to the initial x needs to be filled with zeros/False.
+        This time is now set to the time spanned by 1 sequence.
+        Therefore, the digital signal is assambled as the repetition of the
+        sequence for the whole scan in one row and then append zeros for 1
+        sequence time. THIS IS NOW INCOMPATIBLE WITH VOLUMETRIC SCAN, maybe."""
         # Signal for a single line
         lineSig = np.tile(fullDOsig, self.stageScan.FOVscan.stepsX)
-        emptySeqs = self.stageScan.FOVscan.stepsX
-        emptySig = np.zeros((4, int(self.stageScan.seqSamps*(emptySeqs + 2))),
-                            dtype=bool)
-        fullDOsig = np.concatenate((emptySig, lineSig), axis=1)
-#        fullDOsig = np.tile(fullDOsig, self.stageScan.FOVscan.stepsY)
-#        np.concatefullDOsig
-
-#        """If doing unidirectional scan, the time needed for the stage to move
-#        back to the initial x needs to be filled with zeros/False. This time is
-#        equal to one "row time". To do so we first have to repeat the
-#        sequence for the whole scan in one plane and then append zeros.
-#        THIS IS NOW INCOMPATIBLE WITH VOLUMETRIC SCAN."""
-#        fullDOsig = np.tile(fullDOsig, self.stageScan.FOVscan.stepsX)
-#        fullDOsig = np.concatenate(
-#            (fullDOsig,
-#             np.zeros((4, self.stageScan.FOVscan.rowSamps), dtype=bool)),
-#            axis=1)
+        emptySig = np.zeros((4, int(self.stageScan.seqSamps)), dtype=bool)
+        fullDOsig = np.concatenate((emptySig, lineSig, emptySig), axis=1)
 
         # TODO: adapt this to work with unidirectional scanning (see before)
         """If doing VOLume scan, the time needed for the stage to move
@@ -544,9 +534,10 @@ class Scanner(QtCore.QObject):
         self.waiter.waitdoneSignal.connect(self.finalize)
 
         plt.figure()
-        plt.plot(0.3*np.tile(fullDOsig[1], self.stageScan.FOVscan.stepsY))
-        plt.plot(fullAOsig[0])
-        plt.plot(fullAOsig[1])
+        plt.plot(0.3*np.tile(fullDOsig[1],
+                             int(0.25*self.stageScan.FOVscan.stepsY)))
+        plt.plot(fullAOsig[0][:int(0.25*len(fullAOsig[0]))])
+        plt.plot(fullAOsig[1][:int(0.25*len(fullAOsig[0]))])
 
         self.aotask.write(fullAOsig, auto_start=False)
         self.dotask.write(fullDOsig, auto_start=False)
@@ -607,15 +598,16 @@ class Scanner(QtCore.QObject):
 
 class MultipleScanWidget(QtGui.QFrame):
 
-    def __init__(self):
-
+    def __init__(self, main):
         super().__init__()
+
+        self.main = main
 
         # make illumination image widget
         self.illum_wgt = IllumImageWidget()
 
         # make worker
-        self.worker = MultiScanWorker(self)
+        self.worker = MultiScanWorker(self, self.main)
 
         # make other GUI componentsa
         self.analysis_btn = QtGui.QPushButton('Analyze')
@@ -626,10 +618,10 @@ class MultipleScanWidget(QtGui.QFrame):
         self.show_beads_btn.clicked.connect(self.worker.find_fp)
         self.quality_label = QtGui.QLabel('Quality level of points')
         self.quality_edit = QtGui.QLineEdit('0.05')
-        self.quality_edit.editingFinished.connect(self.worker.find_fp)
+        self.quality_edit.textChanged.connect(self.worker.find_fp)
         self.win_size_label = QtGui.QLabel('Window size [px]')
         self.win_size_edit = QtGui.QLineEdit('10')
-        self.win_size_edit.editingFinished.connect(self.worker.find_fp)
+        self.win_size_edit.textChanged.connect(self.worker.find_fp)
 
         self.beads_label = QtGui.QLabel('Bead number')
         self.beads_box = QtGui.QComboBox()
@@ -692,10 +684,11 @@ class MultipleScanWidget(QtGui.QFrame):
 
 class MultiScanWorker(QtCore.QObject):
 
-    def __init__(self, main_wgt):
+    def __init__(self, main_wgt, mainScanWid):
         super().__init__()
 
         self.main = main_wgt
+        self.mainScanWid = mainScanWid
         self.illum_images = []
         self.illum_images_stocked = []
         self.labels = []
@@ -727,16 +720,16 @@ class MultiScanWorker(QtCore.QObject):
         # draw feature point window
         self.delete_label()
         for i, point in enumerate(self.f_feature):
-            point_x, point_y = point.ravel()
+            pointX, pointY = point.ravel()
             frame_rect = rectangle(self.f_frame,
-                                   (int(point_x - self.radius),
-                                    int(point_y - self.radius)),
-                                   (int(point_x + self.radius),
-                                    int(point_y + self.radius)),
+                                   (int(pointX - self.radius),
+                                    int(pointY - self.radius)),
+                                   (int(pointX + self.radius),
+                                    int(pointY + self.radius)),
                                    255, 1)
             self.main.illum_wgt.update(frame_rect)
             label = pg.TextItem()
-            label.setPos(point_x + self.radius, point_y + self.radius)
+            label.setPos(pointX + self.radius, pointY + self.radius)
             label.setText(str(i))
             self.labels.append(label)
             self.main.illum_wgt.vb.addItem(label)
@@ -795,10 +788,14 @@ class MultiScanWorker(QtCore.QObject):
             feature_prev = good_next.reshape(-1, 1, 2)
 
         # reconstruct the illumination image
-        side = int(np.sqrt(np.size(data_mean[0])))
+        stepsX = self.mainScanWid.scanner.stageScan.FOVscan.stepsX
+        stepsY = self.mainScanWid.scanner.stageScan.FOVscan.stepsY
         for i in range(len(data_mean)):
-            data_r = np.reshape(data_mean[i], [side, side])
-            data_r[::2] = np.fliplr(data_r[::2])
+            data_r = np.reshape(data_mean[i], [stepsX, stepsY])
+
+#            # Bidirectional scanning
+#            data_r[::2] = np.fliplr(data_r[::2])
+
             self.illum_images.append(data_r)
             self.main.beads_box.addItem(str(i))
         self.illum_images_stocked.append(self.illum_images)
@@ -811,16 +808,16 @@ class MultiScanWorker(QtCore.QObject):
             dif_x = f_cps[i][0] - l_cps[i][0]
             dif_y = f_cps[i][1] - l_cps[i][1]
             dif.append(max(dif_x, dif_y))
-        rate = side / np.average(dif)
+        rate = stepsX / np.average(dif)
         img_large = np.zeros((int(self.f_frame.shape[0] * rate),
                               int(self.f_frame.shape[1] * rate)))
         self.points_large = []
         for point, illum_image in zip(self.f_feature, self.illum_images):
-            point_x, point_y = point.ravel()
-            point_x = int(point_x * rate)
-            point_y = int(point_y * rate)
-            img_large[point_y:point_y+side, point_x:point_x+side] = illum_image
-            self.points_large.append([point_x, point_y])
+            pointX, pointY = point.ravel()
+            pointX = int(pointX * rate)
+            pointY = int(pointY * rate)
+            img_large[pointY:pointY+stepsY, pointX:pointX+stepsX] = illum_image
+            self.points_large.append([pointX, pointY])
         self.illum_images.append(img_large)
 
         # update illumination image
@@ -829,9 +826,8 @@ class MultiScanWorker(QtCore.QObject):
         self.main.beads_box.setCurrentIndex(len(self.illum_images) - 1)
         self.main.illum_wgt.vb.autoRange()
 
-        if len(self.illum_images) == 1:
-            print('ee')
-            self.main.multiScanWgt.next_bead()
+        if len(self.illum_images) == 2:
+            self.main.next_bead()
 
     def overlay(self):
         ind = self.main.overlay_box.currentIndex()
@@ -905,15 +901,17 @@ class IllumImageWidget(pg.GraphicsLayoutWidget):
         self.vb.addItem(self.img_back)
         self.img_back.setZValue(10)
         self.img_back.setOpacity(0.5)
-        self.hist = pg.HistogramLUTItem(image=self.img_back)
-        self.hist.vb.setLimits(yMin=0, yMax=66000)
-        self.addItem(self.hist, row=1, col=3)
+        self.hist_back = pg.HistogramLUTItem(image=self.img_back)
+        self.hist_back.vb.setLimits(yMin=0, yMax=66000)
+        self.addItem(self.hist_back, row=1, col=3)
 
     def update(self, img):
         self.img.setImage(img.T)
+        self.hist.setLevels(*guitools.bestLimits(img))
 
     def update_back(self, img):
         self.img_back.setImage(img.T)
+        self.hist_back.setLevels(*guitools.bestLimits(img))
 
     def delete_back(self):
         self.img_back.clear()
@@ -1069,75 +1067,25 @@ class FOVscan():
         self.rowSamps = self.stepsX * self.seqSamps
         self.colSamps = self.stepsY * self.seqSamps
 
-#        # Smooth scanning, by Aurelién
-#        fracRemoved = 0.1
-#        nSamplesRamp = int(2 * fracRemoved * self.rowSamps)
-#        nSampsFlat = int((2 * self.rowSamps - nSamplesRamp))
-#        rampAx2 = makeRamp(0, self.corrStepSize, nSamplesRamp)
-#        self.freq = self.sampleRate / (self.rowSamps * 2)
-#        # sine scanning
-#        sine = 2*np.pi*np.arange(0, 2*self.rowSamps*self.stepsY)
-#        sine /= (2*self.rowSamps)
-#        # Sine varies from -1 to 1 so need to divide by 2
-#        sine = np.sin(sine) * sizeX / 2
-#        newValue = startY
-#        Xsig = []
-#        Ysig = []
-#        for i in range(0, self.stepsY):
-#            Ysig = np.concatenate(
-#                (Ysig, newValue*np.ones(nSampsFlat), newValue + rampAx2))
-#            newValue += self.corrStepSize
-#        # Correction for amplitude:
-#        Xsig = sine * ampCorrection(fracRemoved, self.freq)
-#        Xsig += startX
-
-#        # Generate the delay samples in the end of the scan
-#        # elimination of 1/4 period at the beginning
-#        delay = self.sampleRate / self.freq / 2
-#        delay += phaseCorr(self.freq)/self.freq*self.sampleRate/2/np.pi
-#        delay = int(delay)
-#        sine = np.arange(delay)/delay*2*np.pi*self.freq/self.sampleRate
-#        sine = np.sin(sine) * sizeX * convFactors['x'] / 2
-#        Xsig = np.concatenate((Xsig, sine))
-#        Ysig = np.concatenate((Ysig, Ysig[-1]*np.ones(delay)))
-
         # Ramps in Y axis
         Yramp = makeRamp(startY, sizeY, self.colSamps)
         Yramps = np.split(Yramp, self.stepsY)
 
-#        # Back and forth scanning
-#        Ysig = np.array([np.concatenate((i[0]*np.ones(self.rowSamps), i))
-#                        for i in Yramps])
-
         # Unidirectional scanning
-        constant = np.ones((2*self.stepsX + 1)*self.seqSamps)
-        Ysig = np.array([np.concatenate((i, i[-1]*constant)) for i in Yramps])
+        constant = np.ones((self.stepsX + 1)*self.seqSamps)
+        Ysig = np.array([np.concatenate((i[0]*constant, i)) for i in Yramps])
         Ysig = Ysig.ravel()
-#        Ysig = np.concatenate((Ysig[0]*np.ones(self.seqSamps), Ysig, Yramps[-1][-1]*constant))
 
         LTRramp = makeRamp(startX, sizeX, self.rowSamps)
-        RTLramp = LTRramp[::-1]
-
-        LTRramp = np.concatenate((startX*np.ones(len(Yramps[0])), LTRramp))
-        RTLramp = np.concatenate((sizeX*np.ones(len(Yramps[0])), RTLramp))
+        # Fast return to startX
+        RTLramp = makeRamp(sizeX, startX, self.seqSamps)
+        LTRramp = np.concatenate((startX*np.ones(self.seqSamps), LTRramp))
+#        RTLramp = np.concatenate((sizeX*np.ones(len(Yramps[0])), RTLramp))
 
         LTRTLramp = np.concatenate((LTRramp, RTLramp))
 
-#        # Back and forth scanning
-#        if self.stepsY % 2 == 0:
-#            Xsig = np.tile(RTLTRramp, self.stepsY//2)
-#        else:
-#            Xsig = np.tile(RTLTRramp, (self.stepsY - 1)//2)
-#            Xsig = np.concatenate((Xsig, RTLramp))
-
         # Unidirectional scanning
         Xsig = np.tile(LTRTLramp, self.stepsY)
-
-#        # Square steps in Y axis
-#        Yval = startY
-#        Yval += np.array(
-#            [i*self.corrStepSize for i in np.arange(self.stepsY)])
-#        Ysig = np.repeat(Yval, self.rowSamps)
 
         self.sigDict['x'] = Xsig / convFactors['x']
         self.sigDict['y'] = Ysig / convFactors['y']
