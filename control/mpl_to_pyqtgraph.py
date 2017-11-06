@@ -77,7 +77,11 @@ def cmapToColormap(cmap, nTicks=16):
         elif ('red' in colordata) and isinstance(colordata['red'],
                                                  collections.Callable):
             indices = np.linspace(0., 1., nTicks)
-            luts = [np.clip(np.array(colordata[rgb](indices), dtype=np.float),
+            luts = [
+                np.clip(
+                    np.array(
+                        colordata[rgb](indices),
+                        dtype=np.float),
                     0,
                     1) *
                 255 for rgb in (
@@ -99,8 +103,8 @@ def cmapToColormap(cmap, nTicks=16):
                     rgbTuple[2] * 255) for rgbTuple in colordata]
             rgb_list = zip(indices, scaledRgbTuples)
 
-        # Case #4: a list of tuples with positions and RGB-values (e.g. 'terrain')
-        # -> this section is probably not needed anymore!?
+        # Case #4: a list of tuples with positions and RGB-values
+        # (e.g. 'terrain') -> this section is probably not needed anymore!?
         elif len(colordata[0]) == 2:
             rgb_list = [(idx, (vals[0] * 255, vals[1] * 255, vals[2] * 255))
                         for idx, vals in colordata]
@@ -140,7 +144,9 @@ class MplCmapImageView(pyqtgraph.ImageView):
         for cmapName in cmapNames:
             if not hasattr(matplotlib.cm, cmapName):
                 print(
-                    '[MplCmapImageView] Unknown cmap name: \'{}\'. Your Matplotlib installation might be outdated.'.format(cmapName))
+                    '[MplCmapImageView] Unknown cmap name: \'{}\'. Your '
+                    'Matplotlib installation might be '
+                    'outdated.'.format(cmapName))
             else:
                 # create a Dictionary just as the one at the top of
                 # GradientEditorItem.py
@@ -169,7 +175,8 @@ class MplCmapImageView(pyqtgraph.ImageView):
         self.gradientEditorItem.length = savedLength
 
     def cmapClicked(self, b=None):
-        """onclick handler for our custom entries in the GradientEditorItem's context menu"""
+        """onclick handler for our custom entries in the GradientEditorItem's
+        context menu"""
         act = self.sender()
         self.gradientEditorItem.restoreState(self.mplCmaps[act.name])
         self.activeCm = act.name

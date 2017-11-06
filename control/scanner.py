@@ -291,7 +291,7 @@ class ScanWidget(QtGui.QMainWindow):
             self.graph.update(self.allDevices)
         self.stageScan.updateFrames(self.scanParValues)
         self.nrFramesPar.setText(str(self.stageScan.frames))
-        self.scanDuration = 0.001*self.scanParValues['seqTime']/self.sampleRate
+        self.scanDuration = self.stageScan.frames*self.scanParValues['seqTime']
         self.scanDurationLabel.setText(str(np.round(self.scanDuration, 2)))
 
     def pxParameterChanged(self, p):
@@ -1227,19 +1227,3 @@ def makeSmoothStep(start, end, samples):
     x = np.linspace(start, end, num=samples, endpoint=True)
     signal = start + (end - start) * 0.5*(1 - np.cos(x * np.pi))
     return signal
-
-
-def ampCorrection(fracRemoved, freq):
-    """corrects the amplitude to take into account the sample we throw away and
-    the response of the stage
-
-    :param float fracRemoved: fraction of a cosine removed at the
-    beginning and end of acquisition of a line
-    :param float freq: scanning frequency in Hz"""
-    cosFactor = 1 / np.cos(np.pi * fracRemoved)
-    coeffs = [3.72521796e-12, -1.27313251e-09, 1.57438425e-07,
-              -7.70042004e-06, 5.38779963e-05, -8.34837794e-04,
-              1.00054532e+00]
-    polynom = np.poly1d(coeffs)
-    freqFactor = 1 / polynom(freq)
-    return freqFactor * cosFactor
