@@ -33,12 +33,12 @@ class ScanWidget(QtGui.QMainWindow):
     commented parameters etc. It contain an instance of stageScan and
     pixel_scan which in turn harbour the analog and digital signals
     respectively.
-    The function run is the function that is supposed to start communication
-    with the Nidaq through the Scanner object. This object was initially
-    written as a QThread object but is not right now.
+    The function run starts the communication with the Nidaq through the
+    Scanner object. This object was initially written as a QThread object but
+    is not right now.
     As seen in the commened lines of run() I also tried running in a QThread
     created in run().
-    The rest of the functions contain mosly GUI related code.'''
+    The rest of the functions contain mostly GUI related code.'''
     def __init__(self, device, main, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -335,14 +335,14 @@ class ScanWidget(QtGui.QMainWindow):
         else:
             self.scanner.abort()
 
-    def prepAndRun(self):
+    def prepAndRun(self, continuous=False):
         ''' Only called if scanner is not running (See scanOrAbort function).
         '''
         if self.scanRadio.isChecked():
             self.stageScan.update(self.scanParValues)
             self.scanButton.setText('Abort')
             self.scanner = Scanner(
-               self.nidaq, self.stageScan, self.pxCycle, self)
+               self.nidaq, self.stageScan, self.pxCycle, self, continuous)
             self.scanner.finalizeDone.connect(self.finalizeDone)
             self.scanner.scanDone.connect(self.scanDone)
             self.scanning = True
@@ -391,6 +391,9 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanButton.setEnabled(True)
             del self.scanner
             self.scanning = False
+        elif self.continuousCheck.isChecked():
+            self.scanButton.setEnabled(True)
+            self.prepAndRun(True)
         else:
             self.scanButton.setEnabled(True)
             self.prepAndRun()
@@ -439,12 +442,14 @@ class Scanner(QtCore.QObject):
     scanDone = QtCore.pyqtSignal()
     finalizeDone = QtCore.pyqtSignal()
 
-    def __init__(self, device, stageScan, pxCycle, main, *args, **kwargs):
+    def __init__(self, device, stageScan, pxCycle, main, continuous=False,
+                 *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.nidaq = device
         self.stageScan = stageScan
         self.pxCycle = pxCycle
+        self.continuous = continuous
 
         self.sampsInScan = len(self.stageScan.sigDict['x'])
         self.main = main
@@ -466,7 +471,7 @@ class Scanner(QtCore.QObject):
         scanTime = self.sampsInScan / self.main.sampleRate
         ret = QtGui.QMessageBox.Yes
         self.scanTimeW.setText("Scan will take %s seconds" % scanTime)
-        if scanTime > 10:
+        if scanTime > 10 and not(self.continuous):
             ret = self.scanTimeW.exec_()
 
         if ret == QtGui.QMessageBox.No:
@@ -531,12 +536,6 @@ class Scanner(QtCore.QObject):
             samps_per_chan=self.sampsInScan)
 
         self.waiter.waitdoneSignal.connect(self.finalize)
-
-        plt.figure()
-        plt.plot(0.3*np.tile(fullDOsig[1],
-                             int(0.25*self.stageScan.FOVscan.stepsY)))
-        plt.plot(fullAOsig[0][:int(0.25*len(fullAOsig[0]))])
-        plt.plot(fullAOsig[1][:int(0.25*len(fullAOsig[0]))])
 
         self.aotask.write(fullAOsig, auto_start=False)
         self.dotask.write(fullDOsig, auto_start=False)
@@ -699,6 +698,8 @@ class MultiScanWorker(QtCore.QObject):
                                    blockSize=7)
 
     def set_images(self, images):
+        self.steps = [self.mainScanWid.scanner.stageScan.FOVscan.stepsX,
+                      self.mainScanWid.scanner.stageScan.FOVscan.stepsY]
         self.images = images
 
     def find_fp(self):
@@ -767,9 +768,8 @@ class MultiScanWorker(QtCore.QObject):
                 data_mean[i].append(mean)
 
         # reconstruct the illumination image
-        imside = int(np.sqrt(np.size(data_mean[0])))
         for i in range(len(data_mean)):
-            data_r = np.reshape(data_mean[i], [imside, imside])
+            data_r = np.reshape(data_mean[i], self.steps)
             self.illum_images.append(data_r)
             self.main.beads_box.addItem(str(i))
         self.illum_images_stocked.append(self.illum_images)
@@ -782,14 +782,14 @@ class MultiScanWorker(QtCore.QObject):
             dif_x = cps_f[i][0] - cps_l[i][0]
             dif_y = cps_f[i][1] - cps_l[i][1]
             dif.append(max(dif_x, dif_y))
-        rate = imside / np.average(dif)
+        rate = self.steps[0] / np.average(dif)
         img_large = np.zeros((int(self.f_frame.shape[0]*rate),
                               int(self.f_frame.shape[1]*rate)))
         self.points_large = []
         for point, illum_image in zip(self.fps_f, self.illum_images):
             px = int(point[0] * rate)
             py = int(point[1] * rate)
-            img_large[py:py+imside, px:px+imside] = illum_image
+            img_large[py:py+self.steps[1], px:px+self.steps[0]] = illum_image
             self.points_large.append([px, py])
         self.illum_images.append(img_large)
 
@@ -866,10 +866,12 @@ class IllumImageWidget(pg.GraphicsLayoutWidget):
         self.img = pg.ImageItem()
         self.vb.addItem(self.img)
         self.hist = pg.HistogramLUTItem(image=self.img)
-        self.hist.gradient.loadPreset('thermal')
+        self.hist.vb.setLimits(yMin=0, yMax=66000)
+        pos, rgba = zip(*mplToPg.cmapToColormap(plt.get_cmap('Reds_r')))
+        redsColormap = pg.ColorMap(pos, rgba)
+        self.hist.gradient.setColorMap(redsColormap)
         for tick in self.hist.gradient.ticks:
             tick.hide()
-        self.hist.vb.setLimits(yMin=0, yMax=66000)
         self.addItem(self.hist, row=1, col=2)
 
         self.img_back = pg.ImageItem()
@@ -879,11 +881,10 @@ class IllumImageWidget(pg.GraphicsLayoutWidget):
         self.hist_back = pg.HistogramLUTItem(image=self.img_back)
         self.hist_back.vb.setLimits(yMin=0, yMax=66000)
         pos, rgba = zip(*mplToPg.cmapToColormap(plt.get_cmap('Greens_r')))
-        pgColormap = pg.ColorMap(pos, rgba)
-        self.hist_back.gradient.setColorMap(pgColormap)
+        greensColormap = pg.ColorMap(pos, rgba)
+        self.hist_back.gradient.setColorMap(greensColormap)
         for tick in self.hist_back.gradient.ticks:
             tick.hide()
-
         self.addItem(self.hist_back, row=1, col=3)
 
     def update(self, img):
@@ -1242,15 +1243,3 @@ def ampCorrection(fracRemoved, freq):
     polynom = np.poly1d(coeffs)
     freqFactor = 1 / polynom(freq)
     return freqFactor * cosFactor
-
-
-def phaseCorr(freq):
-    """models the frequency-dependant phase shift of a Piezoconcept LFSH2
-    stage, x axis(fast)
-
-    :param float freq: frequency of the driving signal"""
-    coeffs = [1.06208989e-09, 4.13293782e-07, -1.65441906e-04,
-              2.35337482e-02, -3.73010981e-02]
-    polynom = np.poly1d(coeffs)
-    phase = polynom(freq)
-    return phase
