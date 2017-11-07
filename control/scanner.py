@@ -181,15 +181,11 @@ class ScanWidget(QtGui.QMainWindow):
         self.scanButton = QtGui.QPushButton('Scan')
         self.scanning = False
         self.scanButton.clicked.connect(self.scanOrAbort)
-        self.previewButton = QtGui.QPushButton('Preview')
+        self.previewButton = QtGui.QPushButton('Plot scan path')
+        self.previewButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
+                                         QtGui.QSizePolicy.Expanding)
         self.previewButton.clicked.connect(self.previewScan)
-        self.continuousCheck = QtGui.QCheckBox('Continuous Scan')
-
-        # Crosshair
-        self.crosshair = guitools.Crosshair(self.multiScanWgt.illum_wgt.vb)
-        self.crossButton = QtGui.QPushButton('Cross')
-        self.crossButton.setCheckable(True)
-        self.crossButton.pressed.connect(self.crosshair.toggle)
+        self.continuousCheck = QtGui.QCheckBox('Repeat')
 
         self.cwidget = QtGui.QWidget()
         self.setCentralWidget(self.cwidget)
@@ -198,54 +194,54 @@ class ScanWidget(QtGui.QMainWindow):
 
         grid.addWidget(self.loadScanBtn, 0, 0)
         grid.addWidget(self.saveScanBtn, 0, 1)
-        grid.addWidget(QtGui.QLabel('Size X (µm):'), 1, 0)
-        grid.addWidget(self.sizeXPar, 1, 1)
-        grid.addWidget(QtGui.QLabel('Size Y (µm):'), 2, 0)
-        grid.addWidget(self.sizeYPar, 2, 1)
-        grid.addWidget(QtGui.QLabel('Size Z (µm):'), 3, 0)
-        grid.addWidget(self.sizeZPar, 3, 1)
-        grid.addWidget(QtGui.QLabel('Step size XY (µm):'), 1, 2)
-        grid.addWidget(self.stepSizeXYPar, 1, 3)
-        grid.addWidget(QtGui.QLabel('Step size Z (µm):'), 3, 2)
-        grid.addWidget(self.stepSizeZPar, 3, 3)
-
-        grid.addWidget(QtGui.QLabel('Number of frames:'), 9, 0)
-        grid.addWidget(self.nrFramesPar, 9, 1)
-        grid.addWidget(QtGui.QLabel('Duration (s):'), 10, 0)
-        grid.addWidget(self.scanDurationLabel, 10, 1)
-
         grid.addWidget(self.scanRadio, 0, 2)
-        grid.addWidget(QtGui.QLabel('Mode:'), 1, 5)
-        grid.addWidget(self.scanMode, 1, 6)
-        grid.addWidget(QtGui.QLabel('Primary dimension:'), 2, 5)
-        grid.addWidget(self.primScanDim, 2, 6)
         grid.addWidget(self.contLaserPulsesRadio, 0, 3)
 
-        grid.addWidget(QtGui.QLabel('Start (ms):'), 6, 3)
-        grid.addWidget(QtGui.QLabel('End (ms):'), 6, 4)
-        grid.addWidget(QtGui.QLabel('Sequence Time (ms):'), 7, 0)
+        grid.addWidget(QtGui.QLabel('Size X (µm):'), 2, 0)
+        grid.addWidget(self.sizeXPar, 2, 1)
+        grid.addWidget(QtGui.QLabel('Size Y (µm):'), 3, 0)
+        grid.addWidget(self.sizeYPar, 3, 1)
+        grid.addWidget(QtGui.QLabel('Size Z (µm):'), 4, 0)
+        grid.addWidget(self.sizeZPar, 4, 1)
+        grid.addWidget(QtGui.QLabel('Step size XY (µm):'), 2, 2)
+        grid.addWidget(self.stepSizeXYPar, 2, 3)
+        grid.addWidget(QtGui.QLabel('Step size Z (µm):'), 4, 2)
+        grid.addWidget(self.stepSizeZPar, 4, 3)
+        grid.addWidget(QtGui.QLabel('Mode:'), 2, 4)
+        grid.addWidget(self.scanMode, 2, 5)
+        grid.addWidget(QtGui.QLabel('Primary dimension:'), 3, 4)
+        grid.addWidget(self.primScanDim, 3, 5)
+        grid.addWidget(QtGui.QLabel('Number of frames:'), 4, 4)
+        grid.addWidget(self.nrFramesPar, 4, 5)
+        grid.addWidget(self.previewButton, 2, 7, 3, 1)
+
+        grid.addWidget(QtGui.QLabel('Dwell time (ms):'), 7, 0)
         grid.addWidget(self.seqTimePar, 7, 1)
-        grid.addWidget(QtGui.QLabel('405:'), 7, 2)
-        grid.addWidget(self.start405Par, 7, 3)
-        grid.addWidget(self.end405Par, 7, 4)
-        grid.addWidget(QtGui.QLabel('488:'), 8, 2)
-        grid.addWidget(self.start488Par, 8, 3)
-        grid.addWidget(self.end488Par, 8, 4)
-        grid.addWidget(QtGui.QLabel('473:'), 9, 2)
-        grid.addWidget(self.start473Par, 9, 3)
-        grid.addWidget(self.end473Par, 9, 4)
-        grid.addWidget(QtGui.QLabel('Camera:'), 10, 2)
-        grid.addWidget(self.startCAMPar, 10, 3)
-        grid.addWidget(self.endCAMPar, 10, 4)
+        grid.addWidget(QtGui.QLabel('Total time (s):'), 7, 2)
+        grid.addWidget(self.scanDurationLabel, 7, 3)
+        grid.addWidget(QtGui.QLabel('Start (ms):'), 8, 1)
+        grid.addWidget(QtGui.QLabel('End (ms):'), 8, 2)
+        grid.addWidget(QtGui.QLabel('405:'), 9, 0)
+        grid.addWidget(self.start405Par, 9, 1)
+        grid.addWidget(self.end405Par, 9, 2)
+        grid.addWidget(QtGui.QLabel('488:'), 10, 0)
+        grid.addWidget(self.start488Par, 10, 1)
+        grid.addWidget(self.end488Par, 10, 2)
+        grid.addWidget(QtGui.QLabel('473:'), 11, 0)
+        grid.addWidget(self.start473Par, 11, 1)
+        grid.addWidget(self.end473Par, 11, 2)
+        grid.addWidget(QtGui.QLabel('Camera:'), 12, 0)
+        grid.addWidget(self.startCAMPar, 12, 1)
+        grid.addWidget(self.endCAMPar, 12, 2)
+        grid.addWidget(self.graph, 8, 3, 5, 5)
 
-        grid.addWidget(self.graph, 11, 0, 1, 7)
-        grid.addWidget(self.multiScanWgt, 13, 0, 4, 7)
-        grid.addWidget(self.crossButton, 12, 3)
-        grid.addWidget(self.previewButton, 12, 0)
-        grid.addWidget(self.scanButton, 12, 1)
-        grid.addWidget(self.continuousCheck, 12, 2)
+        grid.addWidget(self.scanButton, 14, 0, 1, 6)
+        grid.addWidget(self.continuousCheck, 14, 7)
+        grid.addWidget(self.multiScanWgt, 15, 0, 4, 9)
 
-        grid.setRowMinimumHeight(4, 20)
+        grid.setRowMinimumHeight(1, 10)
+        grid.setRowMinimumHeight(6, 10)
+        grid.setRowMinimumHeight(13, 10)
 
     @property
     def scanOrNot(self):
@@ -364,7 +360,8 @@ class ScanWidget(QtGui.QMainWindow):
     def scanDone(self):
         self.scanButton.setEnabled(False)
 
-        if not self.scanner.aborted:
+        buildImg = self.multiScanWgt.makeImgBox.isChecked()
+        if not self.scanner.aborted and buildImg:
             time.sleep(0.1)
             self.end_f = self.main.lvworkers[0].f_ind
             if self.end_f >= self.start_f - 1:
@@ -383,7 +380,7 @@ class ScanWidget(QtGui.QMainWindow):
 
             self.multiScanWgt.worker.set_images(reshapeddata[1:])
             self.multiScanWgt.worker.find_fp()
-            self.multiScanWgt.worker.analyse()
+            self.multiScanWgt.worker.analyze()
 
     def finalizeDone(self):
         if (not self.continuousCheck.isChecked()) or self.scanner.aborted:
@@ -604,12 +601,20 @@ class MultipleScanWidget(QtGui.QFrame):
         # make illumination image widget
         self.illum_wgt = IllumImageWidget()
 
+        self.makeImgBox = QtGui.QCheckBox('Build scan image')
+
+        # Crosshair
+        self.crosshair = guitools.Crosshair(self.illum_wgt.vb)
+        self.crossButton = QtGui.QPushButton('Crosshair')
+        self.crossButton.setCheckable(True)
+        self.crossButton.pressed.connect(self.crosshair.toggle)
+
         # make worker
         self.worker = MultiScanWorker(self, self.main)
 
         # make other GUI componentsa
         self.analysis_btn = QtGui.QPushButton('Analyze')
-        self.analysis_btn.clicked.connect(self.worker.analyse)
+        self.analysis_btn.clicked.connect(self.worker.analyze)
         self.analysis_btn.setSizePolicy(QtGui.QSizePolicy.Preferred,
                                         QtGui.QSizePolicy.Expanding)
         self.show_beads_btn = QtGui.QPushButton('Show beads')
@@ -636,21 +641,23 @@ class MultipleScanWidget(QtGui.QFrame):
         grid = QtGui.QGridLayout()
         self.setLayout(grid)
 
-        grid.addWidget(self.illum_wgt, 0, 0, 1, 8)
+        grid.addWidget(self.makeImgBox, 0, 0)
+        grid.addWidget(self.crossButton, 0, 1)
+        grid.addWidget(self.illum_wgt, 1, 0, 1, 8)
 
-        grid.addWidget(self.quality_label, 1, 0)
-        grid.addWidget(self.quality_edit, 1, 1)
-        grid.addWidget(self.win_size_label, 2, 0)
-        grid.addWidget(self.win_size_edit, 2, 1)
-        grid.addWidget(self.show_beads_btn, 1, 2)
-        grid.addWidget(self.analysis_btn, 2, 2)
+        grid.addWidget(self.quality_label, 2, 0)
+        grid.addWidget(self.quality_edit, 2, 1)
+        grid.addWidget(self.win_size_label, 3, 0)
+        grid.addWidget(self.win_size_edit, 3, 1)
+        grid.addWidget(self.show_beads_btn, 2, 2)
+        grid.addWidget(self.analysis_btn, 3, 2)
 
-        grid.addWidget(self.beads_label, 1, 4)
-        grid.addWidget(self.beads_box, 1, 5)
-        grid.addWidget(self.change_beads_button, 2, 4, 1, 2)
-        grid.addWidget(self.overlay_check, 1, 6)
-        grid.addWidget(self.overlay_box, 1, 7)
-        grid.addWidget(self.clear_btn, 2, 6, 1, 2)
+        grid.addWidget(self.beads_label, 2, 4)
+        grid.addWidget(self.beads_box, 2, 5)
+        grid.addWidget(self.change_beads_button, 3, 4, 1, 2)
+        grid.addWidget(self.overlay_check, 2, 6)
+        grid.addWidget(self.overlay_box, 2, 7)
+        grid.addWidget(self.clear_btn, 3, 6, 1, 2)
 
         grid.setColumnMinimumWidth(3, 100)
 
@@ -741,7 +748,7 @@ class MultiScanWorker(QtCore.QObject):
         self.main.illum_wgt.update(self.frame_view)
         self.main.illum_wgt.vb.autoRange()
 
-    def analyse(self):
+    def analyze(self):
         self.main.beads_box.clear()
         self.illum_images = []
 
@@ -753,18 +760,15 @@ class MultiScanWorker(QtCore.QObject):
         for i in range(len(self.centers)):
             data_mean.append([])
             # record the center point of gravity
-            cps_f.append(self.find_cp(self.f_frame,
-                                      self.fps_f[i].astype(np.uint16),
-                                      self.radius))
-            cps_l.append(self.find_cp(self.l_frame,
-                                      self.fps_l[i].astype(np.uint16),
-                                      self.radius))
+            cps_f.append(self.find_cp(
+                self.f_frame, self.fps_f[i].astype(np.uint16), self.radius))
+            cps_l.append(self.find_cp(
+                self.l_frame, self.fps_l[i].astype(np.uint16), self.radius))
 
             # calculate the mean of ROI
             for image in self.images:
-                mean = self.mean_roi(image,
-                                     self.centers[i].astype(np.uint16),
-                                     self.radius)
+                mean = self.mean_roi(
+                    image, self.centers[i].astype(np.uint16), self.radius)
                 data_mean[i].append(mean)
 
         # reconstruct the illumination image
@@ -1208,7 +1212,6 @@ class GraphFrame(pg.GraphicsWindow):
                             '488': self.plot.plot(pen=pg.mkPen(0, 247, 255)),
                             '473': self.plot.plot(pen=pg.mkPen(0, 183, 255)),
                             'CAM': self.plot.plot(pen='w')}
-        self.resize(600, 200)
 
     def update(self, devices=None):
         if devices is None:
