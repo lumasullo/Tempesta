@@ -626,7 +626,7 @@ class CamParamTree(ParameterTree):
                   {'name': 'Image frame', 'type': 'group', 'children': [
                       {'name': 'Binning', 'type': 'list', 
                                   'values': [1, 2, 4], 'tip': BinTip},
-{'name': 'Mode', 'type': 'list', 'values': ['Full Widefield', 'Full chip', 'Minimal line', 'Microlenses', 'Fast ROI', 'Fast ROI only v2', 'Custom']},
+{'name': 'Mode', 'type': 'list', 'values': ['Full Widefield', 'Full chip', 'Minimal line', 'Microlenses v2', 'Microlenses v3', 'Fast ROI v2', 'Fast ROI v3', 'Custom']},
 {'name': 'X0', 'type': 'int', 'value': 0, 'limits': (0, 2044)},
 {'name': 'Y0', 'type': 'int', 'value': 0, 'limits': (0, 2044)},
 {'name': 'Width', 'type': 'int', 'value': 2048, 'limits': (1, 2048)},
@@ -940,8 +940,13 @@ class TormentaGUI(QtGui.QMainWindow):
                                           QtGui.QSizePolicy.Expanding)
         self.liveviewButton.clicked.connect(self.liveview)      #Link button click to funciton liveview
         self.liveviewButton.setEnabled(True)
-        self.viewtimer = QtCore.QTimer()
-        self.viewtimer.timeout.connect(self.updateView)
+        self.viewtimer1 = QtCore.QTimer()
+        self.viewtimer1.timeout.connect(self.updateView)
+        self.viewtimer2 = QtCore.QTimer()
+        self.viewtimer2.timeout.connect(self.updateView)
+        self.viewtimers = [self.viewtimer1, self.viewtimer2]
+        
+        self.liveviewrunning = [False, False]        
         
         self.alignmentON = False
         
@@ -1164,7 +1169,9 @@ class TormentaGUI(QtGui.QMainWindow):
             self.orcaflash = self.cameras[1]
             self.CamLabel.setText('OrcaFlash V3')
         
-        self.curr_cam_ind = np.mod(self.curr_cam_ind + 1, 2)        
+         
+        self.curr_cam_ind = np.mod(self.curr_cam_ind + 1, 2)  
+        self.liveviewButton.setChecked(self.liveviewrunning[self.curr_cam_ind])
         self.updateTimings()
         self.expPar.setValue(self.RealExpPar.value())
         
@@ -1297,9 +1304,9 @@ class TormentaGUI(QtGui.QMainWindow):
  
         vpos = int(4*np.ceil(vpos/4))
         hpos = int(4*np.ceil(hpos/4))
-        vsize = int(min(2048 - vpos, 128*np.ceil(vsize/128)))
-        hsize = int(min(2048 - hpos, 128*np.ceil(hsize/128))) # V3 camera seems to only be able to take multiples of 128.
-
+        vsize = int(min(2048 - vpos, 4*np.ceil(vsize/4)))
+        hsize = int(min(2048 - hpos, 128*np.ceil(hsize/128))) # The v3 camera seems to only be able to take multiples of 128 in this dimension.
+        
         
         self.cameras[self.curr_cam_ind].setPropertyValue('subarray_vsize', vsize)
         self.cameras[self.curr_cam_ind].setPropertyValue('subarray_hsize', hsize)
@@ -1361,8 +1368,9 @@ class TormentaGUI(QtGui.QMainWindow):
 
             
             if frameParam.param('Mode').value() == 'Full Widefield':
-                self.X0par.setValue(630)
-                self.Y0par.setValue(610)
+                print('Full widefield')
+                self.X0par.setValue(650)
+                self.Y0par.setValue(650)
                 self.Widthpar.setValue(800)
                 self.Heightpar.setValue(800)
                 self.adjustFrame()
@@ -1379,33 +1387,42 @@ class TormentaGUI(QtGui.QMainWindow):
 
                 self.ROI.hide()
 
-            elif frameParam.param('Mode').value() == 'Microlenses':
+            elif frameParam.param('Mode').value() == 'Microlenses v2':
                 print('Full chip')
-                self.X0par.setValue(595)
-                self.Y0par.setValue(685)
-                self.Widthpar.setValue(600)
-                self.Heightpar.setValue(600)
+                self.X0par.setValue(622)
+                self.Y0par.setValue(697)
+                self.Widthpar.setValue(635)
+                self.Heightpar.setValue(635)
                 self.adjustFrame()
 
                 self.ROI.hide()
                 
-                
-            elif frameParam.param('Mode').value() == 'Fast ROI':
+            elif frameParam.param('Mode').value() == 'Microlenses v3':
                 print('Full chip')
-                self.X0par.setValue(595)
-                self.Y0par.setValue(960)
-                self.Widthpar.setValue(600)
-                self.Heightpar.setValue(128)
+                self.X0par.setValue(923)
+                self.Y0par.setValue(728)
+                self.Widthpar.setValue(735)
+                self.Heightpar.setValue(735)
                 self.adjustFrame()
 
                 self.ROI.hide()
                 
-            elif frameParam.param('Mode').value() == 'Fast ROI only v2':
+            elif frameParam.param('Mode').value() == 'Fast ROI v2':
                 print('Full chip')
-                self.X0par.setValue(595)
-                self.Y0par.setValue(1000)
+                self.X0par.setValue(750)
+                self.Y0par.setValue(1010)
                 self.Widthpar.setValue(600)
-                self.Heightpar.setValue(50)
+                self.Heightpar.setValue(25)
+                self.adjustFrame()
+
+                self.ROI.hide()
+                
+            elif frameParam.param('Mode').value() == 'Fast ROI v3':
+                print('Full chip')
+                self.X0par.setValue(750) #1010
+                self.Y0par.setValue(1010)
+                self.Widthpar.setValue(600)
+                self.Heightpar.setValue(75)
                 self.adjustFrame()
 
                 self.ROI.hide()
@@ -1504,47 +1521,42 @@ class TormentaGUI(QtGui.QMainWindow):
         self.vb.scene().sigMouseMoved.connect(self.mouseMoved)
         self.recWidget.readyToRecord = True
         
-        for i in range(0,2):
-            self.lvworkers[i] = LVWorker(self, i, self.cameras[i])
-            self.lvthreads[i] = QtCore.QThread()
-            self.lvworkers[i].moveToThread(self.lvthreads[i])
-            self.lvthreads[i].started.connect(self.lvworkers[i].run)
-            self.lvthreads[i].start()
-            self.viewtimer.start(30)
+        self.lvworkers[self.curr_cam_ind] = LVWorker(self, self.curr_cam_ind, self.cameras[self.curr_cam_ind])
+        self.lvthreads[self.curr_cam_ind] = QtCore.QThread()
+        self.lvworkers[self.curr_cam_ind].moveToThread(self.lvthreads[self.curr_cam_ind])
+        self.lvthreads[self.curr_cam_ind].started.connect(self.lvworkers[self.curr_cam_ind].run)
+        self.lvthreads[self.curr_cam_ind].start()
+        self.viewtimers[self.curr_cam_ind].start(30)
             
         self.liveviewRun()
 
 
     def liveviewStop(self):
         
-        for i in range(0,2):
 
-            self.lvworkers[i].stop()
-            self.lvthreads[i].terminate()
-            # Turn off camera, close shutter
-            self.cameras[i].stopAcquisition()
+        self.lvworkers[self.curr_cam_ind].stop()
+        self.lvthreads[self.curr_cam_ind].terminate()
+        # Turn off camera, close shutter
             
-        self.viewtimer.stop()
+        self.viewtimers[self.curr_cam_ind].stop()
         self.recWidget.readyToRecord = False
 
         self.img.setImage(np.zeros(self.shapes[self.curr_cam_ind]), autoLevels=False)
+        self.liveviewPause()
             
 
 
     def liveviewRun(self):
 #       
-        for i in range(0,2):
-            self.lvworkers[i].reset() # Needed if parameter is changed during liveview since that causes camera to start writing to buffer place zero again.      
-            self.cameras[i].startAcquisition()
-#        time.sleep(0.3)
-#        self.viewtimer.start(0)
-#        self.lvthread.run()
-#        self.lvthread.start()
+
+        self.lvworkers[self.curr_cam_ind].reset() # Needed if parameter is changed during liveview since that causes camera to start writing to buffer place zero again.      
+        self.cameras[self.curr_cam_ind].startAcquisition()
+        self.liveviewrunning[self.curr_cam_ind] = True
     
     def liveviewPause(self):
         
-        for i in range(0,2):
-            self.cameras[i].stopAcquisition()
+        self.cameras[self.curr_cam_ind].stopAcquisition()
+        self.liveviewrunning[self.curr_cam_ind] = False
 
     def updateView(self):
         """ Image update while in Liveview mode
@@ -1599,7 +1611,9 @@ class TormentaGUI(QtGui.QMainWindow):
     def closeEvent(self, *args, **kwargs):
 
         # Stop running threads
-        self.viewtimer.stop()
+        self.viewtimer[0].stop()
+        self.viewtimer[1].stop()
+
 #        self.stabilizer.timer.stop()
 #        self.stabilizerThread.terminate()
         try:

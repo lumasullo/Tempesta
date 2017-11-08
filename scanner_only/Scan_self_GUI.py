@@ -38,7 +38,7 @@ class ScanWidget(QtGui.QMainWindow):
         self.nidaq = device
         self.aochannels = device.get_analog_output_channels()
         self.dochannels = device.get_digital_output_lines()
-        self.all_devices = ['TIS', '355', '405', '488', 'CAM']
+        self.all_devices = ['TIS', '355', '405', '488', 'CAM', 'OF1', 'OF2']
         self.saved_signal = np.array([0, 0])
         self.times_run = 0
         self.saveScanBtn = QtGui.QPushButton('Save Scan')
@@ -50,21 +50,29 @@ class ScanWidget(QtGui.QMainWindow):
         
         self.sampleRateEdit = QtGui.QLineEdit()
         
-        self.size_xPar = QtGui.QLineEdit('10')
+        self.size_xPar = QtGui.QLineEdit('0.75')
         self.size_xPar.editingFinished.connect(lambda: self.ScanParameterChanged('size_x'))
-        self.size_yPar = QtGui.QLineEdit('10')
+        self.size_yPar = QtGui.QLineEdit('0.75')
         self.size_yPar.editingFinished.connect(lambda: self.ScanParameterChanged('size_y'))
-        self.size_zPar = QtGui.QLineEdit('10')
+        self.size_zPar = QtGui.QLineEdit('1')
         self.size_zPar.editingFinished.connect(lambda: self.ScanParameterChanged('size_z'))
         self.sequence_timePar = QtGui.QLineEdit('100') # Milliseconds
         self.sequence_timePar.editingFinished.connect(lambda: self.ScanParameterChanged('sequence_time'))
         self.nrFramesPar = QtGui.QLabel()
         self.scanDuration = QtGui.QLabel()
-        self.step_sizeXYPar = QtGui.QLineEdit('0.5')
+        self.step_sizeXYPar = QtGui.QLineEdit('0.035')
         self.step_sizeXYPar.editingFinished.connect(lambda: self.ScanParameterChanged('step_sizeXY'))
-        self.step_sizeZPar = QtGui.QLineEdit('0.5')
+        self.step_sizeZPar = QtGui.QLineEdit('0.2')
         self.step_sizeZPar.editingFinished.connect(lambda: self.ScanParameterChanged('step_sizeZ'))
         self.sample_rate = 100000
+        self.x1_offsetPar = QtGui.QLineEdit('0')
+        self.x1_offsetPar.editingFinished.connect(lambda: self.ScanParameterChanged('x1_offset'))
+        self.y1_offsetPar = QtGui.QLineEdit('0')
+        self.y1_offsetPar.editingFinished.connect(lambda: self.ScanParameterChanged('y1_offset'))
+        self.x2_offsetPar = QtGui.QLineEdit('0')
+        self.x2_offsetPar.editingFinished.connect(lambda: self.ScanParameterChanged('x2_offset'))
+        self.y2_offsetPar = QtGui.QLineEdit('0')
+        self.y2_offsetPar.editingFinished.connect(lambda: self.ScanParameterChanged('y2_offset'))
 #        self.sample_rate = np.float(self.sampleRateEdit.text())
         
         self.Scan_Mode_label= QtGui.QLabel('Scan mode:')        
@@ -84,14 +92,22 @@ class ScanWidget(QtGui.QMainWindow):
                                 'size_z': self.size_zPar,
                                 'sequence_time': self.sequence_timePar,
                                 'step_sizeXY': self.step_sizeXYPar,
-                                'step_sizeZ': self.step_sizeZPar}
+                                'step_sizeZ': self.step_sizeZPar,
+                                'x1_offset': self.x1_offsetPar,
+                                'y1_offset': self.y1_offsetPar,
+                                'x2_offset': self.x2_offsetPar,
+                                'y2_offset': self.y2_offsetPar}
 
         self.scan_par_values = {'size_x': float(self.size_xPar.text()),
                            'size_y': float(self.size_yPar.text()),
                            'size_z': float(self.size_zPar.text()),
                            'sequence_time': float(self.sequence_timePar.text())/1000,
                            'step_sizeXY': float(self.step_sizeXYPar.text()), 
-                           'step_sizeZ': float(self.step_sizeZPar.text())}
+                           'step_sizeZ': float(self.step_sizeZPar.text()),
+                           'x1_offset': float(self.x1_offsetPar.text()),
+                           'y1_offset': float(self.y1_offsetPar.text()),
+                           'x2_offset': float(self.x2_offsetPar.text()),
+                           'y2_offset': float(self.y2_offsetPar.text())}
                            
         self.start488Par = QtGui.QLineEdit('0')
         self.start488Par.editingFinished.connect(lambda: self.PixelParameterChanged('start488'))
@@ -103,6 +119,10 @@ class ScanWidget(QtGui.QMainWindow):
         self.startTISPar.editingFinished.connect(lambda: self.PixelParameterChanged('startTIS'))
         self.startCAMPar = QtGui.QLineEdit('0')
         self.startCAMPar.editingFinished.connect(lambda: self.PixelParameterChanged('startCAM'))
+        self.startOF1Par = QtGui.QLineEdit('0')
+        self.startOF1Par.editingFinished.connect(lambda: self.PixelParameterChanged('startOF1'))
+        self.startOF2Par = QtGui.QLineEdit('0')
+        self.startOF2Par.editingFinished.connect(lambda: self.PixelParameterChanged('startOF2'))
         
         self.end488Par = QtGui.QLineEdit('0')
         self.end488Par.editingFinished.connect(lambda: self.PixelParameterChanged('end488'))
@@ -114,7 +134,10 @@ class ScanWidget(QtGui.QMainWindow):
         self.endTISPar.editingFinished.connect(lambda: self.PixelParameterChanged('endTIS'))
         self.endCAMPar = QtGui.QLineEdit('0')
         self.endCAMPar.editingFinished.connect(lambda: self.PixelParameterChanged('endCAM'))
-        
+        self.endOF1Par = QtGui.QLineEdit('0')
+        self.endOF1Par.editingFinished.connect(lambda: self.PixelParameterChanged('endOF1'))
+        self.endOF2Par = QtGui.QLineEdit('0')
+        self.endOF2Par.editingFinished.connect(lambda: self.PixelParameterChanged('endOF2'))        
         
 
         self.pixel_parameters = {'startTIS': self.startTISPar,
@@ -122,11 +145,15 @@ class ScanWidget(QtGui.QMainWindow):
                                  'start405': self.start405Par,
                                  'start488': self.start488Par,
                                  'startCAM': self.startCAMPar,
+                                 'startOF1': self.startOF1Par,
+                                 'startOF2': self.startOF2Par,
                                  'end488': self.end488Par,
                                  'end405': self.end405Par,
                                  'end355': self.end355Par,
                                  'endTIS': self.endTISPar,
-                                 'endCAM': self.endCAMPar}
+                                 'endCAM': self.endCAMPar,
+                                 'endOF1': self.endOF1Par,
+                                 'endOF2': self.endOF2Par}
 
         
         self.pixel_par_values = {'startTIS': float(self.startTISPar.text())/1000,
@@ -134,11 +161,15 @@ class ScanWidget(QtGui.QMainWindow):
                                  'start405': float(self.start405Par.text())/1000,
                                  'start488': float(self.start488Par.text())/1000,
                                  'startCAM': float(self.startCAMPar.text())/1000,
+                                 'startOF1': float(self.startOF1Par.text())/1000,
+                                 'startOF2': float(self.startOF2Par.text())/1000,
                                  'end488': float(self.end488Par.text())/1000,
                                  'end405': float(self.end405Par.text())/1000,
                                  'end355': float(self.end355Par.text())/1000,
                                  'endTIS': float(self.endTISPar.text())/1000,
-                                 'endCAM': float(self.endCAMPar.text())/1000}
+                                 'endCAM': float(self.endCAMPar.text())/1000,
+                                 'endOF1': float(self.endOF1Par.text())/1000,
+                                 'endOF2': float(self.endOF2Par.text())/1000}
         
         self.current_dochannels = {'TIS': 0, '355': 1, '405': 2, '488': 3, 'CAM': 4}
         self.current_aochannels = {'x': 0, 'y': 1, 'z': 2}
@@ -199,11 +230,11 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(self.saveScanBtn, 0 , 1)
 #        grid.addWidget(QtGui.QLabel('X channel'), 1, 6)
 #        grid.addWidget(self.XchanPar, 1, 5)
-        grid.addWidget(QtGui.QLabel('Size X (um):'), 2, 0, 1, 1)
+        grid.addWidget(QtGui.QLabel('Size X (µm):'), 2, 0, 1, 1)
         grid.addWidget(self.size_xPar, 2, 1, 2, 1)
-        grid.addWidget(QtGui.QLabel('Size Y (um):'), 2, 2, 1, 1)
+        grid.addWidget(QtGui.QLabel('Size Y (µm):'), 2, 2, 1, 1)
         grid.addWidget(self.size_yPar, 2, 3, 2, 1)
-        grid.addWidget(QtGui.QLabel('Size Z (um):'), 2, 4, 1, 1)
+        grid.addWidget(QtGui.QLabel('Size Z (µm):'), 2, 4, 1, 1)
         grid.addWidget(self.size_zPar, 2, 5, 2, 1)
 #        grid.addWidget(QtGui.QLabel('Y channel'), 2, 6)
 #        grid.addWidget(self.YchanPar, 2, 5)
@@ -211,9 +242,9 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(self.sequence_timePar, 4, 1)
         grid.addWidget(QtGui.QLabel('Frames in scan:'), 4, 2)
         grid.addWidget(self.nrFramesPar, 4, 3)
-        grid.addWidget(QtGui.QLabel('Step size XY (um):'), 4, 4)
+        grid.addWidget(QtGui.QLabel('Step size XY (µm):'), 4, 4)
         grid.addWidget(self.step_sizeXYPar, 4, 5)
-        grid.addWidget(QtGui.QLabel('Step size Z (um):'), 5, 4)
+        grid.addWidget(QtGui.QLabel('Step size Z (µm):'), 5, 4)
         grid.addWidget(self.step_sizeZPar, 5, 5)
         grid.addWidget(QtGui.QLabel('Scan duration (s):'), 6, 4)
         grid.addWidget(self.scanDuration, 6, 5)
@@ -245,9 +276,23 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(self.startCAMPar, 12, 1)
         grid.addWidget(self.endCAMPar, 12, 2)
         grid.addWidget(self.chanCAMPar, 12, 3)
-        grid.addWidget(self.graph, 13, 0, 1, 6)
-        grid.addWidget(self.ScanButton, 14, 3)
-        grid.addWidget(self.PreviewButton, 14, 4)
+        grid.addWidget(QtGui.QLabel('OF1set:'), 13, 0)
+        grid.addWidget(self.startOF1Par, 13, 1)
+        grid.addWidget(self.endOF1Par, 13, 2)
+        grid.addWidget(QtGui.QLabel('X1 offset (µm):'), 13, 3)
+        grid.addWidget(self.x1_offsetPar, 13, 4)
+        grid.addWidget(QtGui.QLabel('Y1 offset (µm):'), 13, 5)
+        grid.addWidget(self.y1_offsetPar, 13, 6)
+        grid.addWidget(QtGui.QLabel('OF2set:'), 14, 0)
+        grid.addWidget(self.startOF2Par, 14, 1)
+        grid.addWidget(self.endOF2Par, 14, 2)
+        grid.addWidget(QtGui.QLabel('X2 offset (µm):'), 14, 3)
+        grid.addWidget(self.x2_offsetPar, 14, 4)
+        grid.addWidget(QtGui.QLabel('Y2 offset (µm):'), 14, 5)
+        grid.addWidget(self.y2_offsetPar, 14, 6) 
+        grid.addWidget(self.graph, 15, 0, 1, 6)
+        grid.addWidget(self.ScanButton, 16, 3)
+        grid.addWidget(self.PreviewButton, 16, 4)
         
     @property
     def scanOrNot(self):
@@ -506,10 +551,10 @@ class Scanner(QtCore.QObject):
             chanstring = 'Dev1/port0/line%s'%temp_dochannels[dev]
             self.dotask.create_channel(lines = chanstring, name = 'chan%s'%dev)
             temp_dochannels.pop(dev)
-            
-            if self.stage_scan.scan_mode == 'VOL_scan':
+            print(self.stage_scan.scan_mode)
+            if self.stage_scan.scan_mode == 'VOL scan':
                 signal = np.tile(self.pixel_cycle.sig_dict[dev+'sig'], self.stage_scan.VOL_scan.cycles_p_slice)
-                signal = np.concatenate((signal, np.zeros(self.stage_scan.sequence_samples)))
+                signal = np.concatenate((signal, np.zeros(self.stage_scan.VOL_scan.row_samples)))
             else:
                 signal = self.pixel_cycle.sig_dict[dev+'sig']
             
@@ -517,7 +562,26 @@ class Scanner(QtCore.QObject):
 #                print('Signal lengths does not match (printed from run)')
             full_do_signal = np.append(full_do_signal, signal)
         
-        
+        #Add eventual offset to x1 and y1 signals
+        cps = self.stage_scan.scans[self.stage_scan.scan_mode].cycles_p_slice
+        x1_off = self.main.scan_par_values['x1_offset']
+        y1_off = self.main.scan_par_values['y1_offset']        
+        x2_off = self.main.scan_par_values['x2_offset']
+        y2_off = self.main.scan_par_values['y2_offset']
+        off_cycle_mask1 = self.pixel_cycle.sig_dict['OF1sig'] 
+        off_cycle_mask2 = self.pixel_cycle.sig_dict['OF2sig']        
+
+        full_ao_signal = AdjustSignalOffsets(
+                                             full_ao_signal,
+                                             x1_off, 
+                                             y1_off, 
+                                             x2_off, 
+                                             y2_off, 
+                                             off_cycle_mask1, 
+                                             off_cycle_mask2,
+                                             cps)
+        plt.plot(full_ao_signal[0:len(full_ao_signal)/3])
+        plt.plot(full_ao_signal[len(full_ao_signal)/3:2*len(full_ao_signal)/3])
         self.aotask.configure_timing_sample_clock(rate = self.stage_scan.sample_rate,
                                              sample_mode = 'finite',
                                              samples_per_channel = self.samples_in_scan)
@@ -719,9 +783,10 @@ class FOV_Scan():
         self.steps_x = int(np.ceil(size_x / step_size))
         self.steps_y = int(np.ceil(size_y / step_size))
         self.corr_step_size = size_x/self.steps_x # Step size compatible with width
-        row_samples = self.steps_x * self.sequence_samples
+        self.row_samples = self.steps_x * self.sequence_samples
         
-        ramp_and_k = make_ramp(start_x, size_x, row_samples) # ramp_and_k contains [ramp, k]
+        ramp_and_k = make_ramp(start_x, size_x, self.row_samples) # ramp_and_k contains [ramp, k]
+        print(ramp_and_k)
         k = ramp_and_k[1]
         ltr_ramp = ramp_and_k[0]
         rtl_ramp = ltr_ramp[::-1]  # rtl_ramp contains only ramp, no k since same k = -k
@@ -747,9 +812,11 @@ class FOV_Scan():
                 prim_dim_sig = np.concatenate((prim_dim_sig, ltr_ramp))#, turn_rtl))
             else:
                 prim_dim_sig = np.concatenate((prim_dim_sig, rtl_ramp))#, turn_ltr))
-            sec_dim_sig = np.concatenate((sec_dim_sig, new_value*np.ones(row_samples)))#, new_value+y_ramp_smooth))
+            sec_dim_sig = np.concatenate((sec_dim_sig, new_value*np.ones(self.row_samples)))#, new_value+y_ramp_smooth))
             new_value = new_value + self.corr_step_size
-            
+         
+        samples_p_slice = len(prim_dim_sig) #Used in Scanner->runScan
+        self.cycles_p_slice = samples_p_slice / self.sequence_samples
 #        i = i + 1
 #        if i%2 == 0:
 #            prim_dim_sig = np.concatenate((prim_dim_sig, ltr_ramp))
@@ -798,9 +865,9 @@ class VOL_Scan():
         self.steps_z = int(np.ceil(size_z / step_sizeZ))
         self.corr_step_sizeXY = size_x/self.steps_x # Step size compatible with width
         self.corr_step_sizeZ = size_z/self.steps_z # Step size compatible with range
-        row_samples = self.steps_x * self.sequence_samples
+        self.row_samples = self.steps_x * self.sequence_samples
         
-        ramp_and_k = make_ramp(start_x, size_x, row_samples) # ramp_and_k contains [ramp, k]
+        ramp_and_k = make_ramp(start_x, size_x, self.row_samples) # ramp_and_k contains [ramp, k]
         k = ramp_and_k[1]
         ltr_ramp = ramp_and_k[0]
         rtl_ramp = ltr_ramp[::-1]  # rtl_ramp contains only ramp, no k since same k = -k        
@@ -813,7 +880,7 @@ class VOL_Scan():
                 prim_dim_sig = np.concatenate((prim_dim_sig, ltr_ramp))
             else:
                 prim_dim_sig = np.concatenate((prim_dim_sig, rtl_ramp))
-            sec_dim_sig = np.concatenate((sec_dim_sig, new_value*np.ones(row_samples)))
+            sec_dim_sig = np.concatenate((sec_dim_sig, new_value*np.ones(self.row_samples)))
             new_value = new_value + self.corr_step_sizeXY
             
         samples_p_slice = len(prim_dim_sig) #Used in Scanner->runScan
@@ -824,24 +891,30 @@ class VOL_Scan():
         fullZ_prim_dim_sig = prim_dim_sig
         fullZ_sec_dim_sig = sec_dim_sig
         fullZ_third_dim_sig = start_z*np.ones(len(prim_dim_sig))
-        new_value = start_z + 1
-        prim_dim_transition = make_smooth_step(prim_dim_sig[-1], prim_dim_sig[0], self.sequence_samples)
-        sec_dim_transition = make_smooth_step(sec_dim_sig[-1], sec_dim_sig[0], self.sequence_samples)
-        third_dim_transition = make_smooth_step(0, self.corr_step_sizeZ, self.sequence_samples)
+        new_value = start_z
+        prim_dim_transition = make_smooth_step(prim_dim_sig[-1], prim_dim_sig[0], self.row_samples)
+        sec_dim_transition = make_smooth_step(sec_dim_sig[-1], sec_dim_sig[0], self.row_samples)
+        third_dim_transition = make_smooth_step(0, self.corr_step_sizeZ, self.row_samples)
         
         for i in range(1,self.steps_z-1):
             fullZ_prim_dim_sig = np.concatenate((fullZ_prim_dim_sig, prim_dim_transition))
             fullZ_sec_dim_sig = np.concatenate((fullZ_sec_dim_sig, sec_dim_transition))
             fullZ_third_dim_sig = np.concatenate((fullZ_third_dim_sig, new_value + third_dim_transition))
             
+            new_value = new_value + self.corr_step_sizeZ
             fullZ_prim_dim_sig = np.concatenate((fullZ_prim_dim_sig, prim_dim_sig))
             fullZ_sec_dim_sig = np.concatenate((fullZ_sec_dim_sig, sec_dim_sig))
             fullZ_third_dim_sig = np.concatenate((fullZ_third_dim_sig, new_value*np.ones(len(prim_dim_sig))))
-            new_value = new_value + self.corr_step_sizeZ
             
+        fullZ_prim_dim_sig = np.concatenate((fullZ_prim_dim_sig, prim_dim_transition))
+        fullZ_sec_dim_sig = np.concatenate((fullZ_sec_dim_sig, sec_dim_transition))
+        fullZ_third_dim_sig = np.concatenate((fullZ_third_dim_sig, new_value + third_dim_transition))           
+        
+        new_value = new_value + self.corr_step_sizeZ        
         fullZ_prim_dim_sig = np.concatenate((fullZ_prim_dim_sig, prim_dim_sig))
         fullZ_sec_dim_sig = np.concatenate((fullZ_sec_dim_sig, sec_dim_sig))
         fullZ_third_dim_sig = np.concatenate((fullZ_third_dim_sig, new_value*np.ones(len(prim_dim_sig))))    
+
         # Assign primary scan dir
         self.sig_dict[prim_scan_dim+'_sig'] = 1.14 * fullZ_prim_dim_sig #1.14 is an emperically measured correction factor
         # Assign second and third dim
@@ -863,7 +936,7 @@ class VOL_Scan():
 class PixelCycle():
     
     def __init__(self, sample_rate):
-        self.sig_dict = {'TISsig': [], '355sig': [], '405sig': [], '488sig': [], 'CAMsig': []}
+        self.sig_dict = {'TISsig': [], '355sig': [], '405sig': [], '488sig': [], 'CAMsig': [], 'OF1sig': [], 'OF2sig': []}
         self.sample_rate = sample_rate
       
         
@@ -876,9 +949,8 @@ class PixelCycle():
             start_pos = int(min(start_pos, cycle_samples - 1))
             end_pos = par_values[end_name] * self.sample_rate
             end_pos = int(min(end_pos, cycle_samples))
-            signal[range(start_pos, end_pos)] = 1
+            signal[range(start_pos, end_pos)] = True
             self.sig_dict[device+'sig'] = signal
-
 
 
         
@@ -897,7 +969,9 @@ class GraphFrame(pg.GraphicsWindow):
                               '355': self.plot.plot(pen=pg.mkPen(97, 0, 97)), 
                               '405': self.plot.plot(pen=pg.mkPen(73, 0, 188)), 
                               '488': self.plot.plot(pen=pg.mkPen(0, 247, 255)), 
-                              'CAM': self.plot.plot(pen='w')}
+                              'CAM': self.plot.plot(pen='w'),
+                              'OF1': self.plot.plot(pen='r'),
+                              'OF2': self.plot.plot(pen='g')}
         
     def update(self, devices = None):
                  
@@ -912,12 +986,12 @@ class GraphFrame(pg.GraphicsWindow):
         
 def make_ramp(start, end, samples):
 
-    return np.linspace(start, end, num=samples)
+    return np.linspace(start, end, num=samples, retstep=True)
     
     
 def make_smooth_step(start, end, samples):
 
-    x = np.linspace(start,end, num = samples, endpoint=True)
+    x = np.linspace(0,1, num = samples, endpoint=True)
     x = 0.5 - 0.5*np.cos(x*np.pi)
     
     signal = start + (end-start)*x
@@ -960,6 +1034,26 @@ def distance_to_voltage_X(D_signal):
     return V_signal
     
     
+def AdjustSignalOffsets(full_ao_signal, x1o_um, y1o_um, x2o_um, y2o_um, off1, off2, cps):
+    signal_len = len(full_ao_signal)/3  
+    
+    if not x1o_um == 0:
+        full_ao_signal[0:signal_len] = AddOffset2Signal(full_ao_signal[0:signal_len], x1o_um, off1, cps)
+    if not y1o_um == 0:
+        full_ao_signal[signal_len:2*signal_len] = AddOffset2Signal(full_ao_signal[signal_len:2*signal_len], y1o_um, off1, cps)
+    if not x2o_um == 0:
+        full_ao_signal[0:signal_len] = AddOffset2Signal(full_ao_signal[0:signal_len], x2o_um, off2, cps)
+    if not y2o_um == 0:
+        full_ao_signal[signal_len:2*signal_len] = AddOffset2Signal(full_ao_signal[signal_len:2*signal_len], y2o_um, off2, cps)
+        
+    return full_ao_signal        
+        
+def AddOffset2Signal(signal, offset_um, off_mask_cycle, cycles):
+    x_off_mask = np.tile(off_mask_cycle, cycles)
+    x_off_sig = (offset_um/2)*np.ones([len(signal)], dtype=float)
+    assert len(x_off_mask) == len(x_off_sig)
+    x_off_sig = np.multiply(x_off_sig, x_off_mask)
+    return signal + x_off_sig   
     
 if __name__ == '__main__':
     ScanWid = ScanWidget(libnidaqmx.Device('Dev1'))
