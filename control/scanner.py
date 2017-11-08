@@ -196,6 +196,8 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(self.saveScanBtn, 0, 1)
         grid.addWidget(self.scanRadio, 0, 2)
         grid.addWidget(self.contLaserPulsesRadio, 0, 3)
+        grid.addWidget(self.scanButton, 0, 4, 1, 2)
+        grid.addWidget(self.continuousCheck, 0, 6)
 
         grid.addWidget(QtGui.QLabel('Size X (µm):'), 2, 0)
         grid.addWidget(self.sizeXPar, 2, 1)
@@ -203,17 +205,18 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(self.sizeYPar, 3, 1)
         grid.addWidget(QtGui.QLabel('Size Z (µm):'), 4, 0)
         grid.addWidget(self.sizeZPar, 4, 1)
-        grid.addWidget(QtGui.QLabel('Step size XY (µm):'), 2, 2)
+        grid.addWidget(QtGui.QLabel('Step XY (µm):'), 2, 2)
         grid.addWidget(self.stepSizeXYPar, 2, 3)
-        grid.addWidget(QtGui.QLabel('Step size Z (µm):'), 4, 2)
+        grid.addWidget(QtGui.QLabel('Step Z (µm):'), 4, 2)
         grid.addWidget(self.stepSizeZPar, 4, 3)
+
         grid.addWidget(QtGui.QLabel('Mode:'), 2, 4)
         grid.addWidget(self.scanMode, 2, 5)
         grid.addWidget(QtGui.QLabel('Primary dimension:'), 3, 4)
         grid.addWidget(self.primScanDim, 3, 5)
         grid.addWidget(QtGui.QLabel('Number of frames:'), 4, 4)
         grid.addWidget(self.nrFramesPar, 4, 5)
-        grid.addWidget(self.previewButton, 2, 7, 3, 1)
+        grid.addWidget(self.previewButton, 2, 6, 3, 2)
 
         grid.addWidget(QtGui.QLabel('Dwell time (ms):'), 7, 0)
         grid.addWidget(self.seqTimePar, 7, 1)
@@ -235,10 +238,9 @@ class ScanWidget(QtGui.QMainWindow):
         grid.addWidget(self.endCAMPar, 12, 2)
         grid.addWidget(self.graph, 8, 3, 5, 5)
 
-        grid.addWidget(self.scanButton, 14, 0, 1, 6)
-        grid.addWidget(self.continuousCheck, 14, 7)
-        grid.addWidget(self.multiScanWgt, 15, 0, 4, 9)
+        grid.addWidget(self.multiScanWgt, 13, 0, 4, 9)
 
+        grid.setColumnMinimumWidth(6, 160)
         grid.setRowMinimumHeight(1, 10)
         grid.setRowMinimumHeight(6, 10)
         grid.setRowMinimumHeight(13, 10)
