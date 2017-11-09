@@ -186,7 +186,7 @@ class Camera(object):
     def __new__(cls, id, *args, **kwargs):
         try:
             import lantz.drivers.hamamatsu.hamamatsu_camera as hm
-            orcaflash = hm.HamamatsuCameraMR(id)
+            orcaflash = hm.HamamatsuCamera(id)
             return orcaflash
 
         except:
