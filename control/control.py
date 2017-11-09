@@ -1521,7 +1521,6 @@ class TormentaGUI(QtGui.QMainWindow):
         for i in np.arange(len(self.cameras)):
             # Needed if parameter is changed during liveview since that causes
             # camera to start writing to buffer place zero again.
-            self.lvworkers[i].reset()
             self.cameras[i].startAcquisition()
 
     def liveviewPause(self):
