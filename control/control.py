@@ -50,6 +50,7 @@ class RecordingWidget(QtGui.QFrame):
 
         self.recworkers = [None] * len(self.main.cameras)
         self.recthreads = [None] * len(self.main.cameras)
+        self.savenames = [None] * len(self.main.cameras)
 
         newfolderpath = os.path.join(r"D:\Data", time.strftime('%Y-%m-%d'))
 
@@ -78,6 +79,9 @@ class RecordingWidget(QtGui.QFrame):
         self.specifyfile = QtGui.QCheckBox('Specify file name')
         self.specifyfile.clicked.connect(self.specFile)
         self.filenameEdit = QtGui.QLineEdit('Current_time')
+        self.saveModeBox = QtGui.QComboBox()
+        self.saveModeBox.addItem('tiff')
+        self.saveModeBox.addItem('hdf5')
 
         # Snap and recording buttons
         self.showZgraph = QtGui.QCheckBox('Show Z-graph')
@@ -101,6 +105,8 @@ class RecordingWidget(QtGui.QFrame):
         self.specifyFrames.clicked.connect(self.specFrames)
         self.specifyTime = QtGui.QRadioButton('Time to rec (sec)')
         self.specifyTime.clicked.connect(self.specTime)
+        self.recScanBtn = QtGui.QRadioButton('Record whole scanning')
+        self.recScanBtn.clicked.connect(self.recScan)
         self.untilSTOPbtn = QtGui.QRadioButton('Run until STOP')
         self.untilSTOPbtn.clicked.connect(self.untilStop)
         self.timeToRec = QtGui.QLineEdit('1')
@@ -149,7 +155,8 @@ class RecordingWidget(QtGui.QFrame):
         recGrid.addWidget(self.DualCam, 1, 3)
 #        recGrid.addWidget(loadFolderButton, 1, 5)
 #        recGrid.addWidget(openFolderButton, 1, 4)
-        recGrid.addWidget(self.folderEdit, 2, 1, 1, 5)
+        recGrid.addWidget(self.folderEdit, 2, 1, 1, 4)
+        recGrid.addWidget(self.saveModeBox, 2, 5, 1, 1)
         recGrid.addWidget(self.specifyfile, 3, 0, 1, 5)
         recGrid.addWidget(self.filenameEdit, 3, 2, 1, 4)
         recGrid.addWidget(self.specifyFrames, 4, 0, 1, 5)
@@ -162,8 +169,9 @@ class RecordingWidget(QtGui.QFrame):
         recGrid.addWidget(self.timeToRec, 5, 2)
         recGrid.addWidget(self.tRemaining, 5, 3, 1, 2)
 #        recGrid.addWidget(self.progressBar, 5, 4, 1, 2)
-        recGrid.addWidget(self.untilSTOPbtn, 6, 0, 1, 5)
-        recGrid.addWidget(buttonWidget, 7, 0, 1, 0)
+        recGrid.addWidget(self.recScanBtn, 6, 0, 1, 5)
+        recGrid.addWidget(self.untilSTOPbtn, 7, 0, 1, 5)
+        recGrid.addWidget(buttonWidget, 8, 0, 1, 0)
 
         recGrid.setColumnMinimumWidth(0, 70)
         recGrid.setRowMinimumHeight(6, 40)
@@ -199,6 +207,8 @@ class RecordingWidget(QtGui.QFrame):
                 self.specFrames()
             elif self.specifyTime.isChecked():
                 self.specTime()
+            elif self.recScanBtn.isChecked():
+                self.recScan()
             else:
                 self.untilStop()
         else:
@@ -234,12 +244,20 @@ class RecordingWidget(QtGui.QFrame):
         self.rec_mode = 2
         self.filesizeupdate()
 
-    def untilStop(self):
+    def recScan(self):
         self.numExpositionsEdit.setEnabled(False)
         self.timeToRec.setEnabled(False)
         self.filesizeBar.setEnabled(False)
         self.progressBar.setEnabled(False)
         self.rec_mode = 3
+
+    def untilStop(self):
+        self.numExpositionsEdit.setEnabled(False)
+        self.timeToRec.setEnabled(False)
+        self.filesizeBar.setEnabled(False)
+        self.progressBar.setEnabled(False)
+        self.rec_mode = 4
+
 
     def filesizeupdate(self):
         ''' For updating the approximated file size of and eventual recording.
@@ -381,9 +399,6 @@ class RecordingWidget(QtGui.QFrame):
             if self.filesize > 1500000000:
                 ret = self.filesizewar.exec_()
 
-            folder = self.folderEdit.text()
-            if not os.path.exists(folder):
-                os.mkdir(folder)
             if ret == QtGui.QMessageBox.Yes:
 
                 # Sets Recording widget to not be writable during recording.
@@ -400,27 +415,18 @@ class RecordingWidget(QtGui.QFrame):
                 # Saves the time when started to calculate remaining time.
                 self.startTime = ptime.time()
 
-                if self.DualCam.checkState():
-                    self.nr_cameras = 2
-                else:
-                    self.nr_cameras = 1
+                self.makeSavenames()
 
                 for i in range(0, self.nr_cameras):
                     ind = np.mod(self.main.currCamIdx + i, 2)
                     print('Starting recording on camera ' + str(ind + 1))
-                    # Sets name for final output file
-                    self.savename = (os.path.join(folder, self.getFileName(
-                    )) + '_rec_cam_' + str(ind + 1) + '.hdf5')
-                    # If same  filename exists it is appended by (1) or (2)
-                    # etc.
-                    self.savename = guitools.getUniqueName(self.savename)
 
                     # Creates an instance of RecWorker class.
-                    self.recworkers[ind] = RecWorker(
+                    self.recworkers[ind] = RecWorker(self,
                         self.main.cameras[ind], self.rec_mode,
                         self.getTimeOrFrames(), self.main.shapes[ind],
                         self.main.lvworkers[ind], self.main.RealExpPar,
-                        self.savename, self.dataname, self.getAttrs())
+                        self.savenames[ind], self.dataname, self.getAttrs())
                     # Connects the updatesignal that is continously emitted
                     # from recworker to updateGUI function.
                     self.recworkers[ind].updateSignal.connect(self.updateGUI)
@@ -486,8 +492,6 @@ class RecordingWidget(QtGui.QFrame):
                 ind = np.mod(self.main.currCamIdx + i, 2)
                 self.recthreads[ind].terminate()
                 # Same as done in Liveviewrun()
-                self.main.lvworkers[ind].reset()
-                self.main.cameras[ind].startAcquisition()
 
             print('After terminating recording thread')
             self.writable = True
@@ -501,19 +505,62 @@ class RecordingWidget(QtGui.QFrame):
             self.currentTime.setText('0 /')
             self.currentFrame.setText('0 /')
 
+    def makeSavenames(self):
+        if self.DualCam.checkState():
+            self.nr_cameras = 2
+        else:
+            self.nr_cameras = 1
+        folder = self.folderEdit.text()
+        if not os.path.exists(folder):
+            os.mkdir(folder)
+        for i in range(0, self.nr_cameras):
+            ind = np.mod(self.main.currCamIdx + i, 2)
+            # Sets name for final output file
+            self.savenames[ind] = (os.path.join(folder, self.getFileName(
+            )) + '_rec_cam_' + str(ind + 1))
+            # If same  filename exists it is appended by (1) or (2)
+            # etc.
+            self.savenames[ind] = guitools.getUniqueName(self.savenames[ind])
+
+    def saveData(self, data, savename):
+        saveMode = self.saveModeBox.currentText()
+        savename = savename + '.' + saveMode
+        if saveMode == 'tiff':
+            print('Savename = ', savename)
+            t = time.time()
+            para = dict(imagej=True)
+            tiff.imsave(savename, data, **para)
+        elif saveMode == 'hdf5':
+            print('Savename = ', savename)
+            store_file = hdf.File(savename, "w")
+            datashape = data.shape
+            store_file.create_dataset(name=self.dataname, shape=datashape,
+                                           maxshape=datashape, dtype=np.uint16)
+            dataset = store_file[self.dataname]
+            t = time.time()
+            dataset[...] = data
+            # Saving parameters
+            for item in self.attrs:
+                if item[1] is not None:
+                    dataset.attrs[item[0]] = item[1]
+            store_file.close()
+        elapsed = time.time() - t
+        print('Data written, time to write: ', elapsed)
+
 
 class RecWorker(QtCore.QObject):
 
     updateSignal = QtCore.pyqtSignal()
     doneSignal = QtCore.pyqtSignal()
 
-    def __init__(self, camera, rec_mode, timeorframes, shape, lvworker,
+    def __init__(self, main, camera, rec_mode, timeorframes, shape, lvworker,
                  t_exp, savename, dataname, attrs, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.main = main
         self.camera = camera
         self.rec_mode = rec_mode  # 1=frames, 2=time, 3=until stop
-        print(self.rec_mode)
+        print('Recording mode is ' + str(self.rec_mode))
         # Nr of seconds or frames to record depending on bool_ToF.
         self.timeorframes = timeorframes
         self.shape = shape  # Shape of one frame
@@ -524,31 +571,22 @@ class RecWorker(QtCore.QObject):
         self.attrs = attrs
         self.pressed = True
         self.done = False
+        self.scanWidget = self.main.main.scanWidget
 
     def start(self):
         # Set initial values
         self.timerecorded = 0
-        self.frames_recorded = 0
 
+        self.lvworker.startRecording()
         time.sleep(0.1)
-
-        # Find what the index of the first recorded frame will be
-        last_f = self.lvworker.f_ind
-        if last_f is None:
-            # If camera has not recorded any frames yet, start index will be 0
-            start_f = 0
-        else:
-            # index of first frame is one more then provious frame.
-            start_f = last_f + 1
 
         self.starttime = time.time()
 
         # Main loop for waiting until recording is finished and sending update
         # signal
-        f_ind = start_f
         if self.rec_mode == 1:
-            while self.frames_recorded < self.timeorframes and self.pressed:
-                self.frames_recorded = self.lvworker.f_ind - start_f
+            while len(self.lvworker.framesRecorded) < self.timeorframes\
+                    and self.pressed:
                 time.sleep(0.01)
                 self.updateSignal.emit()
 
@@ -557,59 +595,45 @@ class RecWorker(QtCore.QObject):
                 self.timerecorded = time.time() - self.starttime
                 time.sleep(0.01)
                 self.updateSignal.emit()
+
+        elif self.rec_mode == 3:
+            framesExpected = self.scanWidget.stageScan.frames
+            self.scanWidget.scanButton.click()
+            while len(self.lvworker.framesRecorded) != framesExpected\
+                    and self.pressed:
+                time.sleep(0.1)
+                self.updateSignal.emit()
+
         else:
             while self.pressed:
                 self.timerecorded = time.time() - self.starttime
                 time.sleep(0.01)
                 self.updateSignal.emit()
 
+        self.lvworker.stopRecording()
+
         # To avoid camera overwriting buffer while saving recording
-        self.camera.stopAcquisition()
-        end_f = self.lvworker.f_ind  # Get index of the last acquired frame
 
-        if end_f is None:  # If no frames are acquired during recording,
-            end_f = -1
-
-        if end_f >= start_f - 1:
-            f_range = range(start_f, end_f + 1)
-        else:
-            buffer_size = self.camera.number_image_buffers
-            f_range = np.append(
-                range(start_f, buffer_size), range(0, end_f + 1))
-
-        print('Start_f = :', start_f)
-        print('End_f = :', end_f)
-        f_ind = len(f_range)
-        data = [self.camera.hcam_data[i].getData() for i in f_range]
-
+        # get the recorded data
+        data = self.lvworker.framesRecorded
         # Adapted for ImageJ data read shape
-        datashape = (f_ind, self.shape[1], self.shape[0])
-
-        print('Savename = ', self.savename)
-        self.store_file = hdf.File(self.savename, "w")
-        self.store_file.create_dataset(name=self.dataname, shape=datashape,
-                                       maxshape=datashape, dtype=np.uint16)
-        dataset = self.store_file[self.dataname]
+        datashape = (len(data), self.shape[1], self.shape[0])
 
         reshapeddata = np.reshape(data, datashape, order='C')
-        t = time.time()
-        dataset[...] = reshapeddata
-        elapsed = time.time() - t
-        print('Data written, time to write: ', elapsed)
+
+        try:
+            self.main.saveData(reshapeddata, self.savename)
+        except ValueError:
+            print('Data could not be saved')
+
         self.z_stack = [
-            np.mean(reshapeddata[i, :, :]) for i in range(0, f_ind)]
+            np.mean(reshapeddata[i, :, :]) for i in range(0, len(data))]
 
         self.Z_projection = np.flipud(np.sum(reshapeddata, 0))
-        # Saving parameters
-        for item in self.attrs:
-            if item[1] is not None:
-                dataset.attrs[item[0]] = item[1]
 
-        self.store_file.close()
         self.done = True
         self.doneSignal.emit()
         print('doneSignal emitted from thread')
-
 
 class CamParamTree(ParameterTree):
     """ Making the ParameterTree for configuration of the camera during imaging
@@ -733,7 +757,8 @@ class LVWorker(QtCore.QObject):
         self.ind = ind
         self.orcaflash = orcaflash
         self.running = False
-        self.f_ind = None
+        self.recording = False
+        self.framesRecorded = []
 
         # Memory variable to keep track of if update has been run many times in
         # a row with camera trigger source as internal trigger
@@ -745,14 +770,12 @@ class LVWorker(QtCore.QObject):
         self.vtimer = QtCore.QTimer()
         self.vtimer.timeout.connect(self.update)
         self.running = True
-        self.f_ind = None  # Should maybe be f_ind
         self.vtimer.start(30)
-        print('f_ind when started = ', self.f_ind)
         time.sleep(0.03)
 
         # Grab first frame only to set suitable histogram limits
-        self.f_ind = self.orcaflash.newFrames()[-1]
-        frame = self.orcaflash.hcam_data[self.f_ind].getData()
+        hcData = self.orcaflash.getFrames()[0]
+        frame = hcData[0].getData()
         self.image = np.reshape(
             frame, (self.orcaflash.frame_x, self.orcaflash.frame_y), 'F')
         self.main.latest_images[self.ind] = self.image
@@ -762,12 +785,17 @@ class LVWorker(QtCore.QObject):
     def update(self):
         if self.running:
             try:
-                self.f_ind = self.orcaflash.newFrames()[-1]
-                frame = self.orcaflash.hcam_data[self.f_ind].getData()
+                hcData = self.orcaflash.getFrames()[0]
+                frame = hcData[0].getData()
                 self.image = np.reshape(
                     frame, (self.orcaflash.frame_x, self.orcaflash.frame_y),
                     'F')
                 self.main.latest_images[self.ind] = self.image
+
+                # stock frames while recording
+                if self.recording:
+                    for hcDatum in hcData:
+                        self.framesRecorded.append(hcDatum.getData())
 
                 """Following is causing problems with two cameras..."""
     #            trigSource = self.orcaflash.getPropertyValue('trigSource')[0]
@@ -788,9 +816,12 @@ class LVWorker(QtCore.QObject):
         else:
             print('Cannot stop when not running (from LVThread)')
 
-    def reset(self):
-        self.f_ind = None
-        print('LVworker reset, f_ind = ', self.f_ind)
+    def startRecording(self):
+        self.recording = True
+        self.framesRecorded.clear()
+
+    def stopRecording(self):
+        self.recording = False
 
 
 class TormentaGUI(QtGui.QMainWindow):
