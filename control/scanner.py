@@ -345,7 +345,7 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanner.scanDone.connect(self.scanDone)
             self.scanning = True
 
-            self.start_f = self.main.lvworkers[0].f_ind
+            self.main.lvworkers[0].startRecording()
 
             self.scanner.runScan()
 
@@ -363,26 +363,20 @@ class ScanWidget(QtGui.QMainWindow):
         self.scanButton.setEnabled(False)
 
         buildImg = self.multiScanWgt.makeImgBox.isChecked()
-        if not self.scanner.aborted and buildImg:
+        if not self.scanner.aborted:
             time.sleep(0.1)
-            self.end_f = self.main.lvworkers[0].f_ind
-            if self.end_f >= self.start_f - 1:
-                fRange = range(self.start_f, self.end_f + 1)
-            else:
-                buffer_size = self.main.cameras[0].number_image_buffers
-                fRange = np.append(
-                   range(self.start_f, buffer_size), range(0, self.end_f + 1))
 
-            data = [
-                self.main.cameras[0].hcam_data[j].getData() for j in fRange]
+            self.main.lvworkers[0].stopRecording()
+            data = self.main.lvworkers[0].framesRecorded
 
             datashape = (
-                len(fRange), self.main.shapes[0][1], self.main.shapes[0][0])
+                len(data), self.main.shapes[0][1], self.main.shapes[0][0])
             reshapeddata = np.reshape(data, datashape, order='C')
 
             self.multiScanWgt.worker.set_images(reshapeddata[1:])
-            self.multiScanWgt.worker.find_fp()
-            self.multiScanWgt.worker.analyze()
+            if buildImg:
+                self.multiScanWgt.worker.find_fp()
+                self.multiScanWgt.worker.analyze()
 
     def finalizeDone(self):
         if (not self.continuousCheck.isChecked()) or self.scanner.aborted:
