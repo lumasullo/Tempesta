@@ -52,11 +52,11 @@ class RecordingWidget(QtGui.QFrame):
         self.recthreads = [None] * len(self.main.cameras)
         self.savenames = [None] * len(self.main.cameras)
 
-        newfolderpath = os.path.join(r"D:\Data", time.strftime('%Y-%m-%d'))
-
         self.z_stack = []
-        self.rec_mode = 1
-        self.initialDir = newfolderpath
+        self.recMode = 1
+
+        self.dataDir = r"D:\Data"
+        self.initialDir = os.path.join(self.dataDir, time.strftime('%Y-%m-%d'))
 
         self.filesizewar = QtGui.QMessageBox()
         self.filesizewar.setText("File size is very big!")
@@ -72,8 +72,8 @@ class RecordingWidget(QtGui.QFrame):
 
         # Folder and filename fields
         self.folderEdit = QtGui.QLineEdit(self.initialDir)
-#        openFolderButton = QtGui.QPushButton('Open')
-#        openFolderButton.clicked.connect(self.openFolder)
+        openFolderButton = QtGui.QPushButton('Open')
+        openFolderButton.clicked.connect(self.openFolder)
 #        loadFolderButton = QtGui.QPushButton('Load...')
 #        loadFolderButton.clicked.connect(self.loadFolder)
         self.specifyfile = QtGui.QCheckBox('Specify file name')
@@ -101,18 +101,20 @@ class RecordingWidget(QtGui.QFrame):
         self.recButton.clicked.connect(self.startRecording)
 
         # Number of frames and measurement timing
-        self.specifyFrames = QtGui.QRadioButton('Nr of frames')
+        modeTitle = QtGui.QLabel('<strong>Mode</strong>')
+        modeTitle.setTextFormat(QtCore.Qt.RichText)
+        self.specifyFrames = QtGui.QRadioButton('Number of frames')
         self.specifyFrames.clicked.connect(self.specFrames)
-        self.specifyTime = QtGui.QRadioButton('Time to rec (sec)')
+        self.specifyTime = QtGui.QRadioButton('Time (s)')
         self.specifyTime.clicked.connect(self.specTime)
-        self.recScanBtn = QtGui.QRadioButton('Record whole scanning')
+        self.recScanBtn = QtGui.QRadioButton('Scanning')
         self.recScanBtn.clicked.connect(self.recScan)
         self.untilSTOPbtn = QtGui.QRadioButton('Run until STOP')
         self.untilSTOPbtn.clicked.connect(self.untilStop)
         self.timeToRec = QtGui.QLineEdit('1')
         self.timeToRec.setFixedWidth(45)
         self.timeToRec.textChanged.connect(self.filesizeupdate)
-        self.currentTime = QtGui.QLabel('0 /')
+        self.currentTime = QtGui.QLabel('0 / ')
         self.currentTime.setAlignment((QtCore.Qt.AlignRight |
                                        QtCore.Qt.AlignVCenter))
         self.currentFrame = QtGui.QLabel('0 /')
@@ -125,7 +127,6 @@ class RecordingWidget(QtGui.QFrame):
         self.tRemaining.setAlignment((QtCore.Qt.AlignCenter |
                                       QtCore.Qt.AlignVCenter))
         self.numExpositionsEdit.textChanged.connect(self.filesizeupdate)
-#        self.updateRemaining()
 
         self.progressBar = QtGui.QProgressBar()
         self.progressBar.setTextVisible(False)
@@ -139,7 +140,6 @@ class RecordingWidget(QtGui.QFrame):
         buttonGrid = QtGui.QGridLayout()
         buttonWidget.setLayout(buttonGrid)
         buttonGrid.addWidget(self.snapTIFFButton, 0, 0)
-#        buttonGrid.addWidget(self.snapHDFButton, 0, 1)
         buttonWidget.setSizePolicy(QtGui.QSizePolicy.Preferred,
                                    QtGui.QSizePolicy.Expanding)
         buttonGrid.addWidget(self.recButton, 0, 2)
@@ -153,28 +153,26 @@ class RecordingWidget(QtGui.QFrame):
         recGrid.addWidget(self.showZproj, 1, 1)
         recGrid.addWidget(self.showBead_scan, 1, 2)
         recGrid.addWidget(self.DualCam, 1, 3)
-#        recGrid.addWidget(loadFolderButton, 1, 5)
-#        recGrid.addWidget(openFolderButton, 1, 4)
-        recGrid.addWidget(self.folderEdit, 2, 1, 1, 4)
-        recGrid.addWidget(self.saveModeBox, 2, 5, 1, 1)
-        recGrid.addWidget(self.specifyfile, 3, 0, 1, 5)
-        recGrid.addWidget(self.filenameEdit, 3, 2, 1, 4)
-        recGrid.addWidget(self.specifyFrames, 4, 0, 1, 5)
-        recGrid.addWidget(self.currentFrame, 4, 1)
-        recGrid.addWidget(self.numExpositionsEdit, 4, 2)
-#        recGrid.addWidget(QtGui.QLabel('File size'), 4, 3, 1, 2)
-#        recGrid.addWidget(self.filesizeBar, 4, 4, 1, 2)
-        recGrid.addWidget(self.specifyTime, 5, 0, 1, 5)
-        recGrid.addWidget(self.currentTime, 5, 1)
-        recGrid.addWidget(self.timeToRec, 5, 2)
-        recGrid.addWidget(self.tRemaining, 5, 3, 1, 2)
+        recGrid.addWidget(self.folderEdit, 2, 1, 1, 2)
+        recGrid.addWidget(openFolderButton, 2, 3)
+        recGrid.addWidget(self.specifyfile, 3, 0)
+        recGrid.addWidget(self.filenameEdit, 3, 1, 1, 2)
+        recGrid.addWidget(self.saveModeBox, 3, 3)
+
+        recGrid.addWidget(modeTitle, 4, 0)
+        recGrid.addWidget(self.specifyFrames, 5, 0, 1, 5)
+        recGrid.addWidget(self.currentFrame, 5, 1)
+        recGrid.addWidget(self.numExpositionsEdit, 5, 2)
+        recGrid.addWidget(self.specifyTime, 6, 0, 1, 5)
+        recGrid.addWidget(self.currentTime, 6, 1)
+        recGrid.addWidget(self.timeToRec, 6, 2)
+        recGrid.addWidget(self.tRemaining, 6, 3, 1, 2)
 #        recGrid.addWidget(self.progressBar, 5, 4, 1, 2)
-        recGrid.addWidget(self.recScanBtn, 6, 0, 1, 5)
-        recGrid.addWidget(self.untilSTOPbtn, 7, 0, 1, 5)
-        recGrid.addWidget(buttonWidget, 8, 0, 1, 0)
+        recGrid.addWidget(self.recScanBtn, 7, 0, 1, 5)
+        recGrid.addWidget(self.untilSTOPbtn, 8, 0, 1, 5)
+        recGrid.addWidget(buttonWidget, 9, 0, 1, 0)
 
         recGrid.setColumnMinimumWidth(0, 70)
-        recGrid.setRowMinimumHeight(6, 40)
 
         # Initial condition of fields and checkboxes.
         self.writable = True
@@ -233,7 +231,7 @@ class RecordingWidget(QtGui.QFrame):
         self.timeToRec.setEnabled(False)
         self.filesizeBar.setEnabled(True)
         self.progressBar.setEnabled(True)
-        self.rec_mode = 1
+        self.recMode = 1
         self.filesizeupdate()
 
     def specTime(self):
@@ -241,7 +239,7 @@ class RecordingWidget(QtGui.QFrame):
         self.timeToRec.setEnabled(True)
         self.filesizeBar.setEnabled(True)
         self.progressBar.setEnabled(True)
-        self.rec_mode = 2
+        self.recMode = 2
         self.filesizeupdate()
 
     def recScan(self):
@@ -249,15 +247,14 @@ class RecordingWidget(QtGui.QFrame):
         self.timeToRec.setEnabled(False)
         self.filesizeBar.setEnabled(False)
         self.progressBar.setEnabled(False)
-        self.rec_mode = 3
+        self.recMode = 3
 
     def untilStop(self):
         self.numExpositionsEdit.setEnabled(False)
         self.timeToRec.setEnabled(False)
         self.filesizeBar.setEnabled(False)
         self.progressBar.setEnabled(False)
-        self.rec_mode = 4
-
+        self.recMode = 4
 
     def filesizeupdate(self):
         ''' For updating the approximated file size of and eventual recording.
@@ -287,13 +284,23 @@ class RecordingWidget(QtGui.QFrame):
         else:
             return int(self.timeToRec.text())
 
-    def openFolder(self, path):
-        if sys.platform == 'darwin':
-            subprocess.check_call(['open', '', self.folderEdit.text()])
-        elif sys.platform == 'linux':
-            subprocess.check_call(['gnome-open', '', self.folderEdit.text()])
-        elif sys.platform == 'win32':
-            os.startfile(self.folderEdit.text())
+    def openFolder(self):
+        try:
+            if sys.platform == 'darwin':
+                subprocess.check_call(['open', '', self.folderEdit.text()])
+            elif sys.platform == 'linux':
+                subprocess.check_call(
+                    ['gnome-open', '', self.folderEdit.text()])
+            elif sys.platform == 'win32':
+                os.startfile(self.folderEdit.text())
+
+        except FileNotFoundError:
+            if sys.platform == 'darwin':
+                subprocess.check_call(['open', '', self.dataDir])
+            elif sys.platform == 'linux':
+                subprocess.check_call(['gnome-open', '', self.dataDir])
+            elif sys.platform == 'win32':
+                os.startfile(self.dataDir)
 
     def loadFolder(self):
         try:
@@ -422,8 +429,8 @@ class RecordingWidget(QtGui.QFrame):
                     print('Starting recording on camera ' + str(ind + 1))
 
                     # Creates an instance of RecWorker class.
-                    self.recworkers[ind] = RecWorker(self,
-                        self.main.cameras[ind], self.rec_mode,
+                    self.recworkers[ind] = RecWorker(
+                        self, self.main.cameras[ind], self.recMode,
                         self.getTimeOrFrames(), self.main.shapes[ind],
                         self.main.lvworkers[ind], self.main.RealExpPar,
                         self.savenames[ind], self.dataname, self.getAttrs())
@@ -535,7 +542,7 @@ class RecordingWidget(QtGui.QFrame):
             store_file = hdf.File(savename, "w")
             datashape = data.shape
             store_file.create_dataset(name=self.dataname, shape=datashape,
-                                           maxshape=datashape, dtype=np.uint16)
+                                      maxshape=datashape, dtype=np.uint16)
             dataset = store_file[self.dataname]
             t = time.time()
             dataset[...] = data
@@ -553,14 +560,13 @@ class RecWorker(QtCore.QObject):
     updateSignal = QtCore.pyqtSignal()
     doneSignal = QtCore.pyqtSignal()
 
-    def __init__(self, main, camera, rec_mode, timeorframes, shape, lvworker,
+    def __init__(self, main, camera, recMode, timeorframes, shape, lvworker,
                  t_exp, savename, dataname, attrs, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.main = main
         self.camera = camera
-        self.rec_mode = rec_mode  # 1=frames, 2=time, 3=until stop
-        print('Recording mode is ' + str(self.rec_mode))
+        self.recMode = recMode  # 1=frames, 2=time, 3=until stop
         # Nr of seconds or frames to record depending on bool_ToF.
         self.timeorframes = timeorframes
         self.shape = shape  # Shape of one frame
@@ -584,19 +590,23 @@ class RecWorker(QtCore.QObject):
 
         # Main loop for waiting until recording is finished and sending update
         # signal
-        if self.rec_mode == 1:
+        if self.recMode == 1:
             while len(self.lvworker.framesRecorded) < self.timeorframes\
                     and self.pressed:
                 time.sleep(0.01)
                 self.updateSignal.emit()
 
-        elif self.rec_mode == 2:
+        elif self.recMode == 2:
             while self.timerecorded < self.timeorframes and self.pressed:
                 self.timerecorded = time.time() - self.starttime
                 time.sleep(0.01)
                 self.updateSignal.emit()
 
-        elif self.rec_mode == 3:
+        elif self.recMode == 3:
+            self.main.main.trigsourceparam.setValue('External "frame-trigger"')
+            laserWidget = self.main.main.laserWidgets
+            laserWidget.DigCtrl.DigitalControlButton.setChecked(True)
+            laserWidget.DigCtrl.GlobalDigitalMod()
             framesExpected = self.scanWidget.stageScan.frames
             self.scanWidget.scanButton.click()
             while len(self.lvworker.framesRecorded) != framesExpected\
@@ -626,14 +636,12 @@ class RecWorker(QtCore.QObject):
         except ValueError:
             print('Data could not be saved')
 
-        self.z_stack = [
-            np.mean(reshapeddata[i, :, :]) for i in range(0, len(data))]
-
+        self.z_stack = [np.mean(reshapeddata[i]) for i in range(len(data))]
         self.Z_projection = np.flipud(np.sum(reshapeddata, 0))
 
         self.done = True
         self.doneSignal.emit()
-        print('doneSignal emitted from thread')
+
 
 class CamParamTree(ParameterTree):
     """ Making the ParameterTree for configuration of the camera during imaging
@@ -977,7 +985,7 @@ class TormentaGUI(QtGui.QMainWindow):
 
         # Liveview functionality
         self.liveviewButton = QtGui.QPushButton('LIVEVIEW')
-        self.liveviewButton.setStyleSheet("font-size:18px")
+        self.liveviewButton.setStyleSheet("font-size:20px")
         self.liveviewButton.setCheckable(True)
         self.liveviewButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
                                           QtGui.QSizePolicy.Expanding)
@@ -989,27 +997,20 @@ class TormentaGUI(QtGui.QMainWindow):
 
         self.alignmentON = False
 
-        # RESOLFT rec
-        self.resolftRecButton = QtGui.QPushButton('RESOLFT REC')
-        self.resolftRecButton.setStyleSheet("font-size:18px")
-        self.resolftRecButton.clicked.connect(self.resolftRec)
-
-        self.toggleCamButton = QtGui.QPushButton('Toggle camera')
-        self.toggleCamButton.setStyleSheet("font-size:18px")
-        self.toggleCamButton.clicked.connect(self.toggleCamera)
-        if len(self.cameras) < 2:
-            self.toggleCamButton.setEnabled(False)
-        self.camLabel = QtGui.QLabel('Hamamatsu0')
-        self.camLabel.setStyleSheet("font-size:18px")
-
         # Liveview control buttons
         self.viewCtrl = QtGui.QWidget()
         self.viewCtrlLayout = QtGui.QGridLayout()
         self.viewCtrl.setLayout(self.viewCtrlLayout)
         self.viewCtrlLayout.addWidget(self.liveviewButton, 0, 0, 1, 3)
-        self.viewCtrlLayout.addWidget(self.resolftRecButton, 1, 0, 1, 3)
-        self.viewCtrlLayout.addWidget(self.toggleCamButton, 2, 0, 1, 2)
-        self.viewCtrlLayout.addWidget(self.camLabel, 2, 2, 1, 1)
+
+        if len(self.cameras) > 1:
+            self.toggleCamButton = QtGui.QPushButton('Toggle camera')
+            self.toggleCamButton.setStyleSheet("font-size:18px")
+            self.toggleCamButton.clicked.connect(self.toggleCamera)
+            self.camLabel = QtGui.QLabel('Hamamatsu0')
+            self.camLabel.setStyleSheet("font-size:18px")
+            self.viewCtrlLayout.addWidget(self.toggleCamButton, 2, 0, 1, 2)
+            self.viewCtrlLayout.addWidget(self.camLabel, 2, 2)
 
         # Status bar info
         self.fpsBox = QtGui.QLabel()
@@ -1091,8 +1092,7 @@ class TormentaGUI(QtGui.QMainWindow):
         # Initial camera configuration taken from the parameter tree
         self.orcaflash.setPropertyValue('exposure_time', self.expPar.value())
         self.adjustFrame()
-#        self.toggleCamera()
-#        self.adjustFrame()
+        self.updateFrame()
 
         # Illumination dock area
         illumDockArea = DockArea()
@@ -1148,22 +1148,7 @@ class TormentaGUI(QtGui.QMainWindow):
         dockArea.addDock(scanDock, 'below', FocusLockDock)
 
         # Console widget
-#        consoleDock = Dock("Console", size=(1, 1))
         console = ConsoleWidget(namespace={'pg': pg, 'np': np})
-#        consoleDock.addWidget(console)
-#        dockArea.addDock(consoleDock, 'below', FocusLockDock)
-
-        # Scan Widget
-#        self.scanxyWidget = scanner.ScanWidget(self.nidaq, self)
-#        self.scanImageDock = Dock("Image from scanning", size=(300, 300))
-#        self.scanImageDock.addWidget(self.scanxyWidget.display)
-#        dockArea.addDock(self.scanImageDock)
-
-#        # Signal generation widget
-#        signalDock = Dock('Signal Generator')
-#        self.signalWidget = SignalGen.SigGenWidget(self.nidaq)
-#        signalDock.addWidget(self.signalWidget)
-#        dockArea.addDock(signalDock, 'above', laserDock)
 
         self.setWindowTitle('TempestaDev')
         self.cwidget = QtGui.QWidget()
@@ -1172,10 +1157,6 @@ class TormentaGUI(QtGui.QMainWindow):
         # Widgets' layout
         layout = QtGui.QGridLayout()
         self.cwidget.setLayout(layout)
-        layout.setColumnMinimumWidth(0, 350)
-        layout.setColumnMinimumWidth(7, 200)
-        layout.setRowMinimumHeight(1, 350)
-        layout.setRowMinimumHeight(2, 300)
         layout.addWidget(self.presetsMenu, 0, 0)
         layout.addWidget(self.loadPresetButton, 0, 1)
         layout.addWidget(cameraWidget, 1, 0, 2, 2)
@@ -1189,9 +1170,11 @@ class TormentaGUI(QtGui.QMainWindow):
         layout.addWidget(illumDockArea, 0, 7, 2, 1)
         layout.addWidget(dockArea, 2, 7, 5, 1)
 
+        layout.setRowMinimumHeight(1, 350)
+        layout.setRowMinimumHeight(2, 300)
+        layout.setColumnMinimumWidth(0, 350)
         layout.setColumnMinimumWidth(2, 1000)
-
-#        self.toggleCamera()
+        layout.setColumnMinimumWidth(7, 200)
 
     def autoLevels(self):
         self.hist.setLevels(*guitools.bestLimits(self.img.image))
@@ -1555,15 +1538,6 @@ class TormentaGUI(QtGui.QMainWindow):
         self.alignmentLine = pg.InfiniteLine(
             pen=pen, angle=angle, movable=True)
         self.alignmentON = True
-
-    def resolftRec(self):
-        self.trigsourceparam.setValue('External "frame-trigger"')
-        self.recWidget.untilSTOPbtn.setChecked(True)
-        self.recWidget.untilStop()
-        self.recWidget.recButton.setChecked(True)
-        self.recWidget.startRecording()
-        self.laserWidgets.DigCtrl.DigitalControlButton.setChecked(True)
-        self.laserWidgets.DigCtrl.GlobalDigitalMod()
 
     def fpsMath(self):
         now = ptime.time()

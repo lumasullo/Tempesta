@@ -313,23 +313,13 @@ class ScanWidget(QtGui.QMainWindow):
         if not self.scanning:
             main = self.main
             lasers = main.laserWidgets
-            mod = (lasers.DigCtrl.DigitalControlButton.isChecked() and
-                   main.trigsourceparam.value() == 'External "frame-trigger"')
-            if mod:
-                self.prepAndRun()
-#            # Good idea but breaks the timing of signals somehow
-#            m = self.main
-#            m.laserWidgets.DigCtrl.DigitalControlButton.setChecked(True)
-#            m.trigsourceparam.setValue('External "frame-trigger"')
-#            time.sleep(1)
-#            try:
-#                self.main.lvworkers[0].f_ind
-#                self.prepAndRun()
-#            except AttributeError:
-#                self.scanInLiveviewWar.exec_()
-            else:
-                self.digModWarning.exec_()
-#                self.scanInLiveviewWar.exec_()
+            if not(lasers.DigCtrl.DigitalControlButton.isChecked() and
+                   main.trigsourceparam.value() == 'External "frame-trigger"'):
+                main.trigsourceparam.setValue('External "frame-trigger"')
+                main.laserWidgets.DigCtrl.DigitalControlButton.setChecked(True)
+                main.laserWidgets.DigCtrl.GlobalDigitalMod()
+
+            self.prepAndRun()
         else:
             self.scanner.abort()
 
@@ -369,11 +359,11 @@ class ScanWidget(QtGui.QMainWindow):
             self.main.lvworkers[0].stopRecording()
             data = self.main.lvworkers[0].framesRecorded
 
-            datashape = (
-                len(data), self.main.shapes[0][1], self.main.shapes[0][0])
+            datashape = (len(data), *self.main.shapes[0][::-1])
             reshapeddata = np.reshape(data, datashape, order='C')
 
-            self.multiScanWgt.worker.set_images(reshapeddata[1:])
+#            self.multiScanWgt.worker.set_images(reshapeddata[1:])
+            self.multiScanWgt.worker.set_images(reshapeddata)
             if buildImg:
                 self.multiScanWgt.worker.find_fp()
                 self.multiScanWgt.worker.analyze()
@@ -714,13 +704,11 @@ class MultiScanWorker(QtCore.QObject):
         self.nor_const = 255 / (np.max(self.images))
         self.f_frame = (self.images[1] * self.nor_const).astype(np.uint8)
         self.l_frame = (self.images[-1] * self.nor_const).astype(np.uint8)
-        fps_f = goodFeaturesToTrack(self.f_frame,
-                                    mask=None,
-                                    **self.feature_params)
+        fps_f = goodFeaturesToTrack(
+            self.f_frame, mask=None, **self.feature_params)
         self.fps_f = np.array([point[0] for point in fps_f])
-        fps_l = goodFeaturesToTrack(self.l_frame,
-                                    mask=None,
-                                    **self.feature_params)
+        fps_l = goodFeaturesToTrack(
+            self.l_frame, mask=None, **self.feature_params)
         self.fps_l = np.array([point[0] for point in fps_l])
         self.frame_view = (self.f_frame + self.l_frame) / 2
 
@@ -737,7 +725,7 @@ class MultiScanWorker(QtCore.QObject):
                       255, 1)
             self.centers.append(center)
             label = pg.TextItem()
-            label.setPos(center[0]+self.radius, center[1]+self.radius)
+            label.setPos(center[0] + self.radius, center[1] + self.radius)
             label.setText(str(i))
             self.labels.append(label)
             self.main.illum_wgt.vb.addItem(label)
@@ -787,8 +775,7 @@ class MultiScanWorker(QtCore.QObject):
                               int(self.f_frame.shape[1]*rate)))
         self.points_large = []
         for point, illum_image in zip(self.fps_f, self.illum_images):
-            px = int(point[0] * rate)
-            py = int(point[1] * rate)
+            px, py = (point * rate).astype(int)
             img_large[py:py+self.steps[1], px:px+self.steps[0]] = illum_image
             self.points_large.append([px, py])
         self.illum_images.append(img_large)
@@ -812,8 +799,7 @@ class MultiScanWorker(QtCore.QObject):
             # process the large field of view
             illum_image_large_pre = self.illum_images[-1].copy()
             for i, point in enumerate(self.points_large):
-                px = point[0]
-                py = point[1]
+                px, py = point
                 side = len(self.illum_images[0])
                 illum_image_pre = self.illum_images_stocked[ind][i]
                 illum_image_large_pre[py:py+side, px:px+side] = illum_image_pre
@@ -867,8 +853,9 @@ class IllumImageWidget(pg.GraphicsLayoutWidget):
         self.vb.addItem(self.img)
         self.hist = pg.HistogramLUTItem(image=self.img)
         self.hist.vb.setLimits(yMin=0, yMax=66000)
-        pos, rgba = zip(*mplToPg.cmapToColormap(plt.get_cmap('Reds_r')))
-        redsColormap = pg.ColorMap(pos, rgba)
+#        pos, rgba = zip(*mplToPg.cmapToColormap(plt.get_cmap('hot')))
+#        redsColormap = pg.ColorMap(pos, rgba)
+        redsColormap = pg.ColorMap([0, 1], [(0, 0, 0), (255, 0, 0)])
         self.hist.gradient.setColorMap(redsColormap)
         for tick in self.hist.gradient.ticks:
             tick.hide()
@@ -880,8 +867,9 @@ class IllumImageWidget(pg.GraphicsLayoutWidget):
         self.img_back.setOpacity(0.5)
         self.hist_back = pg.HistogramLUTItem(image=self.img_back)
         self.hist_back.vb.setLimits(yMin=0, yMax=66000)
-        pos, rgba = zip(*mplToPg.cmapToColormap(plt.get_cmap('Greens_r')))
+        pos, rgba = zip(*mplToPg.cmapToColormap(plt.get_cmap('viridis')))
         greensColormap = pg.ColorMap(pos, rgba)
+#        greensColormap = pg.ColorMap([0, 1], [(0, 0, 0), (0, 250, 0)])
         self.hist_back.gradient.setColorMap(greensColormap)
         for tick in self.hist_back.gradient.ticks:
             tick.hide()
@@ -1049,28 +1037,23 @@ class FOVscan():
         self.rowSamps = self.stepsX * self.seqSamps
         self.colSamps = self.stepsY * self.seqSamps
 
-        # Ramps in Y axis
-        Yramp = makeRamp(startY, sizeY, self.colSamps)
-        Yramps = np.split(Yramp, self.stepsY)
-
-        # Unidirectional scanning
-        constant = np.ones((self.stepsX + 1)*self.seqSamps)
-        Ysig = np.array([np.concatenate((i[0]*constant, i)) for i in Yramps])
-        Ysig = Ysig.ravel()
-
+        # x axis unidirectional scan signal
         LTRramp = makeRamp(startX, sizeX, self.rowSamps)
         # Fast return to startX
         RTLramp = makeRamp(sizeX, startX, self.seqSamps)
         LTRramp = np.concatenate((startX*np.ones(self.seqSamps), LTRramp))
-#        RTLramp = np.concatenate((sizeX*np.ones(len(Yramps[0])), RTLramp))
-
         LTRTLramp = np.concatenate((LTRramp, RTLramp))
-
-        # Unidirectional scanning
         Xsig = np.tile(LTRTLramp, self.stepsY)
-
         self.sigDict['x'] = Xsig / convFactors['x']
+
+        # y axis scan signal
+        Yramp = makeRamp(startY, sizeY, self.colSamps)
+        Yramps = np.split(Yramp, self.stepsY)
+        constant = np.ones((self.stepsX + 1)*self.seqSamps)
+        Ysig = np.array([np.concatenate((i[0]*constant, i)) for i in Yramps])
+        Ysig = Ysig.ravel()
         self.sigDict['y'] = Ysig / convFactors['y']
+
         self.sigDict['z'] = np.zeros(len(Ysig))
 
 
@@ -1092,7 +1075,6 @@ class VOLscan():
     def update(self, parValues, primScanDim):
         """Updates the VOL-scan signals, units of length are used when creating
         the scan signals and is converted to voltages at the end """
-        print('Updating VOL scan')
         # Create signals
         startX = 0
         startY = 0
@@ -1165,10 +1147,6 @@ class VOLscan():
         self.sigDict['x'] = fullXsig / convFactors['x']
         self.sigDict['y'] = fullXsig / convFactors['y']
         self.sigDict['z'] = fullXsig / convFactors['z']
-
-        print('Final X: ' + str(fullZprimDimSig[-1]))
-        print('Final Y: ' + str(fullZsecDimSig[-1]))
-        print('Final Z: ' + str(fullZthirdDimSig[-1]))
 
 
 class PixelCycle():

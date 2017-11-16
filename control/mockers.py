@@ -389,8 +389,6 @@ class MockHamamatsu(Driver):
         self.hcam_data = [HMockCamData(self.frame_x * self.frame_y)
                           for i in range(1, 2)]
 
-        print('size of hcam_data = ', np.size(self.hcam_data))
-
     # stopAcquisition
     #
     # Stop data acquisition.
