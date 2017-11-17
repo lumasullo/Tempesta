@@ -607,10 +607,10 @@ class MultipleScanWidget(QtGui.QFrame):
         self.show_beads_btn.clicked.connect(self.worker.find_fp)
         self.quality_label = QtGui.QLabel('Quality level of points')
         self.quality_edit = QtGui.QLineEdit('0.05')
-        self.quality_edit.textChanged.connect(self.worker.find_fp)
+        self.quality_edit.editingFinished.connect(self.worker.find_fp)
         self.win_size_label = QtGui.QLabel('Window size [px]')
         self.win_size_edit = QtGui.QLineEdit('10')
-        self.win_size_edit.textChanged.connect(self.worker.find_fp)
+        self.win_size_edit.editingFinished.connect(self.worker.find_fp)
 
         self.beads_label = QtGui.QLabel('Bead number')
         self.beads_box = QtGui.QComboBox()
@@ -715,9 +715,11 @@ class MultiScanWorker(QtCore.QObject):
         # draw feature point window
         self.delete_label()
         self.centers = []
+        self.fps_ll = []
         for i, fp_f in enumerate(self.fps_f):
             distances = [np.linalg.norm(fp_l - fp_f) for fp_l in self.fps_l]
             ind = np.argmin(distances)
+            self.fps_ll.append(self.fps_l[ind])
             center = (fp_f + self.fps_l[ind]) / 2
             rectangle(self.frame_view,
                       (int(center[0]-self.radius), int(center[1]-self.radius)),
@@ -747,7 +749,7 @@ class MultiScanWorker(QtCore.QObject):
             cps_f.append(self.find_cp(
                 self.f_frame, self.fps_f[i].astype(np.uint16), self.radius))
             cps_l.append(self.find_cp(
-                self.l_frame, self.fps_l[i].astype(np.uint16), self.radius))
+                self.l_frame, self.fps_ll[i].astype(np.uint16), self.radius))
 
             # calculate the mean of ROI
             for image in self.images:
@@ -776,7 +778,9 @@ class MultiScanWorker(QtCore.QObject):
         self.points_large = []
         for point, illum_image in zip(self.fps_f, self.illum_images):
             px, py = (point * rate).astype(int)
-            img_large[py:py+self.steps[1], px:px+self.steps[0]] = illum_image
+            pye = min(py+self.steps[0], img_large.shape[0])
+            pxe = min(px+self.steps[1], img_large.shape[1])
+            img_large[py:pye, px:pxe] = illum_image[0:pye-py, 0:pxe-px]
             self.points_large.append([px, py])
         self.illum_images.append(img_large)
 
@@ -828,12 +832,20 @@ class MultiScanWorker(QtCore.QObject):
 
     @staticmethod
     def mean_roi(array, p, r):
-        roi = array[p[1] - r: p[1] + r, p[0] - r: p[0] + r]
+        xs = max(p[1] - r, 0)
+        xe = min(p[1] + r, array.shape[1])
+        ys = max(p[0] - r, 0)
+        ye = min(p[0] + r, array.shape[0])
+        roi = array[ys: ye, xs: xe]
         return np.average(roi)
 
     @staticmethod
     def find_cp(array, point, r):
-        roi = array[point[1] - r:point[1] + r, point[0] - r:point[0] + r]
+        xs = max(point[1] - r, 0)
+        xe = min(point[1] + r, array.shape[1])
+        ys = max(point[0] - r, 0)
+        ye = min(point[0] + r, array.shape[0])
+        roi = array[ys: ye, xs: xe]
         M = moments(roi, False)
         cx = int(M['m10'] / M['m00'])
         cy = int(M['m01'] / M['m00'])
