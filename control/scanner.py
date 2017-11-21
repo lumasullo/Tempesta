@@ -376,26 +376,26 @@ class ScanWidget(QtGui.QMainWindow):
         self.start405Par = QtGui.QLineEdit('0')
         self.start405Par.textChanged.connect(
             lambda: self.pxParameterChanged('start405'))
-        self.start488Par = QtGui.QLineEdit('0')
+        self.start488Par = QtGui.QLineEdit('2.5')
         self.start488Par.textChanged.connect(
             lambda: self.pxParameterChanged('start488'))
         self.start473Par = QtGui.QLineEdit('0')
         self.start473Par.textChanged.connect(
             lambda: self.pxParameterChanged('start473'))
-        self.startCAMPar = QtGui.QLineEdit('0')
+        self.startCAMPar = QtGui.QLineEdit('2.5')
         self.startCAMPar.textChanged.connect(
             lambda: self.pxParameterChanged('startCAM'))
 
         self.end405Par = QtGui.QLineEdit('0')
         self.end405Par.textChanged.connect(
             lambda: self.pxParameterChanged('end405'))
-        self.end488Par = QtGui.QLineEdit('0')
+        self.end488Par = QtGui.QLineEdit('7.5')
         self.end488Par.textChanged.connect(
             lambda: self.pxParameterChanged('end488'))
         self.end473Par = QtGui.QLineEdit('0')
         self.end473Par.textChanged.connect(
             lambda: self.pxParameterChanged('end473'))
-        self.endCAMPar = QtGui.QLineEdit('0')
+        self.endCAMPar = QtGui.QLineEdit('7.5')
         self.endCAMPar.textChanged.connect(
             lambda: self.pxParameterChanged('endCAM'))
 
@@ -587,11 +587,13 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanButton.setText('Abort')
 #            self.main.piezoWidget.resetChannels(
 #                self.stageScan.activeChannels[self.stageScan.scanMode])
+            countScan = self.stageScan.FOVscan.stepsZ
             self.scanner = Scanner(
-               self.nidaq, self.stageScan, self.pxCycle, self, continuous)
+               self.nidaq, self.stageScan, self.pxCycle, self, countScan, continuous)
             self.scanner.finalizeDone.connect(self.finalizeDone)
             self.scanner.scanDone.connect(self.scanDone)
             self.scanning = True
+            self.focusWgt.unlockFocus()
 
             self.main.lvworkers[0].startRecording()
 
@@ -631,6 +633,7 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanButton.setEnabled(True)
             del self.scanner
             self.scanning = False
+            self.focusWgt.lockFocus()
 #            self.main.piezoWidget.resetChannels(
 #                self.stageScan.activeChannels[self.stageScan.scanMode])
         elif self.continuousCheck.isChecked():
@@ -684,7 +687,7 @@ class Scanner(QtCore.QObject):
     scanDone = QtCore.pyqtSignal()
     finalizeDone = QtCore.pyqtSignal()
 
-    def __init__(self, device, stageScan, pxCycle, main, continuous=False,
+    def __init__(self, device, stageScan, pxCycle, main, countScan, continuous=False,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -707,6 +710,7 @@ class Scanner(QtCore.QObject):
         self.channelOrder = main.channelOrder
 
         self.aborted = False
+        self.countScan = countScan
 
     def runScan(self):
         self.aborted = False
@@ -781,6 +785,11 @@ class Scanner(QtCore.QObject):
             sample_mode=nidaqmx.constants.AcquisitionType.FINITE,
             samps_per_chan=self.sampsInScan)
 
+        try:
+            self.waiter.waitdoneSignal.disconnect(self.done)
+        except TypeError:
+            # This happens when the scan is aborted after the warning
+            pass
         self.waiter.waitdoneSignal.connect(self.finalize)
 
         self.aotask.write(fullAOsig, auto_start=False)
@@ -799,7 +808,9 @@ class Scanner(QtCore.QObject):
         self.finalize()
 
     def finalize(self):
-        self.scanDone.emit()
+        self.countScan -= 1
+        if self.countScan == 0:
+            self.scanDone.emit()
         # Apparently important, otherwise finalize is called again when next
         # waiting finishes.
         try:
@@ -837,7 +848,12 @@ class Scanner(QtCore.QObject):
         self.dotask.stop()
         self.dotask.close()
         self.nidaq.reset_device()
-        self.finalizeDone.emit()
+        if self.countScan == 0:
+            self.finalizeDone.emit()
+            print("End scanning")
+        else:
+            self.runScan()
+            print("Continue scanning")
 
 
 class MultipleScanWidget(QtGui.QFrame):
@@ -1350,7 +1366,7 @@ class FOVscan():
         self.seqSamps = int(np.round(self.sampleRate*parValues['seqTime']))
         self.stepsX = int(np.ceil(sizeX / stepSizeX))
         self.stepsY = int(np.ceil(sizeY / stepSizeY))
-        self.stepsZ = 0
+        self.stepsZ = 1
         # Step size compatible with width
         self.corrStepSize = sizeX / self.stepsX
 
