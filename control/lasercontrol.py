@@ -5,7 +5,6 @@ Created on Tue Aug 12 11:51:21 2014
 @author: Federico Barabas
 """
 
-from copy import copy
 import numpy as np
 from pyqtgraph.Qt import QtCore, QtGui
 from lantz import Q_
@@ -32,28 +31,23 @@ class UpdatePowers(QtCore.QObject):
 class LaserWidget(QtGui.QFrame):
 
     def __init__(self, lasers, daq, *args, **kwargs):
-
         super().__init__(*args, **kwargs)
 
         self.actlaser, self.offlaser, self.exclaser = lasers
-        print('Actlaser = ', self.actlaser)
-        print('Offlaser = ', self.offlaser)
-        print('Exclaser = ', self.exclaser)
 
         self.mW = Q_(1, 'mW')
         self.daq = daq
 
-        self.actControl = LaserControl(self.actlaser, '<h3>405<h3>',
-                                       color=(130, 0, 200), prange=(0, 200),
-                                       tickInterval=5, singleStep=0.1)
+        self.actControl = LaserControl(
+            self.actlaser, '<h3>405<h3>', color=(130, 0, 200), prange=(0, 200),
+            tickInterval=5, singleStep=0.1)
 
-        self.offControl = LaserControl(self.offlaser, '<h3>488<h3>',
-                                       color=(0, 247, 255), prange=(0, 200),
-                                       tickInterval=100, singleStep=10,
-                                       daq=self.daq, port=0)
+        self.offControl = LaserControl(
+            self.offlaser, '<h3>488<h3>', color=(0, 247, 255), prange=(0, 200),
+            tickInterval=100, singleStep=10, daq=self.daq, port=0)
 
-        self.excControl = LaserControlTTL(self.exclaser, '<h3>473<h3>',
-                                          color=(0, 183, 255))
+        self.excControl = LaserControlTTL(
+            self.exclaser, '<h3>473<h3>', color=(0, 183, 255))
 
         self.actlaser.autostart = False
         self.offlaser.autostart = False
@@ -64,15 +58,13 @@ class LaserWidget(QtGui.QFrame):
         grid = QtGui.QGridLayout()
         self.setLayout(grid)
 
-        self.DigCtrl = DigitalControl(controls=(self.actControl,
-                                                self.offControl,
-                                                self.excControl))
+        self.DigCtrl = DigitalControl(
+            controls=(self.actControl, self.offControl, self.excControl))
 
         grid.addWidget(self.actControl, 0, 0, 4, 1)
         grid.addWidget(self.offControl, 0, 1, 4, 1)
         grid.addWidget(self.excControl, 0, 2, 4, 1)
         grid.addWidget(self.DigCtrl, 4, 0, 2, 3)
-        self.setFixedHeight(400)
 
         # Current power update routine
         self.updatePowers = UpdatePowers(self)
@@ -250,8 +242,7 @@ class LaserControl(QtGui.QFrame):
 
         self.grid = QtGui.QGridLayout()
         self.setLayout(self.grid)
-        powerFrame.setMinimumHeight(180)
-#        powerFrame.setMinimumWidth(100)
+#        powerFrame.setMinimumHeight(250)
         self.grid.addWidget(self.name, 0, 0, 1, 2)
         self.grid.addWidget(powerFrame, 1, 0, 1, 2)
         self.grid.addWidget(self.enableButton, 8, 0, 1, 2)
