@@ -122,16 +122,20 @@ class FocusWidget(QtGui.QFrame):
 
     def toggleFocus(self):
         if self.lockButton.isChecked():
+            self.lockFocus()
+        else:
+            self.unlockFocus()
+
+    def lockFocus(self):
+        if not self.locked:
+            self.locked = True
             self.setPoint = self.processDataThread.focusSignal
             self.focusLockGraph.line = self.focusLockGraph.plot.addLine(
-                                                    y=self.setPoint, pen='r')
+                y=self.setPoint, pen='r')
             self.PI = pi.PI(self.setPoint,
                             np.float(self.kpEdit.text()),
                             np.float(self.kiEdit.text()))
             self.initialZ = self.z.position
-            self.locked = True
-        else:
-            self.unlockFocus()
 
     def unlockFocus(self):
         if self.locked:
