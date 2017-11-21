@@ -799,11 +799,11 @@ class MultiScanWorker(QtCore.QObject):
             px = img_large.shape[1] - (point[1] * rate).astype(int)
             py = img_large.shape[0] - (point[0] * rate).astype(int)
             if self.primScanDim == 'x':
-                pxe = min(px+self.steps[0], img_large.shape[1])
-                pye = min(py+self.steps[1], img_large.shape[0])
-            else:
                 pxe = min(px+self.steps[1], img_large.shape[1])
                 pye = min(py+self.steps[0], img_large.shape[0])
+            else:
+                pxe = min(px+self.steps[0], img_large.shape[1])
+                pye = min(py+self.steps[1], img_large.shape[0])
             img_large[py:pye, px:pxe] = illum_image[0:pye-py, 0:pxe-px]
             self.points_large.append([px, py, pxe, pye])
         self.illum_images.append(img_large)
