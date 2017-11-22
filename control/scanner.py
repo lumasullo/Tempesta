@@ -369,26 +369,26 @@ class ScanWidget(QtGui.QMainWindow):
         self.start405Par = QtGui.QLineEdit('0')
         self.start405Par.textChanged.connect(
             lambda: self.pxParameterChanged('start405'))
-        self.start488Par = QtGui.QLineEdit('2.5')
+        self.start488Par = QtGui.QLineEdit('0')
         self.start488Par.textChanged.connect(
             lambda: self.pxParameterChanged('start488'))
         self.start473Par = QtGui.QLineEdit('0')
         self.start473Par.textChanged.connect(
             lambda: self.pxParameterChanged('start473'))
-        self.startCAMPar = QtGui.QLineEdit('2.5')
+        self.startCAMPar = QtGui.QLineEdit('0')
         self.startCAMPar.textChanged.connect(
             lambda: self.pxParameterChanged('startCAM'))
 
         self.end405Par = QtGui.QLineEdit('0')
         self.end405Par.textChanged.connect(
             lambda: self.pxParameterChanged('end405'))
-        self.end488Par = QtGui.QLineEdit('7.5')
+        self.end488Par = QtGui.QLineEdit('0')
         self.end488Par.textChanged.connect(
             lambda: self.pxParameterChanged('end488'))
         self.end473Par = QtGui.QLineEdit('0')
         self.end473Par.textChanged.connect(
             lambda: self.pxParameterChanged('end473'))
-        self.endCAMPar = QtGui.QLineEdit('7.5')
+        self.endCAMPar = QtGui.QLineEdit('0')
         self.endCAMPar.textChanged.connect(
             lambda: self.pxParameterChanged('endCAM'))
 
