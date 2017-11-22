@@ -132,6 +132,19 @@ class LaserTTL(object):
 
     @enabled.setter
     def enabled(self, value):
+        try:
+            self.dotask
+        except:
+            self.dotask = nidaqmx.Task('dotaskEnableTTL')
+            self.dotask.do_channels.add_do_chan(
+                lines='Dev1/port0/line%s' % self.line,
+                name_to_assign_to_lines='chan')
+
+            self.dotask.timing.cfg_samp_clk_timing(
+               source=r'100kHzTimeBase',
+               rate=100000,
+               sample_mode=nidaqmx.constants.AcquisitionType.FINITE)
+
         if value:
             self.dotask.write(np.ones(100, dtype=bool), auto_start=True)
             self.dotask.wait_until_done()

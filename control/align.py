@@ -41,6 +41,7 @@ class AlignWidgetAverage(QtGui.QFrame):
         grid.addWidget(self.graph, 0, 0, 1, 6)
         grid.addWidget(self.roiButton, 1, 0, 1, 1)
         grid.addWidget(self.resetButton, 1, 1, 1, 1)
+        grid.setRowMinimumHeight(0, 300)
 
         self.scansPerS = 10
         self.alignTime = 1000 / self.scansPerS

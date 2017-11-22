@@ -381,8 +381,11 @@ class RecordingWidget(QtGui.QFrame):
                     '_snap.tiff')
         savename = guitools.getUniqueName(savename)
         image = self.main.latest_images[self.main.currCamIdx].astype(np.uint16)
-        tiff.imsave(savename, image, description=self.dataname,
-                    software='Tormenta')
+        tiff.imsave(
+            savename, image, description=self.dataname, software='Tormenta',
+            imagej=True, resolution=(1/self.main.umxpx, 1/self.main.umxpx),
+            metadata={'spacing': 1, 'unit': 'um'})
+
         guitools.attrsToTxt(os.path.splitext(savename)[0], self.getAttrs())
 
     def folderWarning(self):
@@ -643,6 +646,8 @@ class CamParamTree(ParameterTree):
         # Parameter tree for the camera configuration
         params = [{'name': 'Model', 'type': 'str',
                    'value': orcaflash.camera_model.decode("utf-8")},
+                  {'name': 'Pixel size', 'type': 'float',
+                   'value': 0.238, 'readonly': True, 'suffix': ' µm'},
                   {'name': 'Image frame', 'type': 'group', 'children': [
                       {'name': 'Binning', 'type': 'list',
                        'values': [1, 2, 4], 'tip': BinTip},
@@ -902,6 +907,7 @@ class TormentaGUI(QtGui.QMainWindow):
         fileMenu.addAction(exitAction)
 
         self.tree = CamParamTree(self.orcaflash)
+        self.umxpx = self.tree.p.param('Pixel size').value()
 
         # Indicator for loading frame shape from a preset setting
         # Currently not used.
@@ -964,8 +970,6 @@ class TormentaGUI(QtGui.QMainWindow):
         for preset in os.listdir(self.presetDir):
             self.presetsMenu.addItem(preset)
         self.loadPresetButton = QtGui.QPushButton('Load preset')
-#        self.loadPresetButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
-#                                            QtGui.QSizePolicy.Expanding)
 
         def loadPresetFunction(): return guitools.loadPreset(self)
         self.loadPresetButton.pressed.connect(loadPresetFunction)
@@ -1168,7 +1172,7 @@ class TormentaGUI(QtGui.QMainWindow):
         layout.setRowMinimumHeight(2, 175)
         layout.setRowMinimumHeight(3, 100)
         layout.setRowMinimumHeight(5, 175)
-        layout.setColumnMinimumWidth(0, 250)
+        layout.setColumnMinimumWidth(0, 275)
         imageWidget.ci.layout.setColumnFixedWidth(1, 1150)
         imageWidget.ci.layout.setRowFixedHeight(1, 1150)
         layout.setColumnMinimumWidth(2, 1350)

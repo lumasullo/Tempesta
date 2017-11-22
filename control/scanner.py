@@ -36,6 +36,7 @@ class Positionner(QtGui.QWidget):
 
     def __init__(self, main):
         super().__init__()
+
         self.scanWidget = main
 
         # Position of the different devices in V
@@ -44,7 +45,7 @@ class Positionner(QtGui.QWidget):
         self.z = 0
 
         # Parameters for the ramp (driving signal for the different channels)
-        self.rampTime = 800  # Time for each ramp in ms
+        self.rampTime = 100  # Time for each ramp in ms
         self.sampleRate = 10**5
         self.nSamples = int(self.rampTime * 10**-3 * self.sampleRate)
 
@@ -52,86 +53,11 @@ class Positionner(QtGui.QWidget):
         # this positionner to access the analog output channels
         self.isActive = True
         self.activeChannels = ["x", "y", "z"]
-
-        # Axes control
-        self.xEdit = QtGui.QLineEdit()
-        self.xEdit.setText(str(self.x))
-        self.xEdit.editingFinished.connect(self.editX)
-        self.xSlider = QtGui.QSlider(QtCore.Qt.Horizontal)
-        self.xSlider.sliderReleased.connect(self.moveX)
-        self.xSlider.setRange(100*minVolt['x'], 100*maxVolt['x'])
-        self.xSlider.setValue(self.x)
-        xMin = "{:.2f}".format(minVolt['x']*convFactors['x'])
-        self.xMinLabel = QtGui.QLabel(xMin)
-        xMax = "{:.2f}".format(maxVolt['x']*convFactors['x'])
-        self.xMaxLabel = QtGui.QLabel(xMax)
-        self.xMaxLabel.setAlignment(QtCore.Qt.AlignRight |
-                                    QtCore.Qt.AlignVCenter)
-        self.xSliderLabel = QtGui.QLabel("<strong>x position (µm)</strong>")
-        self.xSliderLabel.setTextFormat(QtCore.Qt.RichText)
-
-        self.yEdit = QtGui.QLineEdit()
-        self.yEdit.setText(str(self.y))
-        self.yEdit.editingFinished.connect(self.editY)
-        self.ySlider = QtGui.QSlider(QtCore.Qt.Horizontal)
-        self.ySlider.sliderReleased.connect(self.moveY)
-        self.ySlider.setRange(100*minVolt['x'], 100*maxVolt['x'])
-        self.ySlider.setValue(self.y)
-        self.yMinLabel = QtGui.QLabel(str(minVolt['y']*convFactors['y']))
-        self.yMaxLabel = QtGui.QLabel(str(maxVolt['y']*convFactors['y']))
-        self.yMaxLabel.setAlignment(QtCore.Qt.AlignRight |
-                                    QtCore.Qt.AlignVCenter)
-        self.ySliderLabel = QtGui.QLabel("<strong>y position (µm)</strong>")
-        self.ySliderLabel.setTextFormat(QtCore.Qt.RichText)
-
-        self.zEdit = QtGui.QLineEdit()
-        self.zEdit.setText(str(self.z))
-        self.zEdit.editingFinished.connect(self.editZ)
-        self.zSlider = QtGui.QSlider(QtCore.Qt.Horizontal)
-        self.zSlider.sliderReleased.connect(self.moveZ)
-        self.zSlider.setRange(100*minVolt['z'], 100*maxVolt['z'])
-        self.zSlider.setValue(self.z)
-        self.zMinLabel = QtGui.QLabel(str(minVolt['z']*convFactors['z']))
-        self.zMaxLabel = QtGui.QLabel(str(maxVolt['z']*convFactors['z']))
-        self.zMaxLabel.setAlignment(QtCore.Qt.AlignRight |
-                                    QtCore.Qt.AlignVCenter)
-        self.zSliderLabel = QtGui.QLabel("<strong>z position (µm)</strong>")
-        self.zSliderLabel.setTextFormat(QtCore.Qt.RichText)
-
-        layout = QtGui.QGridLayout()
-        self.setLayout(layout)
-        layout.addWidget(self.xSliderLabel, 1, 0)
-        layout.addWidget(self.xEdit, 1, 1, 1, 2)
-        layout.addWidget(self.xMinLabel, 2, 0)
-        layout.addWidget(self.xMaxLabel, 2, 2)
-        layout.addWidget(self.xSlider, 3, 0, 1, 3)
-        layout.addWidget(self.ySliderLabel, 5, 0)
-        layout.addWidget(self.yEdit, 5, 1, 1, 2)
-        layout.addWidget(self.yMinLabel, 6, 0)
-        layout.addWidget(self.yMaxLabel, 6, 2)
-        layout.addWidget(self.ySlider, 7, 0, 1, 3)
-        layout.addWidget(self.zSliderLabel, 9, 0)
-        layout.addWidget(self.zEdit, 9, 1, 1, 2)
-        layout.addWidget(self.zMinLabel, 10, 0)
-        layout.addWidget(self.zMaxLabel, 10, 2)
-        layout.addWidget(self.zSlider, 11, 0, 1, 3)
-
-    def move(self):
-        """moves the 3 axis to the positions specified by the sliders"""
-        fullSignal = np.zeros((len(self.activeChannels), self.nSamples))
-        for chan in self.activeChannels:
-            slider = getattr(self, chan + "Slider")
-            newPos = 0.01*slider.value()
-            currPos = getattr(self, chan)
-            print(currPos, newPos)
-            signal = makeRamp(currPos, newPos, self.nSamples)
-            setattr(self, chan, newPos)
-            fullSignal[self.activeChannels.index(chan)] = signal
+        self.AOchans = [0, 1, 2]     # Order corresponds to self.channelOrder
 
         self.aotask = nidaqmx.Task("positionnerTask")
         # Following loop creates the voltage channels
-        AOchans = [0, 1, 2]     # Order corresponds to self.channelOrder
-        for n in AOchans:
+        for n in self.AOchans:
             self.aotask.ao_channels.add_ao_voltage_chan(
                 physical_channel='Dev1/ao%s' % n,
                 name_to_assign_to_channel=self.activeChannels[n],
@@ -143,10 +69,90 @@ class Positionner(QtGui.QWidget):
             sample_mode=nidaqmx.constants.AcquisitionType.FINITE,
             samps_per_chan=self.nSamples)
 
+        # Axes control
+        self.xEdit = QtGui.QLineEdit()
+        self.xEdit.setText(str(self.x))
+        self.xEdit.editingFinished.connect(self.editX)
+        self.xSlider = QtGui.QSlider(QtCore.Qt.Horizontal)
+        self.xSlider.sliderReleased.connect(self.moveX)
+        self.xSlider.setRange(100*minVolt['x'], 100*maxVolt['x'])
+        self.xSlider.setValue(self.x)
+        xMin = "{:.2f}".format(minVolt['x']*convFactors['x'])
+        self.xMinLabel = QtGui.QLabel(xMin)
+        self.xMinLabel.setAlignment(QtCore.Qt.AlignRight |
+                                    QtCore.Qt.AlignVCenter)
+        xMax = "{:.2f}".format(maxVolt['x']*convFactors['x'])
+        self.xMaxLabel = QtGui.QLabel(xMax)
+        self.xMaxLabel.setAlignment(QtCore.Qt.AlignLeft |
+                                    QtCore.Qt.AlignVCenter)
+        self.xSliderLabel = QtGui.QLabel("<strong>x (µm)</strong>")
+        self.xSliderLabel.setTextFormat(QtCore.Qt.RichText)
+
+        self.yEdit = QtGui.QLineEdit()
+        self.yEdit.setText(str(self.y))
+        self.yEdit.editingFinished.connect(self.editY)
+        self.ySlider = QtGui.QSlider(QtCore.Qt.Horizontal)
+        self.ySlider.sliderReleased.connect(self.moveY)
+        self.ySlider.setRange(100*minVolt['x'], 100*maxVolt['x'])
+        self.ySlider.setValue(self.y)
+        self.yMinLabel = QtGui.QLabel(str(minVolt['y']*convFactors['y']))
+        self.yMinLabel.setAlignment(QtCore.Qt.AlignRight |
+                                    QtCore.Qt.AlignVCenter)
+        self.yMaxLabel = QtGui.QLabel(str(maxVolt['y']*convFactors['y']))
+        self.yMaxLabel.setAlignment(QtCore.Qt.AlignLeft |
+                                    QtCore.Qt.AlignVCenter)
+        self.ySliderLabel = QtGui.QLabel("<strong>y (µm)</strong>")
+        self.ySliderLabel.setTextFormat(QtCore.Qt.RichText)
+
+        self.zEdit = QtGui.QLineEdit()
+        self.zEdit.setText(str(self.z))
+        self.zEdit.editingFinished.connect(self.editZ)
+        self.zSlider = QtGui.QSlider(QtCore.Qt.Horizontal)
+        self.zSlider.sliderReleased.connect(self.moveZ)
+        self.zSlider.setRange(100*minVolt['z'], 100*maxVolt['z'])
+        self.zSlider.setValue(self.z)
+        self.zMinLabel = QtGui.QLabel(str(minVolt['z']*convFactors['z']))
+        self.zMinLabel.setAlignment(QtCore.Qt.AlignRight |
+                                    QtCore.Qt.AlignVCenter)
+        self.zMaxLabel = QtGui.QLabel(str(maxVolt['z']*convFactors['z']))
+        self.zMaxLabel.setAlignment(QtCore.Qt.AlignLeft |
+                                    QtCore.Qt.AlignVCenter)
+        self.zSliderLabel = QtGui.QLabel("<strong>z (µm)</strong>")
+        self.zSliderLabel.setTextFormat(QtCore.Qt.RichText)
+
+        layout = QtGui.QGridLayout()
+        self.setLayout(layout)
+        layout.setColumnMinimumWidth(3, 150)
+        layout.addWidget(self.xSliderLabel, 1, 0)
+        layout.addWidget(self.xEdit, 1, 1)
+        layout.addWidget(self.xMinLabel, 1, 2)
+        layout.addWidget(self.xSlider, 1, 3)
+        layout.addWidget(self.xMaxLabel, 1, 4)
+        layout.addWidget(self.ySliderLabel, 3, 0)
+        layout.addWidget(self.yEdit, 3, 1)
+        layout.addWidget(self.yMinLabel, 3, 2)
+        layout.addWidget(self.yMaxLabel, 3, 4)
+        layout.addWidget(self.ySlider, 3, 3)
+        layout.addWidget(self.zSliderLabel, 5, 0)
+        layout.addWidget(self.zEdit, 5, 1)
+        layout.addWidget(self.zMinLabel, 5, 2)
+        layout.addWidget(self.zMaxLabel, 5, 4)
+        layout.addWidget(self.zSlider, 5, 3)
+
+    def move(self):
+        """moves the 3 axis to the positions specified by the sliders"""
+        fullSignal = np.zeros((len(self.activeChannels), self.nSamples))
+        for chan in self.activeChannels:
+            slider = getattr(self, chan + "Slider")
+            newPos = 0.01*slider.value()
+            currPos = getattr(self, chan)
+            signal = makeRamp(currPos, newPos, self.nSamples)
+            setattr(self, chan, newPos)
+            fullSignal[self.activeChannels.index(chan)] = signal
+
         self.aotask.write(fullSignal, auto_start=True)
         self.aotask.wait_until_done()
         self.aotask.stop()
-        self.aotask.close()
 
     def moveX(self):
         """Specifies the movement of the x axis."""
@@ -222,7 +228,6 @@ class Positionner(QtGui.QWidget):
         :param dict channels: the channels which are used or released by
         another object. The positionner does not touch the other channels"""
         if(self.isActive):
-            print("disabling channels")
             self.aotask.stop()
             self.aotask.close()
             del self.aotask
@@ -232,7 +237,8 @@ class Positionner(QtGui.QWidget):
                 x for x in totalChannels if x not in channels]
             self.aotask = nidaqmx.Task("positionnerTask")
             axis = self.activeChannels[0]
-            channel = "Dev1/ao" + str(self.scanWidget.currAOchan[axis])
+            n = self.AOchans[self.activeChannels.index(axis)]
+            channel = "Dev1/ao%s" % n
             self.aotask.ao_channels.add_ao_voltage_chan(
                 physical_channel=channel, name_to_assign_to_channel=axis,
                 min_val=minVolt[axis], max_val=maxVolt[axis])
@@ -240,7 +246,6 @@ class Positionner(QtGui.QWidget):
 
         else:
             # Restarting the analog channels
-            print("restarting channels")
             self.aotask.stop()
             self.aotask.close()
             del self.aotask
@@ -249,10 +254,11 @@ class Positionner(QtGui.QWidget):
             totalChannels = ["x", "y", "z"]
             self.activeChannels = totalChannels
             for elt in totalChannels:
-                channel = "Dev1/ao" + str(self.scanWidget.currAOchan[elt])
-            self.aotask.ao_channels.add_ao_voltage_chan(
-                physical_channel=channel, name_to_assign_to_channel=elt,
-                min_val=minVolt[elt], max_val=maxVolt[elt])
+                n = self.AOchans[self.activeChannels.index(axis)]
+                channel = "Dev1/ao%s" % n
+                self.aotask.ao_channels.add_ao_voltage_chan(
+                    physical_channel=channel, name_to_assign_to_channel=elt,
+                    min_val=minVolt[elt], max_val=maxVolt[elt])
 
             self.aotask.timing.cfg_samp_clk_timing(
                 rate=self.sampleRate,
@@ -260,7 +266,6 @@ class Positionner(QtGui.QWidget):
                 samps_per_chan=self.nSamples)
             self.aotask.start()
             self.isActive = True
-            print("in reset:", self.aotask)
 
     def closeEvent(self, *args, **kwargs):
         if(self.isActive):
@@ -566,7 +571,7 @@ class ScanWidget(QtGui.QMainWindow):
                    main.trigsourceparam.value() == 'External "frame-trigger"'):
                 main.trigsourceparam.setValue('External "frame-trigger"')
                 main.laserWidgets.DigCtrl.DigitalControlButton.setChecked(True)
-                main.laserWidgets.DigCtrl.GlobalDigitalMod()
+#            main.laserWidgets.DigCtrl.GlobalDigitalMod() it is alreay checked
 
             self.prepAndRun()
         else:
@@ -578,6 +583,8 @@ class ScanWidget(QtGui.QMainWindow):
         if self.scanRadio.isChecked():
             self.stageScan.update(self.scanParValues)
             self.scanButton.setText('Abort')
+#            self.main.piezoWidget.resetChannels(
+#                self.stageScan.activeChannels[self.stageScan.scanMode])
             self.scanner = Scanner(
                self.nidaq, self.stageScan, self.pxCycle, self, continuous)
             self.scanner.finalizeDone.connect(self.finalizeDone)
@@ -611,7 +618,6 @@ class ScanWidget(QtGui.QMainWindow):
             datashape = (len(data), *self.main.shapes[0][::-1])
             reshapeddata = np.reshape(data, datashape, order='C')
 
-#            self.multiScanWgt.worker.set_images(reshapeddata[1:])
             self.multiScanWgt.worker.set_images(reshapeddata)
             if buildImg:
                 self.multiScanWgt.worker.find_fp()
@@ -623,6 +629,8 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanButton.setEnabled(True)
             del self.scanner
             self.scanning = False
+#            self.main.piezoWidget.resetChannels(
+#                self.stageScan.activeChannels[self.stageScan.scanMode])
         elif self.continuousCheck.isChecked():
             self.scanButton.setEnabled(True)
             self.prepAndRun(True)
@@ -710,8 +718,8 @@ class Scanner(QtCore.QObject):
             self.done()
             return
 
+        AOchans = [0, 1, 2]
         # Following loop creates the voltage channels
-        AOchans = [0, 1, 2]     # Order corresponds to self.channelOrder
         for n in AOchans:
             self.aotask.ao_channels.add_ao_voltage_chan(
                 physical_channel='Dev1/ao%s' % n,
@@ -1187,6 +1195,9 @@ class StageScan():
         self.scans = {'FOV scan': self.FOVscan,
                       'VOL scan': self.VOLscan,
                       'Line scan': self.lineScan}
+        self.activeChannels = {'Line scan': ['x'],
+                               'FOV scan': ['x', 'y'],
+                               'VOL scan': ['x', 'y', 'z']}
         self.frames = 0
 
     def setScanMode(self, mode):
