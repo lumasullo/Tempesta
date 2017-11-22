@@ -1036,8 +1036,8 @@ class MultiScanWorker(QtCore.QObject):
         # expand beads image
         dif = []
         for i in range(len(cps_f)):
-            dif_x = cps_f[i][0] - cps_l[i][0]
-            dif_y = cps_f[i][1] - cps_l[i][1]
+            dif_x = np.abs(cps_f[i][0] - cps_l[i][0])
+            dif_y = np.abs(cps_f[i][1] - cps_l[i][1])
             dif.append(max(dif_x, dif_y))
         rate = max(self.steps) / np.average(dif)
         img_large = np.zeros((int(self.f_frame.shape[0]*rate),
