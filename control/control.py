@@ -66,7 +66,7 @@ class RecordingWidget(QtGui.QFrame):
             QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
 
         # Title
-        recTitle = QtGui.QLabel('<h2><strong>Recording</strong></h2>')
+        recTitle = QtGui.QLabel('<h2><strong>Recording settings</strong></h2>')
         recTitle.setTextFormat(QtCore.Qt.RichText)
         self.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
 
@@ -74,20 +74,16 @@ class RecordingWidget(QtGui.QFrame):
         self.folderEdit = QtGui.QLineEdit(self.initialDir)
         openFolderButton = QtGui.QPushButton('Open')
         openFolderButton.clicked.connect(self.openFolder)
-#        loadFolderButton = QtGui.QPushButton('Load...')
-#        loadFolderButton.clicked.connect(self.loadFolder)
         self.specifyfile = QtGui.QCheckBox('Specify file name')
         self.specifyfile.clicked.connect(self.specFile)
         self.filenameEdit = QtGui.QLineEdit('Current_time')
-        self.saveModeBox = QtGui.QComboBox()
-        self.saveModeBox.addItem('tiff')
-        self.saveModeBox.addItem('hdf5')
+        self.formatBox = QtGui.QComboBox()
+        self.formatBox.addItem('tiff')
+        self.formatBox.addItem('hdf5')
 
         # Snap and recording buttons
         self.showZgraph = QtGui.QCheckBox('Show Z-graph')
         self.showZproj = QtGui.QCheckBox('Show Z-projection')
-        self.showBead_scan = QtGui.QCheckBox('Show bead scan')
-        self.DualCam = QtGui.QCheckBox('Two-cam rec')
         self.snapTIFFButton = QtGui.QPushButton('Snap')
         self.snapTIFFButton.setStyleSheet("font-size:16px")
         self.snapTIFFButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
@@ -151,13 +147,21 @@ class RecordingWidget(QtGui.QFrame):
         recGrid.addWidget(QtGui.QLabel('Folder'), 2, 0)
         recGrid.addWidget(self.showZgraph, 1, 0)
         recGrid.addWidget(self.showZproj, 1, 1)
-        recGrid.addWidget(self.showBead_scan, 1, 2)
-        recGrid.addWidget(self.DualCam, 1, 3)
-        recGrid.addWidget(self.folderEdit, 2, 1, 1, 2)
-        recGrid.addWidget(openFolderButton, 2, 3)
+
+        if len(self.main.cameras) > 1:
+            self.DualCam = QtGui.QCheckBox('Two-cam rec')
+            recGrid.addWidget(self.DualCam, 1, 3)
+            recGrid.addWidget(self.folderEdit, 2, 1, 1, 2)
+            recGrid.addWidget(openFolderButton, 2, 3)
+            recGrid.addWidget(self.filenameEdit, 3, 1, 1, 2)
+            recGrid.addWidget(self.formatBox, 3, 3)
+        else:
+            recGrid.addWidget(self.folderEdit, 2, 1)
+            recGrid.addWidget(openFolderButton, 2, 2)
+            recGrid.addWidget(self.filenameEdit, 3, 1)
+            recGrid.addWidget(self.formatBox, 3, 2)
+
         recGrid.addWidget(self.specifyfile, 3, 0)
-        recGrid.addWidget(self.filenameEdit, 3, 1, 1, 2)
-        recGrid.addWidget(self.saveModeBox, 3, 3)
 
         recGrid.addWidget(modeTitle, 4, 0)
         recGrid.addWidget(self.specifyFrames, 5, 0, 1, 5)
@@ -471,30 +475,13 @@ class RecordingWidget(QtGui.QFrame):
             print('In first endRecordig "skip me" if')
         else:
             print('In endRecording')
-            print('Show bead scan state is: ', self.showBead_scan.checkState())
             ind = self.main.currCamIdx
             if self.showZgraph.checkState():
                 plt.figure()
                 plt.plot(self.recworkers[ind].z_stack)
             if self.showZproj.checkState():
                 plt.imshow(self.recworkers[ind].Z_projection, cmap='gray')
-            if self.showBead_scan.checkState():
-                data = self.recworkers[ind].z_stack
-                print('Length of data = ', len(data))
-                try:
-                    data = self.recworkers[ind].z_stack
-                    if not np.floor(np.sqrt(len(data))) == np.sqrt(len(data)):
-                        del data[-1]
 
-                    imside = int(np.sqrt(np.size(data)))
-                    print('Imside = ', imside)
-                    data = np.reshape(data, [imside, imside])
-                    data[::2] = np.fliplr(data[::2])
-                    plt.figure()
-                    plt.imshow(
-                       data, interpolation='none', cmap=plt.get_cmap('afmhot'))
-                except BaseException:
-                    pass
             for i in range(0, self.nr_cameras):
                 ind = np.mod(self.main.currCamIdx + i, 2)
                 self.recthreads[ind].terminate()
@@ -530,7 +517,7 @@ class RecordingWidget(QtGui.QFrame):
             self.savenames[ind] = guitools.getUniqueName(self.savenames[ind])
 
     def saveData(self, data, savename):
-        saveMode = self.saveModeBox.currentText()
+        saveMode = self.formatBox.currentText()
         savename = savename + '.' + saveMode
         if saveMode == 'tiff':
             print('Savename = ', savename)
@@ -606,7 +593,7 @@ class RecWorker(QtCore.QObject):
             self.main.main.trigsourceparam.setValue('External "frame-trigger"')
             laserWidget = self.main.main.laserWidgets
             laserWidget.DigCtrl.DigitalControlButton.setChecked(True)
-            laserWidget.DigCtrl.GlobalDigitalMod()
+#            laserWidget.DigCtrl.GlobalDigitalMod()
             framesExpected = self.scanWidget.stageScan.frames
             self.scanWidget.scanButton.click()
             while len(self.lvworker.framesRecorded) != framesExpected\
@@ -841,7 +828,7 @@ class TormentaGUI(QtGui.QMainWindow):
                  webcam, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.resize(2400, 1300)
+#        self.resize(2400, 1300)
 
         self.lasers = [actlaser, offlaser, exclaser]
         self.cameras = cameras
@@ -977,8 +964,8 @@ class TormentaGUI(QtGui.QMainWindow):
         for preset in os.listdir(self.presetDir):
             self.presetsMenu.addItem(preset)
         self.loadPresetButton = QtGui.QPushButton('Load preset')
-        self.loadPresetButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
-                                            QtGui.QSizePolicy.Expanding)
+#        self.loadPresetButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
+#                                            QtGui.QSizePolicy.Expanding)
 
         def loadPresetFunction(): return guitools.loadPreset(self)
         self.loadPresetButton.pressed.connect(loadPresetFunction)
@@ -1001,7 +988,7 @@ class TormentaGUI(QtGui.QMainWindow):
         self.viewCtrl = QtGui.QWidget()
         self.viewCtrlLayout = QtGui.QGridLayout()
         self.viewCtrl.setLayout(self.viewCtrlLayout)
-        self.viewCtrlLayout.addWidget(self.liveviewButton, 0, 0, 1, 3)
+        self.viewCtrlLayout.addWidget(self.liveviewButton, 0, 0, 1, 2)
 
         if len(self.cameras) > 1:
             self.toggleCamButton = QtGui.QPushButton('Toggle camera')
@@ -1009,8 +996,8 @@ class TormentaGUI(QtGui.QMainWindow):
             self.toggleCamButton.clicked.connect(self.toggleCamera)
             self.camLabel = QtGui.QLabel('Hamamatsu0')
             self.camLabel.setStyleSheet("font-size:18px")
-            self.viewCtrlLayout.addWidget(self.toggleCamButton, 2, 0, 1, 2)
-            self.viewCtrlLayout.addWidget(self.camLabel, 2, 2)
+            self.viewCtrlLayout.addWidget(self.toggleCamButton, 2, 0)
+            self.viewCtrlLayout.addWidget(self.camLabel, 2, 1)
 
         # Status bar info
         self.fpsBox = QtGui.QLabel()
@@ -1046,9 +1033,9 @@ class TormentaGUI(QtGui.QMainWindow):
         for tick in self.hist.gradient.ticks:
             tick.hide()
         imageWidget.addItem(self.hist, row=1, col=2)
-        self.ROI = guitools.ROI((0, 0), self.vb, (0, 0),
-                                handlePos=(1, 0), handleCenter=(0, 1),
-                                color='y', scaleSnap=True, translateSnap=True)
+        self.ROI = guitools.ROI((0, 0), self.vb, (0, 0), handlePos=(1, 0),
+                                handleCenter=(0, 1), color='y', scaleSnap=True,
+                                translateSnap=True)
         self.ROI.sigRegionChangeFinished.connect(self.ROIchanged)
         self.ROI.hide()
 
@@ -1075,6 +1062,8 @@ class TormentaGUI(QtGui.QMainWindow):
         self.gridButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
                                       QtGui.QSizePolicy.Expanding)
         self.gridButton.clicked.connect(self.grid.toggle)
+        self.viewCtrlLayout.addWidget(self.gridButton, 1, 0)
+
         self.crosshair = guitools.Crosshair(self.vb)
         self.crosshairButton = QtGui.QPushButton('Crosshair')
         self.crosshairButton.setCheckable(True)
@@ -1082,12 +1071,17 @@ class TormentaGUI(QtGui.QMainWindow):
         self.crosshairButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
                                            QtGui.QSizePolicy.Expanding)
         self.crosshairButton.pressed.connect(self.crosshair.toggle)
+        self.viewCtrlLayout.addWidget(self.crosshairButton, 1, 1)
 
         self.levelsButton = QtGui.QPushButton('Update Levels')
         self.levelsButton.setEnabled(False)
         self.levelsButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
                                         QtGui.QSizePolicy.Expanding)
         self.levelsButton.pressed.connect(self.autoLevels)
+
+        proxy = QtGui.QGraphicsProxyWidget()
+        proxy.setWidget(self.levelsButton)
+        imageWidget.addItem(proxy, row=0, col=2)
 
         # Initial camera configuration taken from the parameter tree
         self.orcaflash.setPropertyValue('exposure_time', self.expPar.value())
@@ -1147,34 +1141,37 @@ class TormentaGUI(QtGui.QMainWindow):
         scanDock.addWidget(self.scanWidget)
         dockArea.addDock(scanDock, 'below', FocusLockDock)
 
-        # Console widget
+        # Piezo positioner
+        piezoDock = Dock('Piezo positioner', size=(1, 1))
+        self.piezoWidget = scanner.Positionner(self.scanWidget)
+        piezoDock.addWidget(self.piezoWidget)
+        dockArea.addDock(piezoDock, 'bottom', alignmentDock)
+
         console = ConsoleWidget(namespace={'pg': pg, 'np': np})
 
         self.setWindowTitle('TempestaDev')
         self.cwidget = QtGui.QWidget()
         self.setCentralWidget(self.cwidget)
 
-        # Widgets' layout
         layout = QtGui.QGridLayout()
         self.cwidget.setLayout(layout)
         layout.addWidget(self.presetsMenu, 0, 0)
         layout.addWidget(self.loadPresetButton, 0, 1)
         layout.addWidget(cameraWidget, 1, 0, 2, 2)
         layout.addWidget(self.viewCtrl, 3, 0, 1, 2)
-        layout.addWidget(self.recWidget, 4, 0, 2, 2)
-        layout.addWidget(console, 6, 0, 1, 2)
-        layout.addWidget(imageWidget, 1, 2, 6, 4)
-        layout.addWidget(self.crosshairButton, 0, 3)
-        layout.addWidget(self.gridButton, 0, 4)
-        layout.addWidget(self.levelsButton, 0, 5)
-        layout.addWidget(illumDockArea, 0, 7, 2, 1)
-        layout.addWidget(dockArea, 2, 7, 5, 1)
+        layout.addWidget(self.recWidget, 4, 0, 1, 2)
+        layout.addWidget(console, 5, 0, 1, 2)
+        layout.addWidget(imageWidget, 0, 2, 6, 1)
+        layout.addWidget(illumDockArea, 0, 3, 2, 1)
+        layout.addWidget(dockArea, 2, 3, 4, 1)
 
-        layout.setRowMinimumHeight(1, 350)
-        layout.setRowMinimumHeight(2, 300)
-        layout.setColumnMinimumWidth(0, 350)
-        layout.setColumnMinimumWidth(2, 1000)
-        layout.setColumnMinimumWidth(7, 200)
+        layout.setRowMinimumHeight(2, 175)
+        layout.setRowMinimumHeight(3, 100)
+        layout.setRowMinimumHeight(5, 175)
+        layout.setColumnMinimumWidth(0, 250)
+        imageWidget.ci.layout.setColumnFixedWidth(1, 1150)
+        imageWidget.ci.layout.setRowFixedHeight(1, 1150)
+        layout.setColumnMinimumWidth(2, 1350)
 
     def autoLevels(self):
         self.hist.setLevels(*guitools.bestLimits(self.img.image))
