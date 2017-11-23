@@ -38,6 +38,7 @@ class Positionner(QtGui.QWidget):
         super().__init__()
 
         self.scanWidget = main
+        self.focusWgt = self.scanWidget.focusWgt
 
         # Position of the different devices in V
         self.x = 0
@@ -109,12 +110,12 @@ class Positionner(QtGui.QWidget):
         self.zEdit.editingFinished.connect(self.editZ)
         self.zSlider = QtGui.QSlider(QtCore.Qt.Horizontal)
         self.zSlider.sliderReleased.connect(self.moveZ)
-        self.zSlider.setRange(100*minVolt['z'], 100*maxVolt['z'])
+        self.zSlider.setRange(0, 100)
         self.zSlider.setValue(self.z)
-        self.zMinLabel = QtGui.QLabel(str(minVolt['z']*convFactors['z']))
+        self.zMinLabel = QtGui.QLabel(str(0))
         self.zMinLabel.setAlignment(QtCore.Qt.AlignRight |
                                     QtCore.Qt.AlignVCenter)
-        self.zMaxLabel = QtGui.QLabel(str(maxVolt['z']*convFactors['z']))
+        self.zMaxLabel = QtGui.QLabel(str(100))
         self.zMaxLabel.setAlignment(QtCore.Qt.AlignLeft |
                                     QtCore.Qt.AlignVCenter)
         self.zSliderLabel = QtGui.QLabel("<strong>z (µm)</strong>")
@@ -168,9 +169,9 @@ class Positionner(QtGui.QWidget):
 
     def moveZ(self):
         """Specifies the movement of the z axis."""
-        value = self.zSlider.value() / 100
-        self.zEdit.setText(str(round(value*convFactors['z'], 2)))
-        self.move()
+        value = self.zSlider.value()
+        self.zEdit.setText(str(round(value, 2)))
+        self.focusWgt.z.moveAbsolute(value * self.focusWgt.um)
 
     def editX(self):
         """Method called when a position for x is entered manually. Repositions
@@ -305,6 +306,7 @@ class ScanWidget(QtGui.QMainWindow):
 
         self.nidaq = device
         self.main = main
+        self.focusWgt = main.FocusLockWidget
 
         # The port order in the NIDAQ follows this same order.
         # We chose to follow the temporal sequence order
