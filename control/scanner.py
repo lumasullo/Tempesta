@@ -915,6 +915,8 @@ class MultipleScanWidget(QtGui.QFrame):
         self.illum_wgt.vb.autoRange()
         if self.overlay_check.isChecked():
             self.illum_wgt.update_back(self.worker.illum_images_back[curr_ind])
+        if curr_ind == len(self.worker.illum_images)-1:
+            self.worker.show_large_view_label()
 
     def next_bead(self):
         self.worker.delete_label()
@@ -927,6 +929,8 @@ class MultipleScanWidget(QtGui.QFrame):
         self.beads_box.setCurrentIndex(next_ind)
         if self.overlay_check.isChecked():
             self.illum_wgt.update_back(self.worker.illum_images_back[next_ind])
+        if next_ind == len(self.worker.illum_images)-1:
+            self.worker.show_large_view_label()
         self.illum_wgt.vb.autoRange()
 
     def clear(self):
@@ -974,6 +978,7 @@ class MultiScanWorker(QtCore.QObject):
         fps_f = goodFeaturesToTrack(
             self.f_frame, mask=None, **self.feature_params)
         self.fps_f = np.array([point[0] for point in fps_f])
+        self.fps_f = np.sort(self.fps_f)
         fps_l = goodFeaturesToTrack(
             self.l_frame, mask=None, **self.feature_params)
         self.fps_l = np.array([point[0] for point in fps_l])
@@ -1067,6 +1072,7 @@ class MultiScanWorker(QtCore.QObject):
 
         # update illumination image
         self.main.illum_wgt.update(img_large)
+        self.show_large_view_label()
         self.main.beads_box.addItem('large field of view')
         self.main.beads_box.setCurrentIndex(len(self.illum_images)-1)
         self.main.illum_wgt.vb.autoRange()
@@ -1109,7 +1115,16 @@ class MultiScanWorker(QtCore.QObject):
         if len(self.labels) != 0:
             for label in self.labels:
                 self.main.illum_wgt.vb.removeItem(label)
-            self.labels = []
+            self.labels.clear()
+
+    def show_large_view_label(self):
+        for i, point in enumerate(self.points_large):
+            px, py, pxe, pye = point
+            label = pg.TextItem()
+            label.setPos(py, px)
+            label.setText(str(i))
+            self.labels.append(label)
+            self.main.illum_wgt.vb.addItem(label)
 
     @staticmethod
     def mean_roi(array, p, r):
