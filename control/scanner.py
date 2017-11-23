@@ -753,8 +753,12 @@ class Scanner(QtCore.QObject):
         Therefore, the digital signal is assambled as the repetition of the
         sequence for the whole scan in one row and then append zeros for 1
         sequence time. THIS IS NOW INCOMPATIBLE WITH VOLUMETRIC SCAN, maybe."""
+        if self.stageScan.primScanDim == 'x':
+            primSteps = self.stageScan.FOVscan.stepsX
+        else:
+            primSteps = self.stageScan.FOVscan.stepsY
         # Signal for a single line
-        lineSig = np.tile(fullDOsig, self.stageScan.FOVscan.stepsX)
+        lineSig = np.tile(fullDOsig, primSteps)
         emptySig = np.zeros((4, int(self.stageScan.seqSamps)), dtype=bool)
         fullDOsig = np.concatenate((emptySig, lineSig, emptySig), axis=1)
 
@@ -864,10 +868,10 @@ class MultipleScanWidget(QtGui.QFrame):
         self.show_beads_btn.clicked.connect(self.worker.find_fp)
         self.quality_label = QtGui.QLabel('Quality level of points')
         self.quality_edit = QtGui.QLineEdit('0.05')
-        self.quality_edit.textChanged.connect(self.worker.find_fp)
+        self.quality_edit.editingFinished.connect(self.worker.find_fp)
         self.win_size_label = QtGui.QLabel('Window size [px]')
         self.win_size_edit = QtGui.QLineEdit('10')
-        self.win_size_edit.textChanged.connect(self.worker.find_fp)
+        self.win_size_edit.editingFinished.connect(self.worker.find_fp)
 
         self.beads_label = QtGui.QLabel('Bead number')
         self.beads_box = QtGui.QComboBox()
@@ -948,12 +952,18 @@ class MultiScanWorker(QtCore.QObject):
                                    blockSize=7)
 
     def set_images(self, images):
-        self.steps = [self.mainScanWid.scanner.stageScan.FOVscan.stepsX,
-                      self.mainScanWid.scanner.stageScan.FOVscan.stepsY]
+        self.primScanDim = self.mainScanWid.scanner.stageScan.primScanDim
+        if self.primScanDim == 'x':
+            self.steps = [self.mainScanWid.scanner.stageScan.FOVscan.stepsX,
+                          self.mainScanWid.scanner.stageScan.FOVscan.stepsY]
+        else:
+            self.steps = [self.mainScanWid.scanner.stageScan.FOVscan.stepsY,
+                          self.mainScanWid.scanner.stageScan.FOVscan.stepsX]
         self.images = images
 
     def find_fp(self):
         self.main.illum_wgt.delete_back()
+
         # find feature points
         ql = float(self.main.quality_edit.text())
         self.feature_params['qualityLevel'] = ql
@@ -967,26 +977,32 @@ class MultiScanWorker(QtCore.QObject):
         fps_l = goodFeaturesToTrack(
             self.l_frame, mask=None, **self.feature_params)
         self.fps_l = np.array([point[0] for point in fps_l])
+
+        # make frame for visualizing feature point detection
         self.frame_view = (self.f_frame + self.l_frame) / 2
 
-        # draw feature point window
+        # draw feature points image
         self.delete_label()
-        self.centers = []
+        self.centers = []   # center points between first FPs and last FPs
+        self.fps_ll = []    # FPs of last frame that match ones of fist frame
         for i, fp_f in enumerate(self.fps_f):
             distances = [np.linalg.norm(fp_l - fp_f) for fp_l in self.fps_l]
             ind = np.argmin(distances)
+            self.fps_ll.append(self.fps_l[ind])
             center = (fp_f + self.fps_l[ind]) / 2
+            self.centers.append(center)
+            # draw calculating window
             rectangle(self.frame_view,
                       (int(center[0]-self.radius), int(center[1]-self.radius)),
                       (int(center[0]+self.radius), int(center[1]+self.radius)),
                       255, 1)
-            self.centers.append(center)
+            # make labels for each window
             label = pg.TextItem()
             label.setPos(center[0] + self.radius, center[1] + self.radius)
             label.setText(str(i))
             self.labels.append(label)
             self.main.illum_wgt.vb.addItem(label)
-        self.main.illum_wgt.update(self.frame_view)
+        self.main.illum_wgt.update(self.frame_view.T, invert=False)
         self.main.illum_wgt.vb.autoRange()
 
     def analyze(self):
@@ -995,18 +1011,18 @@ class MultiScanWorker(QtCore.QObject):
 
         self.delete_label()
 
-        data_mean = []
-        cps_f = []
-        cps_l = []
+        data_mean = []  # means of calculating window for each images
+        cps_f = []  # center points of beads in first frame
+        cps_l = []  # center points of beads in last frame
         for i in range(len(self.centers)):
             data_mean.append([])
             # record the center point of gravity
             cps_f.append(self.find_cp(
                 self.f_frame, self.fps_f[i].astype(np.uint16), self.radius))
             cps_l.append(self.find_cp(
-                self.l_frame, self.fps_l[i].astype(np.uint16), self.radius))
+                self.l_frame, self.fps_ll[i].astype(np.uint16), self.radius))
 
-            # calculate the mean of ROI
+            # calculate the mean of calculating window
             for image in self.images:
                 mean = self.mean_roi(
                     image, self.centers[i].astype(np.uint16), self.radius)
@@ -1015,26 +1031,38 @@ class MultiScanWorker(QtCore.QObject):
         # reconstruct the illumination image
         for i in range(len(data_mean)):
             data_r = np.reshape(data_mean[i], self.steps)
+            if self.primScanDim == 'y':
+                data_r = data_r.T
             self.illum_images.append(data_r)
             self.main.beads_box.addItem(str(i))
+
+        # stock images for overlaying
         self.illum_images_stocked.append(self.illum_images)
-        self.main.illum_wgt.update(self.illum_images[0])
         self.main.overlay_box.addItem(str(self.main.overlay_box.count()))
 
         # make large field of view of illumination image
+        # expand beads image
         dif = []
         for i in range(len(cps_f)):
-            dif_x = cps_f[i][0] - cps_l[i][0]
-            dif_y = cps_f[i][1] - cps_l[i][1]
+            dif_x = np.abs(cps_f[i][0] - cps_l[i][0])
+            dif_y = np.abs(cps_f[i][1] - cps_l[i][1])
             dif.append(max(dif_x, dif_y))
-        rate = self.steps[0] / np.average(dif)
+        rate = max(self.steps) / np.average(dif)
         img_large = np.zeros((int(self.f_frame.shape[0]*rate),
-                              int(self.f_frame.shape[1]*rate)))
-        self.points_large = []
+                              int(self.f_frame.shape[1]*rate))).T
+
+        self.points_large = []  # start and end points of illumination image
         for point, illum_image in zip(self.fps_f, self.illum_images):
-            px, py = (point * rate).astype(int)
-            img_large[py:py+self.steps[1], px:px+self.steps[0]] = illum_image
-            self.points_large.append([px, py])
+            px = img_large.shape[1] - (point[1] * rate).astype(int)
+            py = img_large.shape[0] - (point[0] * rate).astype(int)
+            if self.primScanDim == 'x':
+                pxe = min(px+self.steps[1], img_large.shape[1])
+                pye = min(py+self.steps[0], img_large.shape[0])
+            else:
+                pxe = min(px+self.steps[0], img_large.shape[1])
+                pye = min(py+self.steps[1], img_large.shape[0])
+            img_large[py:pye, px:pxe] = illum_image[0:pye-py, 0:pxe-px]
+            self.points_large.append([px, py, pxe, pye])
         self.illum_images.append(img_large)
 
         # update illumination image
@@ -1043,26 +1071,26 @@ class MultiScanWorker(QtCore.QObject):
         self.main.beads_box.setCurrentIndex(len(self.illum_images)-1)
         self.main.illum_wgt.vb.autoRange()
 
+        # do not display large view if bead is only one
         if len(self.illum_images) == 2:
             self.main.next_bead()
 
     def overlay(self):
         ind = self.main.overlay_box.currentIndex()
-        self.illum_images_back = []
+        self.illum_images_back = [] # illumination images for overlay
 
         # overlay previous image to current image
         if self.main.overlay_check.isChecked():
 
             # process the large field of view
-            illum_image_large_pre = self.illum_images[-1].copy()
+            illum_image_large_pre = np.zeros(self.illum_images[-1].shape)
             for i, point in enumerate(self.points_large):
-                px, py = point
-                side = len(self.illum_images[0])
+                px, py, pxe, pye = point
                 illum_image_pre = self.illum_images_stocked[ind][i]
-                illum_image_large_pre[py:py+side, px:px+side] = illum_image_pre
+                illum_image_large_pre[py:pye, px:pxe] = illum_image_pre[0:pye-py, 0:pxe-px]
 
             # process each image
-            for i in range(len(self.illum_images) - 1):
+            for i in range(len(self.illum_images)-1):
                 illum_image_pre = self.illum_images_stocked[ind][i]
                 self.illum_images_back.append(illum_image_pre)
 
@@ -1073,7 +1101,7 @@ class MultiScanWorker(QtCore.QObject):
             self.main.illum_wgt.update_back(img)
 
         else:
-            self.illum_images_back = []
+            self.illum_images_back.clear()
             self.main.illum_wgt.delete_back()
 
     def delete_label(self):
@@ -1085,12 +1113,20 @@ class MultiScanWorker(QtCore.QObject):
 
     @staticmethod
     def mean_roi(array, p, r):
-        roi = array[p[1] - r: p[1] + r, p[0] - r: p[0] + r]
+        xs = max(p[0] - r, 0)
+        xe = min(p[0] + r, array.shape[1])
+        ys = max(p[1] - r, 0)
+        ye = min(p[1] + r, array.shape[0])
+        roi = array[ys: ye, xs: xe]
         return np.average(roi)
 
     @staticmethod
     def find_cp(array, point, r):
-        roi = array[point[1] - r:point[1] + r, point[0] - r:point[0] + r]
+        xs = max(point[0] - r, 0)
+        xe = min(point[0] + r, array.shape[1])
+        ys = max(point[1] - r, 0)
+        ye = min(point[1] + r, array.shape[0])
+        roi = array[ys: ye, xs: xe]
         M = moments(roi, False)
         cx = int(M['m10'] / M['m00'])
         cy = int(M['m01'] / M['m00'])
@@ -1132,12 +1168,18 @@ class IllumImageWidget(pg.GraphicsLayoutWidget):
             tick.hide()
         self.addItem(self.hist_back, row=1, col=3)
 
-    def update(self, img):
-        self.img.setImage(img.T)
+    def update(self, img, invert=True):
+        self.img.setImage(img)
+        if invert:
+            self.vb.invertX(True)
+            self.vb.invertY(True)
+        else:
+            self.vb.invertX(False)
+            self.vb.invertY(False)
         self.hist.setLevels(*guitools.bestLimits(img))
 
     def update_back(self, img):
-        self.img_back.setImage(img.T)
+        self.img_back.setImage(img)
         self.hist_back.setLevels(*guitools.bestLimits(img))
 
     def delete_back(self):
@@ -1294,28 +1336,35 @@ class FOVscan():
         self.stepsZ = 0
         # Step size compatible with width
         self.corrStepSize = sizeX / self.stepsX
-        self.rowSamps = self.stepsX * self.seqSamps
-        self.colSamps = self.stepsY * self.seqSamps
 
-        # x axis unidirectional scan signal
-        LTRramp = makeRamp(startX, sizeX, self.rowSamps)
+        if primScanDim == 'x':
+            self.makePrimDimSig('x', startX, sizeX, self.stepsX, self.stepsY)
+            self.makeSecDimSig('y', startY, sizeY, self.stepsY, self.stepsX)
+        elif primScanDim == 'y':
+            self.makePrimDimSig('y', startY, sizeY, self.stepsY, self.stepsX)
+            self.makeSecDimSig('x', startX, sizeX, self.stepsX, self.stepsY)
+
+        self.sigDict['z'] = np.zeros(len(self.secSig))
+
+    def makePrimDimSig(self, dim, start, size, steps, otherSteps):
+        rowSamps = steps * self.seqSamps
+        LTRramp = makeRamp(start, size, rowSamps)
         # Fast return to startX
-        RTLramp = makeRamp(sizeX, startX, self.seqSamps)
-        LTRramp = np.concatenate((startX*np.ones(self.seqSamps), LTRramp))
+        RTLramp = makeRamp(size, start, self.seqSamps)
+        LTRramp = np.concatenate((start*np.ones(self.seqSamps), LTRramp))
         LTRTLramp = np.concatenate((LTRramp, RTLramp))
-        Xsig = np.tile(LTRTLramp, self.stepsY)
-        self.sigDict['x'] = Xsig / convFactors['x']
+        self.primSig = np.tile(LTRTLramp, otherSteps)
+        self.sigDict[dim] = self.primSig / convFactors[dim]
 
+    def makeSecDimSig(self, dim, start, size, steps, otherSteps):
         # y axis scan signal
-        Yramp = makeRamp(startY, sizeY, self.colSamps)
-        Yramps = np.split(Yramp, self.stepsY)
-        constant = np.ones((self.stepsX + 1)*self.seqSamps)
-        Ysig = np.array([np.concatenate((i[0]*constant, i)) for i in Yramps])
-        Ysig = Ysig.ravel()
-        self.sigDict['y'] = Ysig / convFactors['y']
-
-        self.sigDict['z'] = np.zeros(len(Ysig))
-
+        colSamps = steps * self.seqSamps
+        Yramp = makeRamp(start, size, colSamps)
+        Yramps = np.split(Yramp, steps)
+        constant = np.ones((otherSteps + 1)*self.seqSamps)
+        Sig = np.array([np.concatenate((i[0]*constant, i)) for i in Yramps])
+        self.secSig = Sig.ravel()
+        self.sigDict[dim] = self.secSig / convFactors[dim]
 
 class VOLscan():
     """Class representing the scanning movement for a volumetric scan i.e.
