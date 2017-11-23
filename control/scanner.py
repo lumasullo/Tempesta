@@ -977,8 +977,8 @@ class MultiScanWorker(QtCore.QObject):
         self.l_frame = (self.images[-1] * self.nor_const).astype(np.uint8)
         fps_f = goodFeaturesToTrack(
             self.f_frame, mask=None, **self.feature_params)
-        self.fps_f = np.array([point[0] for point in fps_f])
-        self.fps_f = np.sort(self.fps_f)
+        fps_f = np.array([point[0] for point in fps_f])
+        self.fps_f = fps_f[fps_f[:, 0].argsort()]
         fps_l = goodFeaturesToTrack(
             self.l_frame, mask=None, **self.feature_params)
         self.fps_l = np.array([point[0] for point in fps_l])
