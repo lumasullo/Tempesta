@@ -543,11 +543,20 @@ class ScanWidget(QtGui.QMainWindow):
         if p == 'seqTime':
             self.updateScan(self.allDevices)
             self.graph.update(self.allDevices)
-        self.stageScan.updateFrames(self.scanParValues)
-        self.nrFramesPar.setText(str(self.stageScan.frames))
-        self.scanDuration = self.stageScan.frames*self.scanParValues['seqTime']
+
         if self.scanMode.currentText() == 'VOL scan':
-            self.scanDuration = self.scanDuration * self.stageScan.VOLscan.stepsZ
+            sizeZ = self.scanParValues['sizeZ']
+            stepSizeZ = self.scanParValues['stepSizeZ']
+            stepsZ = int(np.ceil(sizeZ / stepSizeZ))
+        else:
+            stepsZ = 1
+
+        self.stageScan.updateFrames(self.scanParValues)
+        self.stageScan.frames = self.stageScan.frames * stepsZ
+        self.nrFramesPar.setText(str(self.stageScan.frames))
+
+        self.scanDuration = self.stageScan.frames*self.scanParValues['seqTime']
+        self.scanDuration = self.scanDuration * stepsZ
         self.scanDurationLabel.setText(str(np.round(self.scanDuration, 2)))
 
     def pxParameterChanged(self, p):
@@ -1320,7 +1329,7 @@ class LineScan():
         stepSize = parValues['stepSizeXY'] / convFactors['y']
         self.stepsX = 0
         self.stepsY = int(np.ceil(sizeY / stepSize))
-        self.stepsZ = 0
+        self.stepsZ = 1
         # Step size compatible with width
         self.corrStepSize = sizeY / self.stepsY
         self.seqSamps = int(seqSamps)

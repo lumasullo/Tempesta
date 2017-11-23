@@ -617,12 +617,18 @@ class RecWorker(QtCore.QObject):
         # get the recorded data
         data = self.lvworker.framesRecorded
         # Adapted for ImageJ data read shape
-        datashape = (len(data), self.shape[1], self.shape[0])
+        if self.scanMode.currentText() == 'VOL scan':
+            sizeZ = self.scanParValues['sizeZ']
+            stepSizeZ = self.scanParValues['stepSizeZ']
+            stepsZ = int(np.ceil(sizeZ / stepSizeZ))
+        else:
+            stepsZ = 1
 
+        datashape = (stepsZ, int(len(data)/stepsZ), self.shape[1], self.shape[0])
         reshapeddata = np.reshape(data, datashape, order='C')
-
         try:
-            self.main.saveData(reshapeddata, self.savename)
+            for i, scan in enumerate(reshapeddata):
+                self.main.saveData(scan, self.savename + '_' + str(i))
         except ValueError:
             print('Data could not be saved')
 
