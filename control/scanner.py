@@ -954,11 +954,11 @@ class MultiScanWorker(QtCore.QObject):
     def set_images(self, images):
         self.primScanDim = self.mainScanWid.scanner.stageScan.primScanDim
         if self.primScanDim == 'x':
-            self.steps = [self.mainScanWid.scanner.stageScan.FOVscan.stepsX,
-                          self.mainScanWid.scanner.stageScan.FOVscan.stepsY]
-        else:
             self.steps = [self.mainScanWid.scanner.stageScan.FOVscan.stepsY,
                           self.mainScanWid.scanner.stageScan.FOVscan.stepsX]
+        else:
+            self.steps = [self.mainScanWid.scanner.stageScan.FOVscan.stepsX,
+                          self.mainScanWid.scanner.stageScan.FOVscan.stepsY]
         self.images = images
 
     def find_fp(self):
@@ -1031,7 +1031,7 @@ class MultiScanWorker(QtCore.QObject):
         # reconstruct the illumination image
         for i in range(len(data_mean)):
             data_r = np.reshape(data_mean[i], self.steps)
-            if self.primScanDim == 'y':
+            if self.primScanDim == 'x':
                 data_r = data_r.T
             self.illum_images.append(data_r)
             self.main.beads_box.addItem(str(i))
@@ -1056,11 +1056,11 @@ class MultiScanWorker(QtCore.QObject):
             px = img_large.shape[1] - (point[1] * rate).astype(int)
             py = img_large.shape[0] - (point[0] * rate).astype(int)
             if self.primScanDim == 'x':
-                pxe = min(px+self.steps[1], img_large.shape[1])
-                pye = min(py+self.steps[0], img_large.shape[0])
-            else:
                 pxe = min(px+self.steps[0], img_large.shape[1])
                 pye = min(py+self.steps[1], img_large.shape[0])
+            else:
+                pxe = min(px+self.steps[1], img_large.shape[1])
+                pye = min(py+self.steps[0], img_large.shape[0])
             img_large[py:pye, px:pxe] = illum_image[0:pye-py, 0:pxe-px]
             self.points_large.append([px, py, pxe, pye])
         self.illum_images.append(img_large)
