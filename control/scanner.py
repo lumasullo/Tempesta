@@ -820,7 +820,7 @@ class Scanner(QtCore.QObject):
 
     def finalize(self):
         self.countZ -= 1
-        if self.countZ == 0:
+        if self.countZ == 0 or self.aborted:
             self.scanDone.emit()
         # Apparently important, otherwise finalize is called again when next
         # waiting finishes.
@@ -856,7 +856,7 @@ class Scanner(QtCore.QObject):
     def done(self):
         self.aotask.stop()
         self.dotask.stop()
-        if self.countZ == 0:
+        if self.countZ == 0 or self.aborted:
             print("End scanning")
             self.aotask.close()
             self.dotask.close()
