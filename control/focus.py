@@ -54,6 +54,7 @@ class FocusWidget(QtGui.QFrame):
         self.focusDataBox = QtGui.QCheckBox('Save focus data')
 
         # PZT position widgets
+        time.sleep(0.1)
         self.positionLabel = QtGui.QLabel('Position[um]')
         self.positionEdit = QtGui.QLineEdit(str(
             self.z.position).split(' ')[0])
@@ -129,6 +130,7 @@ class FocusWidget(QtGui.QFrame):
     def lockFocus(self):
         if not self.locked:
             self.locked = True
+            self.lockButton.setChecked(True)
             self.setPoint = self.processDataThread.focusSignal
             self.focusLockGraph.line = self.focusLockGraph.plot.addLine(
                 y=self.setPoint, pen='r')
