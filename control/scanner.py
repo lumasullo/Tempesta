@@ -747,9 +747,9 @@ class Scanner(QtCore.QObject):
         sequence for the whole scan in one row and then append zeros for 1
         sequence time. THIS IS NOW INCOMPATIBLE WITH VOLUMETRIC SCAN, maybe."""
         if self.stageScan.primScanDim == 'x':
-            primSteps = self.stageScan.FOVscan.stepsX
+            primSteps = self.stageScan.scans[self.stageScan.scanMode].stepsX
         else:
-            primSteps = self.stageScan.FOVscan.stepsY
+            primSteps = self.stageScan.scans[self.stageScan.scanMode].stepsY
         # Signal for a single line
         lineSig = np.tile(fullDOsig, primSteps)
         emptySig = np.zeros((4, int(self.stageScan.seqSamps)), dtype=bool)
@@ -1432,7 +1432,7 @@ class VOLscan():
         sizeZ = parValues['sizeZ']
         stepsX = int(np.ceil(sizeX / stepSizeX))
         stepsY = int(np.ceil(sizeY / stepSizeY))
-        stepsZ = int(np.ceil(sizeZ) / stepSizeZ)
+        stepsZ = int(np.ceil(sizeZ / stepSizeZ))
         # +1 because nr of frames per line is one more than nr of steps
         self.frames = stepsY * stepsX * stepsZ
 
