@@ -307,6 +307,7 @@ class ScanWidget(QtGui.QMainWindow):
         self.nidaq = device
         self.main = main
         self.focusWgt = main.FocusLockWidget
+        self.focusLocked = self.focusWgt.locked
 
         # The port order in the NIDAQ follows this same order.
         # We chose to follow the temporal sequence order
@@ -594,7 +595,8 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanner.finalizeDone.connect(self.finalizeDone)
             self.scanner.scanDone.connect(self.scanDone)
             self.scanning = True
-            self.focusWgt.unlockFocus()
+            if self.focusLocked:
+                self.focusWgt.unlockFocus()
 
             self.main.lvworkers[0].startRecording()
 
@@ -634,7 +636,8 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanButton.setEnabled(True)
             del self.scanner
             self.scanning = False
-            # self.focusWgt.lockFocus()
+            if self.focusLocked:
+                self.focusWgt.lockFocus()
 #            self.main.piezoWidget.resetChannels(
 #                self.stageScan.activeChannels[self.stageScan.scanMode])
         elif self.continuousCheck.isChecked():
