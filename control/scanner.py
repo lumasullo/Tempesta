@@ -544,19 +544,10 @@ class ScanWidget(QtGui.QMainWindow):
             self.updateScan(self.allDevices)
             self.graph.update(self.allDevices)
 
-        if self.scanMode.currentText() == 'VOL scan':
-            sizeZ = self.scanParValues['sizeZ']
-            stepSizeZ = self.scanParValues['stepSizeZ']
-            stepsZ = int(np.ceil(sizeZ / stepSizeZ))
-        else:
-            stepsZ = 1
-
         self.stageScan.updateFrames(self.scanParValues)
-        self.stageScan.frames = self.stageScan.frames * stepsZ
         self.nrFramesPar.setText(str(self.stageScan.frames))
 
         self.scanDuration = self.stageScan.frames*self.scanParValues['seqTime']
-        self.scanDuration = self.scanDuration * stepsZ
         self.scanDurationLabel.setText(str(np.round(self.scanDuration, 2)))
 
     def pxParameterChanged(self, p):
@@ -598,7 +589,6 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanButton.setText('Abort')
 #            self.main.piezoWidget.resetChannels(
 #                self.stageScan.activeChannels[self.stageScan.scanMode])
-            countScan = self.stageScan.FOVscan.stepsZ
             self.scanner = Scanner(
                self.nidaq, self.stageScan, self.pxCycle, self, continuous)
             self.scanner.finalizeDone.connect(self.finalizeDone)
@@ -644,7 +634,7 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanButton.setEnabled(True)
             del self.scanner
             self.scanning = False
-            self.focusWgt.lockFocus()
+            # self.focusWgt.lockFocus()
 #            self.main.piezoWidget.resetChannels(
 #                self.stageScan.activeChannels[self.stageScan.scanMode])
         elif self.continuousCheck.isChecked():
@@ -725,6 +715,7 @@ class Scanner(QtCore.QObject):
         self.focusWgt = self.main.focusWgt
         self.countZ = self.stageScan.scans[self.stageScan.scanMode].stepsZ
         self.stepSizeZ = self.stageScan.scans[self.stageScan.scanMode].stepSizeZ
+        self.initialZ = self.focusWgt.z.position
 
         AOchans = [0, 1, 2]
         # Following loop creates the voltage channels
@@ -769,23 +760,24 @@ class Scanner(QtCore.QObject):
         between z-planes needs to be filled with zeros/False. This time is
         equal to one "sequence-time". To do so we first have to repeat the
         sequence for the whole scan in one plane and then append zeros."""
-        if self.stageScan.scanMode == 'VOLscan':
-            fullDOsig = np.tile(
-                fullDOsig, self.stageScan.VOLscan.cyclesPerSlice)
-            fullDOsig = np.concatenate(
-                (fullDOsig, np.zeros(4, self.stageScan.seqSamps)))
+        # if self.stageScan.scanMode == 'VOLscan':
+        #     fullDOsig = np.tile(
+        #         fullDOsig, self.stageScan.VOLscan.cyclesPerSlice)
+        #     fullDOsig = np.concatenate(
+        #         (fullDOsig, np.zeros(4, self.stageScan.seqSamps)))
 
     def runScan(self):
         self.aborted = False
-        scanTime = self.sampsInScan / self.main.sampleRate
-        ret = QtGui.QMessageBox.Yes
-        self.scanTimeW.setText("Scan will take %s seconds" % scanTime)
-        if scanTime > 10 and not(self.continuous):
-            ret = self.scanTimeW.exec_()
 
-        if ret == QtGui.QMessageBox.No:
-            self.done()
-            return
+        # scanTime = self.sampsInScan / self.main.sampleRate
+        # ret = QtGui.QMessageBox.Yes
+        # self.scanTimeW.setText("Scan will take %s seconds" % scanTime)
+        # if scanTime > 10 and not(self.continuous):
+        #     ret = self.scanTimeW.exec_()
+        #
+        # if ret == QtGui.QMessageBox.No:
+        #     self.done()
+        #     return
 
         self.aotask.timing.cfg_samp_clk_timing(
             rate=self.stageScan.sampleRate,
@@ -858,6 +850,8 @@ class Scanner(QtCore.QObject):
         self.dotask.stop()
         if self.countZ == 0 or self.aborted:
             print("End scanning")
+            self.focusWgt.z.moveAbsolute(self.initialZ)
+            time.sleep(0.1)
             self.aotask.close()
             self.dotask.close()
             self.nidaq.reset_device()
@@ -865,6 +859,7 @@ class Scanner(QtCore.QObject):
         else:
             print("Continue scanning")
             self.focusWgt.z.moveRelative(self.stepSizeZ * self.focusWgt.um)
+            time.sleep(0.1)
             self.runScan()
 
 
@@ -994,6 +989,7 @@ class MultiScanWorker(QtCore.QObject):
             self.steps = [self.mainScanWid.scanner.stageScan.FOVscan.stepsX,
                           self.mainScanWid.scanner.stageScan.FOVscan.stepsY]
         self.images = images
+        print('Got {} images'.format(len(self.images)))
 
     def find_fp(self):
         self.main.illum_wgt.delete_back()
@@ -1430,12 +1426,15 @@ class VOLscan():
         to be width divided by an integer. Maybe not a problem ???'''
         stepSizeX = parValues['stepSizeXY']
         stepSizeY = parValues['stepSizeXY']
+        stepSizeZ = parValues['stepSizeZ']
         sizeX = parValues['sizeX']
         sizeY = parValues['sizeY']
+        sizeZ = parValues['sizeZ']
         stepsX = int(np.ceil(sizeX / stepSizeX))
         stepsY = int(np.ceil(sizeY / stepSizeY))
+        stepsZ = int(np.ceil(sizeZ) / stepSizeZ)
         # +1 because nr of frames per line is one more than nr of steps
-        self.frames = stepsY * stepsX
+        self.frames = stepsY * stepsX * stepsZ
 
     def update(self, parValues, primScanDim):
         '''Create signals.

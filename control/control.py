@@ -503,9 +503,10 @@ class RecordingWidget(QtGui.QFrame):
             self.currentFrame.setText('0 /')
 
     def makeSavenames(self):
-        if self.DualCam.checkState():
+        try:
+            print('Dual camera mode is ' + str(self.DualCam.checkState()))
             self.nr_cameras = 2
-        else:
+        except AttributeError:
             self.nr_cameras = 1
         folder = self.folderEdit.text()
         if not os.path.exists(folder):
@@ -610,16 +611,15 @@ class RecWorker(QtCore.QObject):
                 time.sleep(0.01)
                 self.updateSignal.emit()
 
+        print('Number of recorded frame : ' + str(len(self.lvworker.framesRecorded)))
         self.lvworker.stopRecording()
-
-        # To avoid camera overwriting buffer while saving recording
 
         # get the recorded data
         data = self.lvworker.framesRecorded
         # Adapted for ImageJ data read shape
-        if self.scanMode.currentText() == 'VOL scan':
-            sizeZ = self.scanParValues['sizeZ']
-            stepSizeZ = self.scanParValues['stepSizeZ']
+        if self.scanWidget.scanMode.currentText() == 'VOL scan':
+            sizeZ = self.scanWidget.scanParValues['sizeZ']
+            stepSizeZ = self.scanWidget.scanParValues['stepSizeZ']
             stepsZ = int(np.ceil(sizeZ / stepSizeZ))
         else:
             stepsZ = 1
@@ -631,9 +631,6 @@ class RecWorker(QtCore.QObject):
                 self.main.saveData(scan, self.savename + '_' + str(i))
         except ValueError:
             print('Data could not be saved')
-
-        self.z_stack = [np.mean(reshapeddata[i]) for i in range(len(data))]
-        self.Z_projection = np.flipud(np.sum(reshapeddata, 0))
 
         self.done = True
         self.doneSignal.emit()
