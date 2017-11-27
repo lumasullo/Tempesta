@@ -103,11 +103,15 @@ class RecordingWidget(QtGui.QFrame):
         self.specifyFrames.clicked.connect(self.specFrames)
         self.specifyTime = QtGui.QRadioButton('Time (s)')
         self.specifyTime.clicked.connect(self.specTime)
-        self.recScanOnceBtn = QtGui.QRadioButton('Scanning once')
+        self.recScanOnceBtn = QtGui.QRadioButton('Scan once')
         self.recScanOnceBtn.clicked.connect(self.recScanOnce)
-        self.recScanLapsBtn = QtGui.QRadioButton('Scanning time-laps[s]')
-        self.recScanLapsBtn.clicked.connect(self.recScanLaps)
-        self.lapsTimeEdit = QtGui.QLineEdit('1')
+        self.recScanLapseBtn = QtGui.QRadioButton('Time-lapse scan')
+        self.recScanLapseBtn.clicked.connect(self.recScanLapse)
+        self.timeLapseEdit = QtGui.QLineEdit('5')
+        self.timeLapseLabel = QtGui.QLabel('Each/Total [s]')
+        self.timeLapseLabel.setAlignment(QtCore.Qt.AlignRight)
+        self.timeLapseTotalEdit = QtGui.QLineEdit('60')
+        self.timeLapseScan = 0
         self.untilSTOPbtn = QtGui.QRadioButton('Run until STOP')
         self.untilSTOPbtn.clicked.connect(self.untilStop)
         self.timeToRec = QtGui.QLineEdit('1')
@@ -176,8 +180,10 @@ class RecordingWidget(QtGui.QFrame):
         recGrid.addWidget(self.tRemaining, 6, 3, 1, 2)
 #        recGrid.addWidget(self.progressBar, 5, 4, 1, 2)
         recGrid.addWidget(self.recScanOnceBtn, 7, 0, 1, 5)
-        recGrid.addWidget(self.recScanLapsBtn, 8, 0, 1, 5)
-        recGrid.addWidget(self.lapsTimeEdit, 8, 2)
+        recGrid.addWidget(self.recScanLapseBtn, 8, 0, 1, 5)
+        recGrid.addWidget(self.timeLapseLabel, 8, 1)
+        recGrid.addWidget(self.timeLapseEdit, 8, 2)
+        recGrid.addWidget(self.timeLapseTotalEdit, 8, 3)
         recGrid.addWidget(self.untilSTOPbtn, 9, 0, 1, 5)
         recGrid.addWidget(buttonWidget, 10, 0, 1, 0)
 
@@ -216,8 +222,8 @@ class RecordingWidget(QtGui.QFrame):
                 self.specTime()
             elif self.recScanOnceBtn.isChecked():
                 self.recScanOnce()
-            elif self.recScanLapsBtn.isChecked():
-                self.recScanLaps()
+            elif self.recScanLapseBtn.isChecked():
+                self.recScanLapse()
             else:
                 self.untilStop()
         else:
@@ -240,7 +246,8 @@ class RecordingWidget(QtGui.QFrame):
     def specFrames(self):
         self.numExpositionsEdit.setEnabled(True)
         self.timeToRec.setEnabled(False)
-        self.lapsTimeEdit.setEnabled(False)
+        self.timeLapseEdit.setEnabled(False)
+        self.timeLapseTotalEdit.setEnabled(False)
         self.filesizeBar.setEnabled(True)
         self.progressBar.setEnabled(True)
         self.recMode = 1
@@ -249,7 +256,8 @@ class RecordingWidget(QtGui.QFrame):
     def specTime(self):
         self.numExpositionsEdit.setEnabled(False)
         self.timeToRec.setEnabled(True)
-        self.lapsTimeEdit.setEnabled(False)
+        self.timeLapseEdit.setEnabled(False)
+        self.timeLapseTotalEdit.setEnabled(False)
         self.filesizeBar.setEnabled(True)
         self.progressBar.setEnabled(True)
         self.recMode = 2
@@ -258,15 +266,17 @@ class RecordingWidget(QtGui.QFrame):
     def recScanOnce(self):
         self.numExpositionsEdit.setEnabled(False)
         self.timeToRec.setEnabled(False)
-        self.lapsTimeEdit.setEnabled(False)
+        self.timeLapseEdit.setEnabled(False)
+        self.timeLapseTotalEdit.setEnabled(False)
         self.filesizeBar.setEnabled(False)
         self.progressBar.setEnabled(False)
         self.recMode = 3
 
-    def recScanLaps(self):
+    def recScanLapse(self):
         self.numExpositionsEdit.setEnabled(False)
         self.timeToRec.setEnabled(False)
-        self.lapsTimeEdit.setEnabled(True)
+        self.timeLapseEdit.setEnabled(True)
+        self.timeLapseTotalEdit.setEnabled(True)
         self.filesizeBar.setEnabled(False)
         self.progressBar.setEnabled(False)
         self.recMode = 4
@@ -274,7 +284,8 @@ class RecordingWidget(QtGui.QFrame):
     def untilStop(self):
         self.numExpositionsEdit.setEnabled(False)
         self.timeToRec.setEnabled(False)
-        self.lapsTimeEdit.setEnabled(False)
+        self.timeLapseEdit.setEnabled(False)
+        self.timeLapseTotalEdit.setEnabled(False)
         self.filesizeBar.setEnabled(False)
         self.progressBar.setEnabled(False)
         self.recMode = 5
@@ -449,9 +460,12 @@ class RecordingWidget(QtGui.QFrame):
                 self.startTime = ptime.time()
 
                 if self.recMode == 4:
+                    total = float(self.timeLapseTotalEdit.text())
+                    each = float(self.timeLapseEdit.text())
+                    self.timeLapseScan = int(np.ceil(total/each))
                     self.timer = QtCore.QTimer()
                     self.timer.timeout.connect(self.doRecording)
-                    self.timer.start(float(self.lapsTimeEdit.text())*1000)
+                    self.timer.start(float(self.timeLapseEdit.text())*1000)
                 else:
                     self.doRecording()
 
@@ -460,15 +474,16 @@ class RecordingWidget(QtGui.QFrame):
                 self.folderWarning()
 
         else:
+            if self.recMode == 4:
+                self.timeLapseScan = 0
+                self.recButton.setEnabled(False)
             for i in range(0, self.nr_cameras):
                 ind = np.mod(self.main.currCamIdx + i, 2)
                 print('Terminating recording on camera index ' + str(ind))
-                print(self.recworkers)
                 self.recworkers[ind].pressed = False
 
     def doRecording(self):
         self.makeSavenames()
-        print(self.savenames)
 
         for i in range(0, self.nr_cameras):
             ind = np.mod(self.main.currCamIdx + i, 2)
@@ -519,16 +534,30 @@ class RecordingWidget(QtGui.QFrame):
                 # Same as done in Liveviewrun()
 
             print('After terminating recording thread')
-            self.writable = True
-            self.readyToRecord = True
-            self.recButton.setText('REC')
-            self.recButton.setChecked(False)
-            self.main.tree.writable = True
-
-            self.main.liveviewButton.setEnabled(True)
-            self.progressBar.setValue(0)
-            self.currentTime.setText('0 /')
-            self.currentFrame.setText('0 /')
+            if self.recMode != 4:
+                self.writable = True
+                self.readyToRecord = True
+                self.recButton.setText('REC')
+                self.recButton.setChecked(False)
+                self.main.tree.writable = True
+                self.main.liveviewButton.setEnabled(True)
+                self.progressBar.setValue(0)
+                self.currentTime.setText('0 /')
+                self.currentFrame.setText('0 /')
+            else:
+                self.timeLapseScan -= 1
+                if self.timeLapseScan == 0:
+                    self.timer.stop()
+                    self.writable = True
+                    self.readyToRecord = True
+                    self.recButton.setEnabled(True)
+                    self.recButton.setText('REC')
+                    self.recButton.setChecked(False)
+                    self.main.tree.writable = True
+                    self.main.liveviewButton.setEnabled(True)
+                    self.progressBar.setValue(0)
+                    self.currentTime.setText('0 /')
+                    self.currentFrame.setText('0 /')
 
     def makeSavenames(self):
         try:
