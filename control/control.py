@@ -466,52 +466,55 @@ class RecordingWidget(QtGui.QFrame):
                     self.timer = QtCore.QTimer()
                     self.timer.timeout.connect(self.doRecording)
                     self.timer.start(float(self.timeLapseEdit.text())*1000)
-                else:
-                    self.doRecording()
+                self.doRecording()
 
             else:
                 self.recButton.setChecked(False)
                 self.folderWarning()
 
         else:
-            if self.recMode == 4:
+            if self.recMode in [3, 4]:
                 self.timeLapseScan = 0
                 self.recButton.setEnabled(False)
+                if self.main.scanWidget.scanning:
+                    self.main.scanWidget.scanButton.click()
+                else:
+                    self.endRecording()
             for i in range(0, self.nr_cameras):
                 ind = np.mod(self.main.currCamIdx + i, 2)
                 print('Terminating recording on camera index ' + str(ind))
                 self.recworkers[ind].pressed = False
 
     def doRecording(self):
-        self.makeSavenames()
+        if not self.main.scanWidget.scanning:
+            self.makeSavenames()
+            for i in range(0, self.nr_cameras):
+                ind = np.mod(self.main.currCamIdx + i, 2)
+                print('Starting recording on camera ' + str(ind + 1))
 
-        for i in range(0, self.nr_cameras):
-            ind = np.mod(self.main.currCamIdx + i, 2)
-            print('Starting recording on camera ' + str(ind + 1))
+                # Creates an instance of RecWorker class.
+                self.recworkers[ind] = RecWorker(
+                    self, self.main.cameras[ind], self.recMode,
+                    self.getTimeOrFrames(), self.main.shapes[ind],
+                    self.main.lvworkers[ind], self.main.RealExpPar,
+                    self.savenames[ind], self.dataname, self.getAttrs())
+                # Connects the updatesignal that is continously emitted
+                # from recworker to updateGUI function.
+                self.recworkers[ind].updateSignal.connect(self.updateGUI)
+                # Connects the donesignal emitted from recworker to
+                # endrecording function.
+                self.recworkers[ind].doneSignal.connect(self.endRecording)
+                # Creates a new thread
+                self.recthreads[ind] = QtCore.QThread()
+                # moves the worker object to this thread.
+                self.recworkers[ind].moveToThread(self.recthreads[ind])
+                self.recthreads[ind].started.connect(
+                    self.recworkers[ind].start)
 
-            # Creates an instance of RecWorker class.
-            self.recworkers[ind] = RecWorker(
-                self, self.main.cameras[ind], self.recMode,
-                self.getTimeOrFrames(), self.main.shapes[ind],
-                self.main.lvworkers[ind], self.main.RealExpPar,
-                self.savenames[ind], self.dataname, self.getAttrs())
-            # Connects the updatesignal that is continously emitted
-            # from recworker to updateGUI function.
-            self.recworkers[ind].updateSignal.connect(self.updateGUI)
-            # Connects the donesignal emitted from recworker to
-            # endrecording function.
-            self.recworkers[ind].doneSignal.connect(self.endRecording)
-            # Creates a new thread
-            self.recthreads[ind] = QtCore.QThread()
-            # moves the worker object to this thread.
-            self.recworkers[ind].moveToThread(self.recthreads[ind])
-            self.recthreads[ind].started.connect(
-                self.recworkers[ind].start)
-
-        for i in range(0, self.nr_cameras):
-            print('Starting recordings')
-            ind = np.mod(self.main.currCamIdx + i, 2)
-            self.recthreads[ind].start()
+            for i in range(0, self.nr_cameras):
+                print('Starting recordings')
+                ind = np.mod(self.main.currCamIdx + i, 2)
+                self.recthreads[ind].start()
 
     def endRecording(self):
         """ Function called when recording finishes to reset relevent
@@ -675,23 +678,24 @@ class RecWorker(QtCore.QObject):
         data = self.lvworker.framesRecorded
         # Adapted for ImageJ data read shape
         if self.recMode in [3, 4]:
-            if self.scanWidget.scanMode.currentText() == 'VOL scan':
-                sizeZ = self.scanWidget.scanParValues['sizeZ']
-                stepSizeZ = self.scanWidget.scanParValues['stepSizeZ']
-                stepsZ = int(np.ceil(sizeZ / stepSizeZ))
-            else:
-                stepsZ = 1
-            datashape = (stepsZ, int(len(data)/stepsZ), self.shape[1], self.shape[0])
-            reshapeddata = np.reshape(data, datashape, order='C')
             try:
+                if self.scanWidget.scanMode.currentText() == 'VOL scan':
+                    sizeZ = self.scanWidget.scanParValues['sizeZ']
+                    stepSizeZ = self.scanWidget.scanParValues['stepSizeZ']
+                    stepsZ = int(np.ceil(sizeZ / stepSizeZ))
+                else:
+                    stepsZ = 1
+                datashape = (stepsZ, int(len(data)/stepsZ), self.shape[1], self.shape[0])
+                reshapeddata = np.reshape(data, datashape, order='C')
+
                 for i, scan in enumerate(reshapeddata):
                     self.main.saveData(scan, self.savename + '_' + str(i))
             except ValueError:
                 print('Data could not be saved')
         else:
-            datashape = (len(data), self.shape[1], self.shape[0])
-            reshapeddata = np.reshape(data, datashape, order='C')
             try:
+                datashape = (len(data), self.shape[1], self.shape[0])
+                reshapeddata = np.reshape(data, datashape, order='C')
                 self.main.saveData(reshapeddata, self.savename)
             except ValueError:
                 print('Data could not be saved')
