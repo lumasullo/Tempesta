@@ -546,7 +546,7 @@ class RecordingWidget(QtGui.QFrame):
                 self.currentFrame.setText('0 /')
             else:
                 self.timeLapseScan -= 1
-                if self.timeLapseScan == 0:
+                if self.timeLapseScan <= 0:
                     self.timer.stop()
                     self.writable = True
                     self.readyToRecord = True
@@ -674,7 +674,7 @@ class RecWorker(QtCore.QObject):
         # get the recorded data
         data = self.lvworker.framesRecorded
         # Adapted for ImageJ data read shape
-        if self.recMode == 3:
+        if self.recMode in [3, 4]:
             if self.scanWidget.scanMode.currentText() == 'VOL scan':
                 sizeZ = self.scanWidget.scanParValues['sizeZ']
                 stepSizeZ = self.scanWidget.scanParValues['stepSizeZ']
