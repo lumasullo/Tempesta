@@ -834,8 +834,9 @@ class Scanner(QtCore.QObject):
         dim = [self.channelOrder[i] for i in chans]
         finalSamps = [
             self.stageScan.sigDict[dim[i]][writtenSamps - 1] for i in chans]
+        seqTime = self.main.scanParValues['seqTime']
         returnRamps = np.array(
-            [makeRamp(finalSamps[i], 0, self.stageScan.sampleRate)
+            [makeRamp(finalSamps[i], 0, int(self.stageScan.sampleRate*seqTime))
              for i in chans])
 
         self.aotask.stop()

@@ -476,9 +476,7 @@ class RecordingWidget(QtGui.QFrame):
             if self.recMode in [3, 4]:
                 self.timeLapseScan = 0
                 self.recButton.setEnabled(False)
-                if self.main.scanWidget.scanning:
-                    self.main.scanWidget.scanButton.click()
-                else:
+                if not self.main.scanWidget.scanning:
                     self.endRecording()
             for i in range(0, self.nr_cameras):
                 ind = np.mod(self.main.currCamIdx + i, 2)
