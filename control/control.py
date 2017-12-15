@@ -12,8 +12,6 @@ import os
 import time
 import re
 
-import matplotlib
-matplotlib.use('Qt4Agg')
 import matplotlib.pyplot as plt
 
 from pyqtgraph.Qt import QtCore, QtGui
