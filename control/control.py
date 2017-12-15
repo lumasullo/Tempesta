@@ -103,8 +103,15 @@ class RecordingWidget(QtGui.QFrame):
         self.specifyFrames.clicked.connect(self.specFrames)
         self.specifyTime = QtGui.QRadioButton('Time (s)')
         self.specifyTime.clicked.connect(self.specTime)
-        self.recScanBtn = QtGui.QRadioButton('Scanning')
-        self.recScanBtn.clicked.connect(self.recScan)
+        self.recScanOnceBtn = QtGui.QRadioButton('Scan once')
+        self.recScanOnceBtn.clicked.connect(self.recScanOnce)
+        self.recScanLapseBtn = QtGui.QRadioButton('Time-lapse scan')
+        self.recScanLapseBtn.clicked.connect(self.recScanLapse)
+        self.timeLapseEdit = QtGui.QLineEdit('5')
+        self.timeLapseLabel = QtGui.QLabel('Each/Total [s]')
+        self.timeLapseLabel.setAlignment(QtCore.Qt.AlignRight)
+        self.timeLapseTotalEdit = QtGui.QLineEdit('60')
+        self.timeLapseScan = 0
         self.untilSTOPbtn = QtGui.QRadioButton('Run until STOP')
         self.untilSTOPbtn.clicked.connect(self.untilStop)
         self.timeToRec = QtGui.QLineEdit('1')
@@ -172,9 +179,13 @@ class RecordingWidget(QtGui.QFrame):
         recGrid.addWidget(self.timeToRec, 6, 2)
         recGrid.addWidget(self.tRemaining, 6, 3, 1, 2)
 #        recGrid.addWidget(self.progressBar, 5, 4, 1, 2)
-        recGrid.addWidget(self.recScanBtn, 7, 0, 1, 5)
-        recGrid.addWidget(self.untilSTOPbtn, 8, 0, 1, 5)
-        recGrid.addWidget(buttonWidget, 9, 0, 1, 0)
+        recGrid.addWidget(self.recScanOnceBtn, 7, 0, 1, 5)
+        recGrid.addWidget(self.recScanLapseBtn, 8, 0, 1, 5)
+        recGrid.addWidget(self.timeLapseLabel, 8, 1)
+        recGrid.addWidget(self.timeLapseEdit, 8, 2)
+        recGrid.addWidget(self.timeLapseTotalEdit, 8, 3)
+        recGrid.addWidget(self.untilSTOPbtn, 9, 0, 1, 5)
+        recGrid.addWidget(buttonWidget, 10, 0, 1, 0)
 
         recGrid.setColumnMinimumWidth(0, 70)
 
@@ -209,8 +220,10 @@ class RecordingWidget(QtGui.QFrame):
                 self.specFrames()
             elif self.specifyTime.isChecked():
                 self.specTime()
-            elif self.recScanBtn.isChecked():
-                self.recScan()
+            elif self.recScanOnceBtn.isChecked():
+                self.recScanOnce()
+            elif self.recScanLapseBtn.isChecked():
+                self.recScanLapse()
             else:
                 self.untilStop()
         else:
@@ -233,6 +246,8 @@ class RecordingWidget(QtGui.QFrame):
     def specFrames(self):
         self.numExpositionsEdit.setEnabled(True)
         self.timeToRec.setEnabled(False)
+        self.timeLapseEdit.setEnabled(False)
+        self.timeLapseTotalEdit.setEnabled(False)
         self.filesizeBar.setEnabled(True)
         self.progressBar.setEnabled(True)
         self.recMode = 1
@@ -241,24 +256,39 @@ class RecordingWidget(QtGui.QFrame):
     def specTime(self):
         self.numExpositionsEdit.setEnabled(False)
         self.timeToRec.setEnabled(True)
+        self.timeLapseEdit.setEnabled(False)
+        self.timeLapseTotalEdit.setEnabled(False)
         self.filesizeBar.setEnabled(True)
         self.progressBar.setEnabled(True)
         self.recMode = 2
         self.filesizeupdate()
 
-    def recScan(self):
+    def recScanOnce(self):
         self.numExpositionsEdit.setEnabled(False)
         self.timeToRec.setEnabled(False)
+        self.timeLapseEdit.setEnabled(False)
+        self.timeLapseTotalEdit.setEnabled(False)
         self.filesizeBar.setEnabled(False)
         self.progressBar.setEnabled(False)
         self.recMode = 3
 
-    def untilStop(self):
+    def recScanLapse(self):
         self.numExpositionsEdit.setEnabled(False)
         self.timeToRec.setEnabled(False)
+        self.timeLapseEdit.setEnabled(True)
+        self.timeLapseTotalEdit.setEnabled(True)
         self.filesizeBar.setEnabled(False)
         self.progressBar.setEnabled(False)
         self.recMode = 4
+
+    def untilStop(self):
+        self.numExpositionsEdit.setEnabled(False)
+        self.timeToRec.setEnabled(False)
+        self.timeLapseEdit.setEnabled(False)
+        self.timeLapseTotalEdit.setEnabled(False)
+        self.filesizeBar.setEnabled(False)
+        self.progressBar.setEnabled(False)
+        self.recMode = 5
 
     def filesizeupdate(self):
         ''' For updating the approximated file size of and eventual recording.
@@ -429,46 +459,60 @@ class RecordingWidget(QtGui.QFrame):
                 # Saves the time when started to calculate remaining time.
                 self.startTime = ptime.time()
 
-                self.makeSavenames()
-
-                for i in range(0, self.nr_cameras):
-                    ind = np.mod(self.main.currCamIdx + i, 2)
-                    print('Starting recording on camera ' + str(ind + 1))
-
-                    # Creates an instance of RecWorker class.
-                    self.recworkers[ind] = RecWorker(
-                        self, self.main.cameras[ind], self.recMode,
-                        self.getTimeOrFrames(), self.main.shapes[ind],
-                        self.main.lvworkers[ind], self.main.RealExpPar,
-                        self.savenames[ind], self.dataname, self.getAttrs())
-                    # Connects the updatesignal that is continously emitted
-                    # from recworker to updateGUI function.
-                    self.recworkers[ind].updateSignal.connect(self.updateGUI)
-                    # Connects the donesignal emitted from recworker to
-                    # endrecording function.
-                    self.recworkers[ind].doneSignal.connect(self.endRecording)
-                    # Creates a new thread
-                    self.recthreads[ind] = QtCore.QThread()
-                    # moves the worker object to this thread.
-                    self.recworkers[ind].moveToThread(self.recthreads[ind])
-                    self.recthreads[ind].started.connect(
-                        self.recworkers[ind].start)
-
-                for i in range(0, self.nr_cameras):
-                    print('Starting recordings')
-                    ind = np.mod(self.main.currCamIdx + i, 2)
-                    self.recthreads[ind].start()
+                if self.recMode == 4:
+                    total = float(self.timeLapseTotalEdit.text())
+                    each = float(self.timeLapseEdit.text())
+                    self.timeLapseScan = int(np.ceil(total/each))
+                    self.timer = QtCore.QTimer()
+                    self.timer.timeout.connect(self.doRecording)
+                    self.timer.start(float(self.timeLapseEdit.text())*1000)
+                self.doRecording()
 
             else:
                 self.recButton.setChecked(False)
                 self.folderWarning()
 
         else:
+            if self.recMode in [3, 4]:
+                self.timeLapseScan = 0
+                self.recButton.setEnabled(False)
+                if not self.main.scanWidget.scanning:
+                    self.endRecording()
             for i in range(0, self.nr_cameras):
                 ind = np.mod(self.main.currCamIdx + i, 2)
                 print('Terminating recording on camera index ' + str(ind))
-                print(self.recworkers)
                 self.recworkers[ind].pressed = False
+
+    def doRecording(self):
+        if not self.main.scanWidget.scanning:
+            self.makeSavenames()
+            for i in range(0, self.nr_cameras):
+                ind = np.mod(self.main.currCamIdx + i, 2)
+                print('Starting recording on camera ' + str(ind + 1))
+
+                # Creates an instance of RecWorker class.
+                self.recworkers[ind] = RecWorker(
+                    self, self.main.cameras[ind], self.recMode,
+                    self.getTimeOrFrames(), self.main.shapes[ind],
+                    self.main.lvworkers[ind], self.main.RealExpPar,
+                    self.savenames[ind], self.dataname, self.getAttrs())
+                # Connects the updatesignal that is continously emitted
+                # from recworker to updateGUI function.
+                self.recworkers[ind].updateSignal.connect(self.updateGUI)
+                # Connects the donesignal emitted from recworker to
+                # endrecording function.
+                self.recworkers[ind].doneSignal.connect(self.endRecording)
+                # Creates a new thread
+                self.recthreads[ind] = QtCore.QThread()
+                # moves the worker object to this thread.
+                self.recworkers[ind].moveToThread(self.recthreads[ind])
+                self.recthreads[ind].started.connect(
+                    self.recworkers[ind].start)
+
+            for i in range(0, self.nr_cameras):
+                print('Starting recordings')
+                ind = np.mod(self.main.currCamIdx + i, 2)
+                self.recthreads[ind].start()
 
     def endRecording(self):
         """ Function called when recording finishes to reset relevent
@@ -491,21 +535,36 @@ class RecordingWidget(QtGui.QFrame):
                 # Same as done in Liveviewrun()
 
             print('After terminating recording thread')
-            self.writable = True
-            self.readyToRecord = True
-            self.recButton.setText('REC')
-            self.recButton.setChecked(False)
-            self.main.tree.writable = True
-
-            self.main.liveviewButton.setEnabled(True)
-            self.progressBar.setValue(0)
-            self.currentTime.setText('0 /')
-            self.currentFrame.setText('0 /')
+            if self.recMode != 4:
+                self.writable = True
+                self.readyToRecord = True
+                self.recButton.setText('REC')
+                self.recButton.setChecked(False)
+                self.main.tree.writable = True
+                self.main.liveviewButton.setEnabled(True)
+                self.progressBar.setValue(0)
+                self.currentTime.setText('0 /')
+                self.currentFrame.setText('0 /')
+            else:
+                self.timeLapseScan -= 1
+                if self.timeLapseScan <= 0:
+                    self.timer.stop()
+                    self.writable = True
+                    self.readyToRecord = True
+                    self.recButton.setEnabled(True)
+                    self.recButton.setText('REC')
+                    self.recButton.setChecked(False)
+                    self.main.tree.writable = True
+                    self.main.liveviewButton.setEnabled(True)
+                    self.progressBar.setValue(0)
+                    self.currentTime.setText('0 /')
+                    self.currentFrame.setText('0 /')
 
     def makeSavenames(self):
-        if self.DualCam.checkState():
+        try:
+            print('Dual camera mode is ' + str(self.DualCam.checkState()))
             self.nr_cameras = 2
-        else:
+        except AttributeError:
             self.nr_cameras = 1
         folder = self.folderEdit.text()
         if not os.path.exists(folder):
@@ -592,7 +651,7 @@ class RecWorker(QtCore.QObject):
                 time.sleep(0.01)
                 self.updateSignal.emit()
 
-        elif self.recMode == 3:
+        elif self.recMode in [3, 4]:
             self.main.main.trigsourceparam.setValue('External "frame-trigger"')
             laserWidget = self.main.main.laserWidgets
             laserWidget.DigCtrl.DigitalControlButton.setChecked(True)
@@ -610,24 +669,34 @@ class RecWorker(QtCore.QObject):
                 time.sleep(0.01)
                 self.updateSignal.emit()
 
+        print('Number of recorded frame : ' + str(len(self.lvworker.framesRecorded)))
         self.lvworker.stopRecording()
-
-        # To avoid camera overwriting buffer while saving recording
 
         # get the recorded data
         data = self.lvworker.framesRecorded
         # Adapted for ImageJ data read shape
-        datashape = (len(data), self.shape[1], self.shape[0])
+        if self.recMode in [3, 4]:
+            try:
+                if self.scanWidget.scanMode.currentText() == 'VOL scan':
+                    sizeZ = self.scanWidget.scanParValues['sizeZ']
+                    stepSizeZ = self.scanWidget.scanParValues['stepSizeZ']
+                    stepsZ = int(np.ceil(sizeZ / stepSizeZ))
+                else:
+                    stepsZ = 1
+                datashape = (stepsZ, int(len(data)/stepsZ), self.shape[1], self.shape[0])
+                reshapeddata = np.reshape(data, datashape, order='C')
 
-        reshapeddata = np.reshape(data, datashape, order='C')
-
-        try:
-            self.main.saveData(reshapeddata, self.savename)
-        except ValueError:
-            print('Data could not be saved')
-
-        self.z_stack = [np.mean(reshapeddata[i]) for i in range(len(data))]
-        self.Z_projection = np.flipud(np.sum(reshapeddata, 0))
+                for i, scan in enumerate(reshapeddata):
+                    self.main.saveData(scan, self.savename + '_' + str(i))
+            except ValueError:
+                print('Data could not be saved')
+        else:
+            try:
+                datashape = (len(data), self.shape[1], self.shape[0])
+                reshapeddata = np.reshape(data, datashape, order='C')
+                self.main.saveData(reshapeddata, self.savename)
+            except ValueError:
+                print('Data could not be saved')
 
         self.done = True
         self.doneSignal.emit()

@@ -38,6 +38,7 @@ class Positionner(QtGui.QWidget):
         super().__init__()
 
         self.scanWidget = main
+        self.focusWgt = self.scanWidget.focusWgt
 
         # Position of the different devices in V
         self.x = 0
@@ -109,12 +110,12 @@ class Positionner(QtGui.QWidget):
         self.zEdit.editingFinished.connect(self.editZ)
         self.zSlider = QtGui.QSlider(QtCore.Qt.Horizontal)
         self.zSlider.sliderReleased.connect(self.moveZ)
-        self.zSlider.setRange(100*minVolt['z'], 100*maxVolt['z'])
+        self.zSlider.setRange(0, 100)
         self.zSlider.setValue(self.z)
-        self.zMinLabel = QtGui.QLabel(str(minVolt['z']*convFactors['z']))
+        self.zMinLabel = QtGui.QLabel(str(0))
         self.zMinLabel.setAlignment(QtCore.Qt.AlignRight |
                                     QtCore.Qt.AlignVCenter)
-        self.zMaxLabel = QtGui.QLabel(str(maxVolt['z']*convFactors['z']))
+        self.zMaxLabel = QtGui.QLabel(str(100))
         self.zMaxLabel.setAlignment(QtCore.Qt.AlignLeft |
                                     QtCore.Qt.AlignVCenter)
         self.zSliderLabel = QtGui.QLabel("<strong>z (µm)</strong>")
@@ -168,9 +169,9 @@ class Positionner(QtGui.QWidget):
 
     def moveZ(self):
         """Specifies the movement of the z axis."""
-        value = self.zSlider.value() / 100
-        self.zEdit.setText(str(round(value*convFactors['z'], 2)))
-        self.move()
+        value = self.zSlider.value()
+        self.zEdit.setText(str(round(value, 2)))
+        self.focusWgt.z.moveAbsolute(value * self.focusWgt.um)
 
     def editX(self):
         """Method called when a position for x is entered manually. Repositions
@@ -305,6 +306,8 @@ class ScanWidget(QtGui.QMainWindow):
 
         self.nidaq = device
         self.main = main
+        self.focusWgt = main.FocusLockWidget
+        self.focusLocked = self.focusWgt.locked
 
         # The port order in the NIDAQ follows this same order.
         # We chose to follow the temporal sequence order
@@ -541,8 +544,10 @@ class ScanWidget(QtGui.QMainWindow):
         if p == 'seqTime':
             self.updateScan(self.allDevices)
             self.graph.update(self.allDevices)
+
         self.stageScan.updateFrames(self.scanParValues)
         self.nrFramesPar.setText(str(self.stageScan.frames))
+
         self.scanDuration = self.stageScan.frames*self.scanParValues['seqTime']
         self.scanDurationLabel.setText(str(np.round(self.scanDuration, 2)))
 
@@ -553,14 +558,25 @@ class ScanWidget(QtGui.QMainWindow):
         self.graph.update(device)
 
     def previewScan(self):
-        self.stageScan.update(self.scanParValues)
-        plt.plot(self.stageScan.sigDict['x'] * convFactors['x'],
+        self.updateScan(self.allDevices)
+        fig = plt.figure()
+        ax0 = fig.add_subplot(211)
+        ax0.plot(self.stageScan.sigDict['x'] * convFactors['x'])
+        ax0.plot(self.stageScan.sigDict['y'] * convFactors['y'])
+        ax0.plot(self.stageScan.sigDict['z'] * convFactors['z'])
+        ax0.plot(self.pxCycle.sigDict['CAM'])
+        ax0.grid()
+        ax0.set_xlabel('sample')
+        ax0.set_ylabel('position [um]')
+        ax1 = fig.add_subplot(212)
+        ax1.plot(self.stageScan.sigDict['x'] * convFactors['x'],
                  self.stageScan.sigDict['y'] * convFactors['y'])
         mx = max(self.scanParValues['sizeX'], self.scanParValues['sizeY'])
-        plt.margins(0.1*mx)
-        plt.axis('scaled')
-        plt.xlabel("x axis [µm]")
-        plt.ylabel("y axis [µm]")
+        ax1.margins(0.1*mx)
+        ax1.axis('scaled')
+        ax1.set_xlabel("x axis [µm]")
+        ax1.set_ylabel("y axis [µm]")
+
         plt.show()
 
     def scanOrAbort(self):
@@ -590,6 +606,8 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanner.finalizeDone.connect(self.finalizeDone)
             self.scanner.scanDone.connect(self.scanDone)
             self.scanning = True
+            if self.focusLocked:
+                self.focusWgt.unlockFocus()
 
             self.main.lvworkers[0].startRecording()
 
@@ -629,6 +647,8 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanButton.setEnabled(True)
             del self.scanner
             self.scanning = False
+            if self.focusLocked:
+                self.focusWgt.lockFocus()
 #            self.main.piezoWidget.resetChannels(
 #                self.stageScan.activeChannels[self.stageScan.scanMode])
         elif self.continuousCheck.isChecked():
@@ -706,35 +726,19 @@ class Scanner(QtCore.QObject):
 
         self.aborted = False
 
-    def runScan(self):
-        self.aborted = False
-        scanTime = self.sampsInScan / self.main.sampleRate
-        ret = QtGui.QMessageBox.Yes
-        self.scanTimeW.setText("Scan will take %s seconds" % scanTime)
-        if scanTime > 10 and not(self.continuous):
-            ret = self.scanTimeW.exec_()
-
-        if ret == QtGui.QMessageBox.No:
-            self.done()
-            return
+        self.focusWgt = self.main.focusWgt
 
         AOchans = [0, 1, 2]
         # Following loop creates the voltage channels
-        for n in AOchans:
+        for n in range(len(AOchans)):
             self.aotask.ao_channels.add_ao_voltage_chan(
-                physical_channel='Dev1/ao%s' % n,
+                physical_channel='Dev1/ao%s' % AOchans[n],
                 name_to_assign_to_channel='chan_%s' % self.channelOrder[n],
                 min_val=minVolt[self.channelOrder[n]],
                 max_val=maxVolt[self.channelOrder[n]])
 
-        fullAOsig = np.array(
-            [self.stageScan.sigDict[self.channelOrder[i]] for i in AOchans])
-
-        self.aotask.timing.cfg_samp_clk_timing(
-            rate=self.stageScan.sampleRate,
-            source=r'100kHzTimeBase',
-            sample_mode=nidaqmx.constants.AcquisitionType.FINITE,
-            samps_per_chan=self.sampsInScan)
+        self.fullAOsig = np.array(
+            [self.stageScan.sigDict[self.channelOrder[i]] for i in range(len(AOchans))])
 
         # Same as above but for the digital signals/devices
         devs = list(self.pxCycle.sigDict.keys())
@@ -754,39 +758,49 @@ class Scanner(QtCore.QObject):
         sequence for the whole scan in one row and then append zeros for 1
         sequence time. THIS IS NOW INCOMPATIBLE WITH VOLUMETRIC SCAN, maybe."""
         if self.stageScan.primScanDim == 'x':
-            primSteps = self.stageScan.FOVscan.stepsX
+            primSteps = self.stageScan.scans[self.stageScan.scanMode].stepsX
         else:
-            primSteps = self.stageScan.FOVscan.stepsY
+            primSteps = self.stageScan.scans[self.stageScan.scanMode].stepsY
         # Signal for a single line
         lineSig = np.tile(fullDOsig, primSteps)
         emptySig = np.zeros((4, int(self.stageScan.seqSamps)), dtype=bool)
-        fullDOsig = np.concatenate((emptySig, lineSig, emptySig), axis=1)
+        self.fullDOsig = np.concatenate((emptySig, lineSig, emptySig), axis=1)
 
-        # TODO: adapt this to work with unidirectional scanning (see before)
-        """If doing VOLume scan, the time needed for the stage to move
-        between z-planes needs to be filled with zeros/False. This time is
-        equal to one "sequence-time". To do so we first have to repeat the
-        sequence for the whole scan in one plane and then append zeros."""
-        if self.stageScan.scanMode == 'VOLscan':
-            fullDOsig = np.tile(
-                fullDOsig, self.stageScan.VOLscan.cyclesPerSlice)
-            fullDOsig = np.concatenate(
-                (fullDOsig, np.zeros(4, self.stageScan.seqSamps)))
+    def runScan(self):
+        self.aborted = False
 
+        # scanTime = self.sampsInScan / self.main.sampleRate
+        # ret = QtGui.QMessageBox.Yes
+        # self.scanTimeW.setText("Scan will take %s seconds" % scanTime)
+        # if scanTime > 10 and not(self.continuous):
+        #     ret = self.scanTimeW.exec_()
+        #
+        # if ret == QtGui.QMessageBox.No:
+        #     self.done()
+        #     return
+
+        self.aotask.timing.cfg_samp_clk_timing(
+            rate=self.stageScan.sampleRate,
+            source=r'100kHzTimeBase',
+            sample_mode=nidaqmx.constants.AcquisitionType.FINITE,
+            samps_per_chan=self.sampsInScan)
         self.dotask.timing.cfg_samp_clk_timing(
             rate=self.pxCycle.sampleRate,
             source=r'ao/SampleClock',
             sample_mode=nidaqmx.constants.AcquisitionType.FINITE,
             samps_per_chan=self.sampsInScan)
+        self.aotask.write(self.fullAOsig, auto_start=False)
+        self.dotask.write(self.fullDOsig, auto_start=False)
 
+        try:
+            self.waiter.waitdoneSignal.disconnect(self.done)
+        except TypeError:
+            # This happens when the scan is aborted after the warning
+            pass
         self.waiter.waitdoneSignal.connect(self.finalize)
-
-        self.aotask.write(fullAOsig, auto_start=False)
-        self.dotask.write(fullDOsig, auto_start=False)
 
         self.dotask.start()
         self.aotask.start()
-
         self.waiter.start()
 
     def abort(self):
@@ -815,8 +829,9 @@ class Scanner(QtCore.QObject):
         dim = [self.channelOrder[i] for i in chans]
         finalSamps = [
             self.stageScan.sigDict[dim[i]][writtenSamps - 1] for i in chans]
+        seqTime = self.main.scanParValues['seqTime']
         returnRamps = np.array(
-            [makeRamp(finalSamps[i], 0, self.stageScan.sampleRate)
+            [makeRamp(finalSamps[i], 0, int(self.stageScan.sampleRate*seqTime))
              for i in chans])
 
         self.aotask.stop()
@@ -915,6 +930,8 @@ class MultipleScanWidget(QtGui.QFrame):
         self.illum_wgt.vb.autoRange()
         if self.overlay_check.isChecked():
             self.illum_wgt.update_back(self.worker.illum_images_back[curr_ind])
+        if curr_ind == len(self.worker.illum_images)-1:
+            self.worker.show_large_view_label()
 
     def next_bead(self):
         self.worker.delete_label()
@@ -927,6 +944,8 @@ class MultipleScanWidget(QtGui.QFrame):
         self.beads_box.setCurrentIndex(next_ind)
         if self.overlay_check.isChecked():
             self.illum_wgt.update_back(self.worker.illum_images_back[next_ind])
+        if next_ind == len(self.worker.illum_images)-1:
+            self.worker.show_large_view_label()
         self.illum_wgt.vb.autoRange()
 
     def clear(self):
@@ -960,6 +979,7 @@ class MultiScanWorker(QtCore.QObject):
             self.steps = [self.mainScanWid.scanner.stageScan.FOVscan.stepsX,
                           self.mainScanWid.scanner.stageScan.FOVscan.stepsY]
         self.images = images
+        print('Got {} images'.format(len(self.images)))
 
     def find_fp(self):
         self.main.illum_wgt.delete_back()
@@ -973,7 +993,8 @@ class MultiScanWorker(QtCore.QObject):
         self.l_frame = (self.images[-1] * self.nor_const).astype(np.uint8)
         fps_f = goodFeaturesToTrack(
             self.f_frame, mask=None, **self.feature_params)
-        self.fps_f = np.array([point[0] for point in fps_f])
+        fps_f = np.array([point[0] for point in fps_f])
+        self.fps_f = fps_f[fps_f[:, 0].argsort()]
         fps_l = goodFeaturesToTrack(
             self.l_frame, mask=None, **self.feature_params)
         self.fps_l = np.array([point[0] for point in fps_l])
@@ -1067,6 +1088,7 @@ class MultiScanWorker(QtCore.QObject):
 
         # update illumination image
         self.main.illum_wgt.update(img_large)
+        self.show_large_view_label()
         self.main.beads_box.addItem('large field of view')
         self.main.beads_box.setCurrentIndex(len(self.illum_images)-1)
         self.main.illum_wgt.vb.autoRange()
@@ -1109,7 +1131,16 @@ class MultiScanWorker(QtCore.QObject):
         if len(self.labels) != 0:
             for label in self.labels:
                 self.main.illum_wgt.vb.removeItem(label)
-            self.labels = []
+            self.labels.clear()
+
+    def show_large_view_label(self):
+        for i, point in enumerate(self.points_large):
+            px, py, pxe, pye = point
+            label = pg.TextItem()
+            label.setPos(py, px)
+            label.setText(str(i))
+            self.labels.append(label)
+            self.main.illum_wgt.vb.addItem(label)
 
     @staticmethod
     def mean_roi(array, p, r):
@@ -1284,7 +1315,7 @@ class LineScan():
         stepSize = parValues['stepSizeXY'] / convFactors['y']
         self.stepsX = 0
         self.stepsY = int(np.ceil(sizeY / stepSize))
-        self.stepsZ = 0
+        self.stepsZ = 1
         # Step size compatible with width
         self.corrStepSize = sizeY / self.stepsY
         self.seqSamps = int(seqSamps)
@@ -1333,7 +1364,7 @@ class FOVscan():
         self.seqSamps = int(np.round(self.sampleRate*parValues['seqTime']))
         self.stepsX = int(np.ceil(sizeX / stepSizeX))
         self.stepsY = int(np.ceil(sizeY / stepSizeY))
-        self.stepsZ = 0
+        self.stepsZ = 1
         # Step size compatible with width
         self.corrStepSize = sizeX / self.stepsX
 
@@ -1344,7 +1375,7 @@ class FOVscan():
             self.makePrimDimSig('y', startY, sizeY, self.stepsY, self.stepsX)
             self.makeSecDimSig('x', startX, sizeX, self.stepsX, self.stepsY)
 
-        self.sigDict['z'] = np.zeros(len(self.secSig))
+        self.sigDict['z'] = np.zeros(len(self.sigDict['x']))
 
     def makePrimDimSig(self, dim, start, size, steps, otherSteps):
         rowSamps = steps * self.seqSamps
@@ -1353,8 +1384,8 @@ class FOVscan():
         RTLramp = makeRamp(size, start, self.seqSamps)
         LTRramp = np.concatenate((start*np.ones(self.seqSamps), LTRramp))
         LTRTLramp = np.concatenate((LTRramp, RTLramp))
-        self.primSig = np.tile(LTRTLramp, otherSteps)
-        self.sigDict[dim] = self.primSig / convFactors[dim]
+        primSig = np.tile(LTRTLramp, otherSteps)
+        self.sigDict[dim] = primSig / convFactors[dim]
 
     def makeSecDimSig(self, dim, start, size, steps, otherSteps):
         # y axis scan signal
@@ -1363,99 +1394,198 @@ class FOVscan():
         Yramps = np.split(Yramp, steps)
         constant = np.ones((otherSteps + 1)*self.seqSamps)
         Sig = np.array([np.concatenate((i[0]*constant, i)) for i in Yramps])
-        self.secSig = Sig.ravel()
-        self.sigDict[dim] = self.secSig / convFactors[dim]
+        secSig = Sig.ravel()
+        self.sigDict[dim] = secSig / convFactors[dim]
+
 
 class VOLscan():
-    """Class representing the scanning movement for a volumetric scan i.e.
-    multiple conscutive XY-planes with a certain delta z distance."""
 
     def __init__(self, sampleRate):
         self.sigDict = {'x': [], 'y': [], 'z': []}
         self.sampleRate = sampleRate
-        self.corrStepSizeXY = None
-        self.corrStepSizeZ = None
+        self.corrStepSize = None
         self.seqSamps = None
         self.frames = 0
+        self.stepsX = 0
+        self.stepsY = 0
+        self.stepsZ = 0
 
     def updateFrames(self, parValues):
-        pass
+        '''Update signals according to parameters.
+        Note that rounding floats to ints may cause actual scan to differ
+        slightly from expected scan. Maybe either limit input parameters to
+        numbers that "fit each other" or find other solution, eg step size has
+        to be width divided by an integer. Maybe not a problem ???'''
+        stepSizeX = parValues['stepSizeXY']
+        stepSizeY = parValues['stepSizeXY']
+        stepSizeZ = parValues['stepSizeZ']
+        sizeX = parValues['sizeX']
+        sizeY = parValues['sizeY']
+        sizeZ = parValues['sizeZ']
+        stepsX = int(np.ceil(sizeX / stepSizeX))
+        stepsY = int(np.ceil(sizeY / stepSizeY))
+        stepsZ = int(np.ceil(sizeZ / stepSizeZ))
+        # +1 because nr of frames per line is one more than nr of steps
+        self.frames = stepsY * stepsX * stepsZ
 
     def update(self, parValues, primScanDim):
-        """Updates the VOL-scan signals, units of length are used when creating
-        the scan signals and is converted to voltages at the end """
+        '''Create signals.
+        Signals are first created in units of distance and converted to voltage
+        at the end.'''
         # Create signals
-        startX = 0
-        startY = 0
-        startZ = 0
-        # Division by 2 to convert from distance to voltage
+        startX = startY = startZ = 0
         sizeX = parValues['sizeX']
         sizeY = parValues['sizeY']
         sizeZ = parValues['sizeZ']
         stepSizeX = parValues['stepSizeXY']
         stepSizeY = parValues['stepSizeXY']
         stepSizeZ = parValues['stepSizeZ']
-        # WARNING: Correct for units of the time, now seconds!!!!
-        self.seqSamps = int(np.round(self.sampleRate * parValues['seqTime']))
+        self.seqSamps = int(np.round(self.sampleRate*parValues['seqTime']))
         self.stepsX = int(np.ceil(sizeX / stepSizeX))
         self.stepsY = int(np.ceil(sizeY / stepSizeY))
         self.stepsZ = int(np.ceil(sizeZ / stepSizeZ))
-
         # Step size compatible with width
-        self.corrStepSizeXY = sizeX / self.stepsX
-        # Step size compatible with range
-        self.corrStepSizeZ = sizeZ / self.stepsZ
-        rowSamps = self.stepsX * self.seqSamps
+        self.corrStepSize = sizeX / self.stepsX
 
-        # rampAndK contains [ramp, k]
-        LTRramp = makeRamp(startX, sizeX, rowSamps)
-        # RTLramp contains only ramp, no k since same k = -k
-        RTLramp = LTRramp[::-1]
+        if primScanDim == 'x':
+            self.makePrimDimSig('x', startX, sizeX, self.stepsX, [self.stepsY, self.stepsZ])
+            self.makeSecDimSig('y', startY, sizeY, self.stepsY, [self.stepsX, self.stepsZ])
+            self.makeThiDimSig('z', startZ, sizeZ, self.stepsZ, [self.stepsX, self.stepsY])
+        elif primScanDim == 'y':
+            self.makePrimDimSig('y', startY, sizeY, self.stepsY, [self.stepsX, self.stepsZ])
+            self.makeSecDimSig('x', startX, sizeX, self.stepsX, [self.stepsY, self.stepsZ])
+            self.makeThiDimSig('z', startZ, sizeZ, self.stepsZ, [self.stepsY, self.stepsX])
 
-        Xsig = []
-        Ysig = []
-        newValue = startY
-        for i in range(0, self.stepsY):
-            if i % 2 == 0:
-                Xsig = np.concatenate((Xsig, LTRramp))
-            else:
-                Xsig = np.concatenate((Xsig, RTLramp))
-            Ysig = np.concatenate((Ysig, newValue*np.ones(rowSamps)))
-            newValue = newValue + self.corrStepSize
+    def makePrimDimSig(self, dim, start, size, steps, otherSteps):
+        rowSamps = steps * self.seqSamps
+        LTRramp = makeRamp(start, size, rowSamps)
+        # Fast return to startX
+        RTLramp = makeRamp(size, start, self.seqSamps)
+        LTRramp = np.concatenate((start*np.ones(self.seqSamps), LTRramp))
+        LTRTLramp = np.concatenate((LTRramp, RTLramp))
+        numSig = otherSteps[0] * otherSteps[1]
+        primSig = np.tile(LTRTLramp, numSig)
+        self.sigDict[dim] = primSig / convFactors[dim]
 
-        sampsPerSlice = len(Xsig)  # Used in Scanner->runScan
-        self.cyclesPerSlice = sampsPerSlice / self.seqSamps
-        """Below we make the concatenation along the third dimension, between
-        the "slices" we add a smooth transition to avoid too rapid motion that
-        seems to cause strange movent. This needs to be syncronized with the
-        pixel cycle signal"""
-        fullXsig = Xsig
-        fullYsig = Ysig
-        fullZsig = startZ * np.ones(len(Xsig))
-        newValue = startZ + 1
-        XTransition = smoothRamp(Xsig[-1], Xsig[0], self.seqSamps)
-        YTransition = smoothRamp(Ysig[-1], Ysig[0], self.seqSamps)
-        ZTransition = smoothRamp(0, self.corrStepSizeZ, self.seqSamps)
+    def makeSecDimSig(self, dim, start, size, steps, otherSteps):
+        colSamps = steps * self.seqSamps
+        ramp = makeRamp(start, size, colSamps)
+        ramps = np.split(ramp, steps)
+        ramps = ramps[0:len(ramps)-1]
+        wait = otherSteps[0] + 1
+        constant = np.ones(wait * self.seqSamps)
+        sig = np.array([np.concatenate((i, i[-1]*constant)) for i in ramps])
+        sig = sig.ravel()
+        returnRamp = makeRamp(sig[-1], start, self.seqSamps)
+        sig = np.concatenate((constant*0, sig, returnRamp))
+        numSig = otherSteps[1]
+        secSig = np.tile(sig, numSig)
+        self.sigDict[dim] = secSig / convFactors[dim]
 
-        for i in range(1, self.stepsZ - 1):
-            fullXsig = np.concatenate((fullXsig, XTransition))
-            fullYsig = np.concatenate((fullYsig, YTransition))
-            fullZsig = np.concatenate((fullZsig, newValue + ZTransition))
+    def makeThiDimSig(self, dim, start, size, steps, otherSteps):
+        colSamps = steps * self.seqSamps
+        ramp = makeRamp(start, size, colSamps)
+        ramps = np.split(ramp, steps)
+        ramps = ramps[0:len(ramps)-1]
+        wait = (otherSteps[0]+2) * otherSteps[1] - 1
+        constant = np.ones(wait*self.seqSamps)
+        sig = np.array([np.concatenate((i, i[-1]*constant)) for i in ramps])
+        sig = sig.ravel()
+        returnRamp = makeRamp(sig[-1], start, self.seqSamps)
+        sig = np.concatenate((constant*0, sig, returnRamp))
+        thiSig = sig
+        self.sigDict[dim] = thiSig / convFactors[dim]
 
-            fullXsig = np.concatenate((fullXsig, Xsig))
-            fullYsig = np.concatenate((fullYsig, Ysig))
-            fullZsig = np.concatenate(
-                (fullZsig, newValue * np.ones(len(Xsig))))
-            newValue = newValue + self.corrStepSizeZ
-
-        fullXsig = np.concatenate((fullXsig, Xsig))
-        fullYsig = np.concatenate((fullYsig, Ysig))
-        fullZsig = np.concatenate((fullZsig,
-                                   newValue*np.ones(len(primDimSig))))
-        # Assign signals to scanDict
-        self.sigDict['x'] = fullXsig / convFactors['x']
-        self.sigDict['y'] = fullXsig / convFactors['y']
-        self.sigDict['z'] = fullXsig / convFactors['z']
+# class VOLscan():
+#     """Class representing the scanning movement for a volumetric scan i.e.
+#     multiple conscutive XY-planes with a certain delta z distance."""
+#
+#     def __init__(self, sampleRate):
+#         self.sigDict = {'x': [], 'y': [], 'z': []}
+#         self.sampleRate = sampleRate
+#         self.corrStepSizeXY = None
+#         self.corrStepSizeZ = None
+#         self.seqSamps = None
+#         self.frames = 0
+#
+#     def updateFrames(self, parValues):
+#         pass
+#
+#     def update(self, parValues, primScanDim):
+#         """Updates the VOL-scan signals, units of length are used when creating
+#         the scan signals and is converted to voltages at the end """
+#         # Create signals
+#         startX = 0
+#         startY = 0
+#         startZ = 0
+#         # Division by 2 to convert from distance to voltage
+#         sizeX = parValues['sizeX']
+#         sizeY = parValues['sizeY']
+#         sizeZ = parValues['sizeZ']
+#         stepSizeX = parValues['stepSizeXY']
+#         stepSizeY = parValues['stepSizeXY']
+#         stepSizeZ = parValues['stepSizeZ']
+#         # WARNING: Correct for units of the time, now seconds!!!!
+#         self.seqSamps = int(np.round(self.sampleRate * parValues['seqTime']))
+#         self.stepsX = int(np.ceil(sizeX / stepSizeX))
+#         self.stepsY = int(np.ceil(sizeY / stepSizeY))
+#         self.stepsZ = int(np.ceil(sizeZ / stepSizeZ))
+#
+#         # Step size compatible with width
+#         self.corrStepSizeXY = sizeX / self.stepsX
+#         # Step size compatible with range
+#         self.corrStepSizeZ = sizeZ / self.stepsZ
+#         rowSamps = self.stepsX * self.seqSamps
+#
+#         # rampAndK contains [ramp, k]
+#         LTRramp = makeRamp(startX, sizeX, rowSamps)
+#         # RTLramp contains only ramp, no k since same k = -k
+#         RTLramp = LTRramp[::-1]
+#
+#         Xsig = []
+#         Ysig = []
+#         newValue = startY
+#         for i in range(0, self.stepsY):
+#             if i % 2 == 0:
+#                 Xsig = np.concatenate((Xsig, LTRramp))
+#             else:
+#                 Xsig = np.concatenate((Xsig, RTLramp))
+#             Ysig = np.concatenate((Ysig, newValue*np.ones(rowSamps)))
+#             newValue = newValue + self.corrStepSize
+#
+#         sampsPerSlice = len(Xsig)  # Used in Scanner->runScan
+#         self.cyclesPerSlice = sampsPerSlice / self.seqSamps
+#         """Below we make the concatenation along the third dimension, between
+#         the "slices" we add a smooth transition to avoid too rapid motion that
+#         seems to cause strange movent. This needs to be syncronized with the
+#         pixel cycle signal"""
+#         fullXsig = Xsig
+#         fullYsig = Ysig
+#         fullZsig = startZ * np.ones(len(Xsig))
+#         newValue = startZ + 1
+#         XTransition = smoothRamp(Xsig[-1], Xsig[0], self.seqSamps)
+#         YTransition = smoothRamp(Ysig[-1], Ysig[0], self.seqSamps)
+#         ZTransition = smoothRamp(0, self.corrStepSizeZ, self.seqSamps)
+#
+#         for i in range(1, self.stepsZ - 1):
+#             fullXsig = np.concatenate((fullXsig, XTransition))
+#             fullYsig = np.concatenate((fullYsig, YTransition))
+#             fullZsig = np.concatenate((fullZsig, newValue + ZTransition))
+#
+#             fullXsig = np.concatenate((fullXsig, Xsig))
+#             fullYsig = np.concatenate((fullYsig, Ysig))
+#             fullZsig = np.concatenate(
+#                 (fullZsig, newValue * np.ones(len(Xsig))))
+#             newValue = newValue + self.corrStepSizeZ
+#
+#         fullXsig = np.concatenate((fullXsig, Xsig))
+#         fullYsig = np.concatenate((fullYsig, Ysig))
+#         fullZsig = np.concatenate((fullZsig,
+#                                    newValue*np.ones(len(primDimSig))))
+#         # Assign signals to scanDict
+#         self.sigDict['x'] = fullXsig / convFactors['x']
+#         self.sigDict['y'] = fullXsig / convFactors['y']
+#         self.sigDict['z'] = fullXsig / convFactors['z']
 
 
 class PixelCycle():
@@ -1479,6 +1609,30 @@ class PixelCycle():
             end_pos = int(min(end_pos, cycleSamps))
             signal[range(start_pos, end_pos)] = True
             self.sigDict[device] = signal
+
+
+class GraphFrame(pg.GraphicsWindow):
+    """Creates the plot that plots the preview of the pulses.
+    Fcn update() updates the plot of "device" with signal "signal"."""
+    def __init__(self, pxCycle, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.pxCycle = pxCycle
+        self.plot = self.addPlot(row=1, col=0)
+        self.plot.setYRange(0, 1)
+        self.plot.showGrid(x=False, y=False)
+        self.plotSigDict = {'405': self.plot.plot(pen=pg.mkPen(130, 0, 200)),
+                            '488': self.plot.plot(pen=pg.mkPen(0, 247, 255)),
+                            '473': self.plot.plot(pen=pg.mkPen(0, 183, 255)),
+                            'CAM': self.plot.plot(pen='w')}
+
+    def update(self, devices=None):
+        if devices is None:
+            devices = self.plotSigDict
+
+        for device in devices:
+            signal = self.pxCycle.sigDict[device]
+            self.plotSigDict[device].setData(signal)
 
 
 class GraphFrame(pg.GraphicsWindow):
