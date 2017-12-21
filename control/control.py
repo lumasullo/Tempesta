@@ -578,32 +578,6 @@ class RecordingWidget(QtGui.QFrame):
             # etc.
             self.savenames[ind] = guitools.getUniqueName(self.savenames[ind])
 
-    def saveData(self, data, savename):
-        saveMode = self.formatBox.currentText()
-        savename = savename + '.' + saveMode
-        if saveMode == 'tiff':
-            print('Savename = ', savename)
-            t = time.time()
-            para = dict(imagej=True)
-            tiff.imsave(savename, data, **para)
-        elif saveMode == 'hdf5':
-            print('Savename = ', savename)
-            store_file = hdf.File(savename, "w")
-            datashape = data.shape
-            store_file.create_dataset(name=self.dataname, shape=datashape,
-                                      maxshape=datashape, dtype=np.uint16)
-            dataset = store_file[self.dataname]
-            t = time.time()
-            dataset[...] = data
-            # Saving parameters
-            for item in self.attrs:
-                if item[1] is not None:
-                    dataset.attrs[item[0]] = item[1]
-            store_file.close()
-        elapsed = time.time() - t
-        print('Data written, time to write: ', elapsed)
-
-
 class RecWorker(QtCore.QObject):
 
     updateSignal = QtCore.pyqtSignal()
