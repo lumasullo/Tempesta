@@ -8,6 +8,7 @@ Created on Wed Mar 30 10:32:36 2016
 
 import numpy as np
 import time
+import re
 import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
 import matplotlib.pyplot as plt
@@ -41,9 +42,9 @@ class Positionner(QtGui.QWidget):
         self.focusWgt = self.scanWidget.focusWgt
 
         # Position of the different devices in V
-        self.x = 0
-        self.y = 0
-        self.z = 0
+        self.x = 0.00
+        self.y = 0.00
+        self.z = 0.00
 
         # Parameters for the ramp (driving signal for the different channels)
         self.rampTime = 100  # Time for each ramp in ms
@@ -71,154 +72,100 @@ class Positionner(QtGui.QWidget):
             samps_per_chan=self.nSamples)
 
         # Axes control
-        self.xEdit = QtGui.QLineEdit()
-        self.xEdit.setText(str(self.x))
-        self.xEdit.editingFinished.connect(self.editX)
-        self.xSlider = QtGui.QSlider(QtCore.Qt.Horizontal)
-        self.xSlider.sliderReleased.connect(self.moveX)
-        self.xSlider.setRange(100*minVolt['x'], 100*maxVolt['x'])
-        self.xSlider.setValue(self.x)
-        xMin = "{:.2f}".format(minVolt['x']*convFactors['x'])
-        self.xMinLabel = QtGui.QLabel(xMin)
-        self.xMinLabel.setAlignment(QtCore.Qt.AlignRight |
-                                    QtCore.Qt.AlignVCenter)
-        xMax = "{:.2f}".format(maxVolt['x']*convFactors['x'])
-        self.xMaxLabel = QtGui.QLabel(xMax)
-        self.xMaxLabel.setAlignment(QtCore.Qt.AlignLeft |
-                                    QtCore.Qt.AlignVCenter)
-        self.xSliderLabel = QtGui.QLabel("<strong>x (µm)</strong>")
-        self.xSliderLabel.setTextFormat(QtCore.Qt.RichText)
+        self.xLabel = QtGui.QLabel(
+            "<strong>x = {0:.2f} µm</strong>".format(self.x))
+        self.xLabel.setTextFormat(QtCore.Qt.RichText)
+        self.xUpButton = QtGui.QPushButton("+")
+        self.xUpButton.pressed.connect(self.xMoveUp)
+        self.xDownButton = QtGui.QPushButton("-")
+        self.xDownButton.pressed.connect(self.xMoveDown)
+        self.xStepEdit = QtGui.QLineEdit("0.05")
+        self.xStepUnit = QtGui.QLabel(" µm")
 
-        self.yEdit = QtGui.QLineEdit()
-        self.yEdit.setText(str(self.y))
-        self.yEdit.editingFinished.connect(self.editY)
-        self.ySlider = QtGui.QSlider(QtCore.Qt.Horizontal)
-        self.ySlider.sliderReleased.connect(self.moveY)
-        self.ySlider.setRange(100*minVolt['x'], 100*maxVolt['x'])
-        self.ySlider.setValue(self.y)
-        self.yMinLabel = QtGui.QLabel(str(minVolt['y']*convFactors['y']))
-        self.yMinLabel.setAlignment(QtCore.Qt.AlignRight |
-                                    QtCore.Qt.AlignVCenter)
-        self.yMaxLabel = QtGui.QLabel(str(maxVolt['y']*convFactors['y']))
-        self.yMaxLabel.setAlignment(QtCore.Qt.AlignLeft |
-                                    QtCore.Qt.AlignVCenter)
-        self.ySliderLabel = QtGui.QLabel("<strong>y (µm)</strong>")
-        self.ySliderLabel.setTextFormat(QtCore.Qt.RichText)
+        self.yLabel = QtGui.QLabel(
+            "<strong>y = {0:.2f} µm</strong>".format(self.y))
+        self.yLabel.setTextFormat(QtCore.Qt.RichText)
+        self.yUpButton = QtGui.QPushButton("+")
+        self.yUpButton.pressed.connect(self.yMoveUp)
+        self.yDownButton = QtGui.QPushButton("-")
+        self.yDownButton.pressed.connect(self.yMoveDown)
+        self.yStepEdit = QtGui.QLineEdit("0.05")
+        self.yStepUnit = QtGui.QLabel(" µm")
 
-        self.zEdit = QtGui.QLineEdit()
-        self.zEdit.setText(str(self.z))
-        self.zEdit.editingFinished.connect(self.editZ)
-        self.zSlider = QtGui.QSlider(QtCore.Qt.Horizontal)
-        self.zSlider.sliderReleased.connect(self.moveZ)
-        self.zSlider.setRange(0, 100)
-        self.zSlider.setValue(self.z)
-        self.zMinLabel = QtGui.QLabel(str(0))
-        self.zMinLabel.setAlignment(QtCore.Qt.AlignRight |
-                                    QtCore.Qt.AlignVCenter)
-        self.zMaxLabel = QtGui.QLabel(str(100))
-        self.zMaxLabel.setAlignment(QtCore.Qt.AlignLeft |
-                                    QtCore.Qt.AlignVCenter)
-        self.zSliderLabel = QtGui.QLabel("<strong>z (µm)</strong>")
-        self.zSliderLabel.setTextFormat(QtCore.Qt.RichText)
+        self.zLabel = QtGui.QLabel(
+            "<strong>z = {0:.2f} µm</strong>".format(self.z))
+        self.zLabel.setTextFormat(QtCore.Qt.RichText)
+        self.zUpButton = QtGui.QPushButton("+")
+        self.zUpButton.pressed.connect(self.zMoveUp)
+        self.zDownButton = QtGui.QPushButton("-")
+        self.zDownButton.pressed.connect(self.zMoveDown)
+        self.zStepEdit = QtGui.QLineEdit("0.05")
+        self.zStepUnit = QtGui.QLabel(" µm")
 
         layout = QtGui.QGridLayout()
         self.setLayout(layout)
-        layout.setColumnMinimumWidth(3, 150)
-        layout.addWidget(self.xSliderLabel, 1, 0)
-        layout.addWidget(self.xEdit, 1, 1)
-        layout.addWidget(self.xMinLabel, 1, 2)
-        layout.addWidget(self.xSlider, 1, 3)
-        layout.addWidget(self.xMaxLabel, 1, 4)
-        layout.addWidget(self.ySliderLabel, 3, 0)
-        layout.addWidget(self.yEdit, 3, 1)
-        layout.addWidget(self.yMinLabel, 3, 2)
-        layout.addWidget(self.yMaxLabel, 3, 4)
-        layout.addWidget(self.ySlider, 3, 3)
-        layout.addWidget(self.zSliderLabel, 5, 0)
-        layout.addWidget(self.zEdit, 5, 1)
-        layout.addWidget(self.zMinLabel, 5, 2)
-        layout.addWidget(self.zMaxLabel, 5, 4)
-        layout.addWidget(self.zSlider, 5, 3)
+        layout.addWidget(self.xLabel, 1, 0)
+        layout.addWidget(self.xUpButton, 1, 1)
+        layout.addWidget(self.xDownButton, 1, 2)
+        layout.addWidget(QtGui.QLabel("Step"), 1, 3)
+        layout.addWidget(self.xStepEdit, 1, 4)
+        layout.addWidget(self.xStepUnit, 1, 5)
+        layout.addWidget(self.yLabel, 2, 0)
+        layout.addWidget(self.yUpButton, 2, 1)
+        layout.addWidget(self.yDownButton, 2, 2)
+        layout.addWidget(QtGui.QLabel("Step"), 2, 3)
+        layout.addWidget(self.yStepEdit, 2, 4)
+        layout.addWidget(self.yStepUnit, 2, 5)
+        layout.addWidget(self.zLabel, 3, 0)
+        layout.addWidget(self.zUpButton, 3, 1)
+        layout.addWidget(self.zDownButton, 3, 2)
+        layout.addWidget(QtGui.QLabel("Step"), 3, 3)
+        layout.addWidget(self.zStepEdit, 3, 4)
+        layout.addWidget(self.zStepUnit, 3, 5)
 
-    def move(self):
-        """moves the 3 axis to the positions specified by the sliders"""
-        fullSignal = np.zeros((len(self.activeChannels), self.nSamples))
-        for chan in self.activeChannels:
-            slider = getattr(self, chan + "Slider")
-            newPos = 0.01*slider.value()
-            currPos = getattr(self, chan)
-            signal = makeRamp(currPos, newPos, self.nSamples)
-            setattr(self, chan, newPos)
-            fullSignal[self.activeChannels.index(chan)] = signal
+    def move(self, axis, dist):
+        """moves the position along the axis specified a distance dist."""
 
+        # read initial position for all channels
+        texts = [getattr(self, ax + "Label").text()
+                 for ax in self.activeChannels]
+        initPos = [re.findall(r"[-+]?\d*\.\d+|[-+]?\d+", t)[0] for t in texts]
+        initPos = np.array(initPos, dtype=float)[:, np.newaxis]
+        fullPos = np.repeat(initPos, self.nSamples, axis=1)
+
+        # make position ramp for moving axis
+        ramp = makeRamp(0, dist, self.nSamples)
+        fullPos[self.activeChannels.index(axis)] += ramp
+
+        # convert um to V and send signal to piezo
+        factors = np.array([i for i in convFactors.values()])[:, np.newaxis]
+        fullSignal = fullPos/factors
         self.aotask.write(fullSignal, auto_start=True)
         self.aotask.wait_until_done()
         self.aotask.stop()
 
-    def moveX(self):
-        """Specifies the movement of the x axis."""
-        value = self.xSlider.value() / 100
-        self.xEdit.setText(str(round(value*convFactors['x'], 2)))
-        self.move()
+        # update position text
+        newPos = fullPos[self.activeChannels.index(axis)][-1]
+        newText = "<strong>" + axis + " = {0:.2f} µm</strong>".format(newPos)
+        getattr(self, axis + "Label").setText(newText)
 
-    def moveY(self):
-        """Specifies the movement of the y axis."""
-        value = self.ySlider.value() / 100
-        self.yEdit.setText(str(round(value*convFactors['y'], 2)))
-        self.move()
+    def xMoveUp(self):
+        self.move('x', -float(getattr(self, 'x' + "StepEdit").text()))
 
-    def moveZ(self):
-        """Specifies the movement of the z axis."""
-        value = self.zSlider.value()
-        self.zEdit.setText(str(round(value, 2)))
-        self.focusWgt.z.moveAbsolute(value * self.focusWgt.um)
+    def xMoveDown(self):
+        self.move('x', float(getattr(self, 'x' + "StepEdit").text()))
 
-    def editX(self):
-        """Method called when a position for x is entered manually. Repositions
-        the slider and initiates the movement of the stage"""
-        self.xSlider.setValue(100*float(self.xEdit.text())/convFactors['x'])
-        self.move()
+    def yMoveUp(self):
+        self.move('y', -float(getattr(self, 'y' + "StepEdit").text()))
 
-    def editY(self):
-        """Method called when a position for y is entered manually. Repositions
-        the slider and initiates the movement of the stage"""
-        self.ySlider.setValue(100*float(self.yEdit.text())/convFactors['y'])
-        self.move()
+    def yMoveDown(self):
+        self.move('y', float(getattr(self, 'y' + "StepEdit").text()))
 
-    def editZ(self):
-        """Method called when a position for z is entered manually. Repositions
-        the slider and initiates the movement of the stage"""
-        self.zSlider.setValue(100*float(self.zEdit.text())/convFactors['z'])
-        self.move()
+    def zMoveUp(self):
+        self.move('z', float(getattr(self, 'z' + "StepEdit").text()))
 
-    def setX(self, value):
-        """This method sets x to value in Volts and moves accordingly the
-        slider and the corresponding value line"""
-        valueLine = round(value * convFactors['x'], 2)
-        print("in set x", value, valueLine)
-        self.xSlider.setValue(value * 100)
-        self.xEdit.setText(str(valueLine))
-        self.move()
-
-    def setY(self, value):
-        """This method sets y to value in Volts and moves accordingly the
-        slider and the corresponding value line"""
-        self.ySlider.setValue(value * 100)
-        self.yEdit.setText(str(round(value*convFactors['y'], 2)))
-        self.move()
-
-    def setZ(self, value):
-        """This method sets x to value in Volts and moves accordingly the
-        slider and the corresponding value line"""
-        self.zSlider.setValue(value * 100)
-        self.zEdit.setText(str(round(value*convFactors['z'], 2)))
-        self.move()
-
-    def goToZero(self):
-        self.x = 0
-        self.y = 0
-        self.z = 0
-        self.move()
+    def zMoveDown(self):
+        self.move('z', -float(getattr(self, 'z' + "StepEdit").text()))
 
     def resetChannels(self, channels):
         """Method called when the analog output channels need to be used by
@@ -254,12 +201,12 @@ class Positionner(QtGui.QWidget):
 
             totalChannels = ["x", "y", "z"]
             self.activeChannels = totalChannels
-            for elt in totalChannels:
+            for axis in totalChannels:
                 n = self.AOchans[self.activeChannels.index(axis)]
                 channel = "Dev1/ao%s" % n
                 self.aotask.ao_channels.add_ao_voltage_chan(
-                    physical_channel=channel, name_to_assign_to_channel=elt,
-                    min_val=minVolt[elt], max_val=maxVolt[elt])
+                    physical_channel=channel, name_to_assign_to_channel=axis,
+                    min_val=minVolt[axis], max_val=maxVolt[axis])
 
             self.aotask.timing.cfg_samp_clk_timing(
                 rate=self.sampleRate,
@@ -268,14 +215,14 @@ class Positionner(QtGui.QWidget):
             self.aotask.start()
             self.isActive = True
 
+        for axis in self.activeChannels:
+            newText = "<strong>" + axis + " = {0:.2f} µm</strong>".format(0)
+            getattr(self, axis + "Label").setText(newText)
+
     def closeEvent(self, *args, **kwargs):
         if(self.isActive):
             # Resets the sliders, which will reset each channel to 0
             print("closeEvent positionner")
-            self.xSlider.setValue(0)
-            self.ySlider.setValue(0)
-            self.zSlider.setValue(0)
-            self.move()
             self.aotask.wait_until_done(timeout=2)
             self.aotask.stop()
             self.aotask.close()
@@ -583,13 +530,11 @@ class ScanWidget(QtGui.QMainWindow):
         if not self.scanning:
             main = self.main
             lasers = main.laserWidgets
-            if not(lasers.DigCtrl.DigitalControlButton.isChecked() and
-                   main.trigsourceparam.value() == 'External "frame-trigger"'):
-                main.trigsourceparam.setValue('External "frame-trigger"')
-                main.laserWidgets.DigCtrl.DigitalControlButton.setChecked(True)
-#            main.laserWidgets.DigCtrl.GlobalDigitalMod() it is alreay checked
-
-            self.prepAndRun()
+            if (lasers.DigCtrl.DigitalControlButton.isChecked() and
+               main.trigsourceparam.value() == 'External "frame-trigger"'):
+                self.prepAndRun()
+            else:
+                self.digModWarning.exec_()
         else:
             self.scanner.abort()
 
@@ -599,8 +544,8 @@ class ScanWidget(QtGui.QMainWindow):
         if self.scanRadio.isChecked():
             self.stageScan.update(self.scanParValues)
             self.scanButton.setText('Abort')
-#            self.main.piezoWidget.resetChannels(
-#                self.stageScan.activeChannels[self.stageScan.scanMode])
+            self.main.piezoWidget.resetChannels(
+                self.stageScan.activeChannels[self.stageScan.scanMode])
             self.scanner = Scanner(
                self.nidaq, self.stageScan, self.pxCycle, self, continuous)
             self.scanner.finalizeDone.connect(self.finalizeDone)
@@ -649,8 +594,8 @@ class ScanWidget(QtGui.QMainWindow):
             self.scanning = False
             if self.focusLocked:
                 self.focusWgt.lockFocus()
-#            self.main.piezoWidget.resetChannels(
-#                self.stageScan.activeChannels[self.stageScan.scanMode])
+            self.main.piezoWidget.resetChannels(
+                self.stageScan.activeChannels[self.stageScan.scanMode])
         elif self.continuousCheck.isChecked():
             self.scanButton.setEnabled(True)
             self.prepAndRun(True)
@@ -738,7 +683,8 @@ class Scanner(QtCore.QObject):
                 max_val=maxVolt[self.channelOrder[n]])
 
         self.fullAOsig = np.array(
-            [self.stageScan.sigDict[self.channelOrder[i]] for i in range(len(AOchans))])
+            [self.stageScan.sigDict[self.channelOrder[i]]
+             for i in range(len(AOchans))])
 
         # Same as above but for the digital signals/devices
         devs = list(self.pxCycle.sigDict.keys())
@@ -1099,24 +1045,25 @@ class MultiScanWorker(QtCore.QObject):
 
     def overlay(self):
         ind = self.main.overlay_box.currentIndex()
-        self.illum_images_back = [] # illumination images for overlay
+        self.illum_images_back = []     # illumination images for overlay
 
         # overlay previous image to current image
         if self.main.overlay_check.isChecked():
 
             # process the large field of view
-            illum_image_large_pre = np.zeros(self.illum_images[-1].shape)
+            illumImgLargePre = np.zeros(self.illum_images[-1].shape)
             for i, point in enumerate(self.points_large):
                 px, py, pxe, pye = point
-                illum_image_pre = self.illum_images_stocked[ind][i]
-                illum_image_large_pre[py:pye, px:pxe] = illum_image_pre[0:pye-py, 0:pxe-px]
+                illumImgPre = self.illum_images_stocked[ind][i]
+                illumImgLargePre[py:pye, px:pxe] = illumImgPre[:pye-py,
+                                                               :pxe-px]
 
             # process each image
             for i in range(len(self.illum_images)-1):
-                illum_image_pre = self.illum_images_stocked[ind][i]
-                self.illum_images_back.append(illum_image_pre)
+                illumImgPre = self.illum_images_stocked[ind][i]
+                self.illum_images_back.append(illumImgPre)
 
-            self.illum_images_back.append(illum_image_large_pre)
+            self.illum_images_back.append(illumImgLargePre)
 
             # update the background image
             img = self.illum_images_back[self.main.beads_box.currentIndex()]
@@ -1199,22 +1146,30 @@ class IllumImageWidget(pg.GraphicsLayoutWidget):
             tick.hide()
         self.addItem(self.hist_back, row=1, col=3)
 
+        self.first = True
+        self.firstBack = True
+
     def update(self, img, invert=True):
-        self.img.setImage(img)
+        self.img.setImage(img, autoLevels=self.first)
         if invert:
             self.vb.invertX(True)
             self.vb.invertY(True)
         else:
             self.vb.invertX(False)
             self.vb.invertY(False)
-        self.hist.setLevels(*guitools.bestLimits(img))
+        if self.first:
+            self.hist.setLevels(*guitools.bestLimits(img))
+        self.first = False
 
     def update_back(self, img):
-        self.img_back.setImage(img)
-        self.hist_back.setLevels(*guitools.bestLimits(img))
+        self.img_back.setImage(img, autoLevels=self.firstBack)
+        if self.first:
+            self.hist_back.setLevels(*guitools.bestLimits(img))
+        self.firstBack = False
 
     def delete_back(self):
         self.img_back.clear()
+        self.firstBack = True
 
 
 class LaserCycle():
@@ -1448,13 +1403,19 @@ class VOLscan():
         self.corrStepSize = sizeX / self.stepsX
 
         if primScanDim == 'x':
-            self.makePrimDimSig('x', startX, sizeX, self.stepsX, [self.stepsY, self.stepsZ])
-            self.makeSecDimSig('y', startY, sizeY, self.stepsY, [self.stepsX, self.stepsZ])
-            self.makeThiDimSig('z', startZ, sizeZ, self.stepsZ, [self.stepsX, self.stepsY])
+            self.makePrimDimSig(
+                'x', startX, sizeX, self.stepsX, [self.stepsY, self.stepsZ])
+            self.makeSecDimSig(
+                'y', startY, sizeY, self.stepsY, [self.stepsX, self.stepsZ])
+            self.makeThiDimSig(
+                'z', startZ, sizeZ, self.stepsZ, [self.stepsX, self.stepsY])
         elif primScanDim == 'y':
-            self.makePrimDimSig('y', startY, sizeY, self.stepsY, [self.stepsX, self.stepsZ])
-            self.makeSecDimSig('x', startX, sizeX, self.stepsX, [self.stepsY, self.stepsZ])
-            self.makeThiDimSig('z', startZ, sizeZ, self.stepsZ, [self.stepsY, self.stepsX])
+            self.makePrimDimSig(
+                'y', startY, sizeY, self.stepsY, [self.stepsX, self.stepsZ])
+            self.makeSecDimSig(
+                'x', startX, sizeX, self.stepsX, [self.stepsY, self.stepsZ])
+            self.makeThiDimSig(
+                'z', startZ, sizeZ, self.stepsZ, [self.stepsY, self.stepsX])
 
     def makePrimDimSig(self, dim, start, size, steps, otherSteps):
         rowSamps = steps * self.seqSamps
@@ -1512,8 +1473,8 @@ class VOLscan():
 #         pass
 #
 #     def update(self, parValues, primScanDim):
-#         """Updates the VOL-scan signals, units of length are used when creating
-#         the scan signals and is converted to voltages at the end """
+#         """Updates the VOL-scan signals, units of length are used when
+#         creating the scan signals and is converted to voltages at the end """
 #         # Create signals
 #         startX = 0
 #         startY = 0
@@ -1556,9 +1517,9 @@ class VOLscan():
 #         sampsPerSlice = len(Xsig)  # Used in Scanner->runScan
 #         self.cyclesPerSlice = sampsPerSlice / self.seqSamps
 #         """Below we make the concatenation along the third dimension, between
-#         the "slices" we add a smooth transition to avoid too rapid motion that
-#         seems to cause strange movent. This needs to be syncronized with the
-#         pixel cycle signal"""
+#         the "slices" we add a smooth transition to avoid too rapid motion
+#         that seems to cause strange movent. This needs to be syncronized with
+#         the pixel cycle signal"""
 #         fullXsig = Xsig
 #         fullYsig = Ysig
 #         fullZsig = startZ * np.ones(len(Xsig))
@@ -1609,30 +1570,6 @@ class PixelCycle():
             end_pos = int(min(end_pos, cycleSamps))
             signal[range(start_pos, end_pos)] = True
             self.sigDict[device] = signal
-
-
-class GraphFrame(pg.GraphicsWindow):
-    """Creates the plot that plots the preview of the pulses.
-    Fcn update() updates the plot of "device" with signal "signal"."""
-    def __init__(self, pxCycle, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.pxCycle = pxCycle
-        self.plot = self.addPlot(row=1, col=0)
-        self.plot.setYRange(0, 1)
-        self.plot.showGrid(x=False, y=False)
-        self.plotSigDict = {'405': self.plot.plot(pen=pg.mkPen(130, 0, 200)),
-                            '488': self.plot.plot(pen=pg.mkPen(0, 247, 255)),
-                            '473': self.plot.plot(pen=pg.mkPen(0, 183, 255)),
-                            'CAM': self.plot.plot(pen='w')}
-
-    def update(self, devices=None):
-        if devices is None:
-            devices = self.plotSigDict
-
-        for device in devices:
-            signal = self.pxCycle.sigDict[device]
-            self.plotSigDict[device].setData(signal)
 
 
 class GraphFrame(pg.GraphicsWindow):

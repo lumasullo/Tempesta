@@ -669,7 +669,6 @@ class RecWorker(QtCore.QObject):
                 time.sleep(0.01)
                 self.updateSignal.emit()
 
-        print('Number of recorded frame : ' + str(len(self.lvworker.framesRecorded)))
         self.lvworker.stopRecording()
 
         # get the recorded data
@@ -683,7 +682,8 @@ class RecWorker(QtCore.QObject):
                     stepsZ = int(np.ceil(sizeZ / stepSizeZ))
                 else:
                     stepsZ = 1
-                datashape = (stepsZ, int(len(data)/stepsZ), self.shape[1], self.shape[0])
+                datashape = (stepsZ, int(len(data)/stepsZ), self.shape[1],
+                             self.shape[0])
                 reshapeddata = np.reshape(data, datashape, order='C')
 
                 for i, scan in enumerate(reshapeddata):
@@ -1560,8 +1560,14 @@ class TormentaGUI(QtGui.QMainWindow):
             self.cameras[i].stopAcquisition()
 
         self.viewtimer.stop()
+
+        if self.crosshair.showed:
+            self.crosshair.hide()
         self.crosshairButton.setEnabled(False)
+        if self.grid.showed:
+            self.grid.hide()
         self.gridButton.setEnabled(False)
+
         self.levelsButton.setEnabled(False)
         self.recWidget.readyToRecord = False
 
