@@ -426,7 +426,7 @@ class RecordingWidget(QtGui.QFrame):
 
     def updateGUI(self):
         pass
-#        eSecs = self.worker.timerecorded
+#        eSecs = self.worker.tRecorded
 #        nframe = self.worker.frames_recorded
 #        rSecs = self.getTimeOrFrames() - eSecs
 #        rText = '{}'.format(datetime.timedelta(seconds=max(0, rSecs)))
@@ -578,31 +578,6 @@ class RecordingWidget(QtGui.QFrame):
             # etc.
             self.savenames[ind] = guitools.getUniqueName(self.savenames[ind])
 
-    def saveData(self, data, savename):
-        saveMode = self.formatBox.currentText()
-        savename = savename + '.' + saveMode
-        if saveMode == 'tiff':
-            print('Savename = ', savename)
-            t = time.time()
-            para = dict(imagej=True)
-            tiff.imsave(savename, data, **para)
-        elif saveMode == 'hdf5':
-            print('Savename = ', savename)
-            store_file = hdf.File(savename, "w")
-            datashape = data.shape
-            store_file.create_dataset(name=self.dataname, shape=datashape,
-                                      maxshape=datashape, dtype=np.uint16)
-            dataset = store_file[self.dataname]
-            t = time.time()
-            dataset[...] = data
-            # Saving parameters
-            for item in self.attrs:
-                if item[1] is not None:
-                    dataset.attrs[item[0]] = item[1]
-            store_file.close()
-        elapsed = time.time() - t
-        print('Data written, time to write: ', elapsed)
-
 
 class RecWorker(QtCore.QObject):
 
@@ -630,73 +605,184 @@ class RecWorker(QtCore.QObject):
 
     def start(self):
         # Set initial values
-        self.timerecorded = 0
+        self.tRecorded = 0
 
         self.lvworker.startRecording()
         time.sleep(0.1)
 
         self.starttime = time.time()
+        numStored = 0  # number of frames stored
+        saveMode = self.main.formatBox.currentText()
 
         # Main loop for waiting until recording is finished and sending update
         # signal
         if self.recMode == 1:
-            while len(self.lvworker.framesRecorded) < self.timeorframes\
-                    and self.pressed:
-                time.sleep(0.01)
-                self.updateSignal.emit()
+            if saveMode == 'tiff':
+                with tiff.TiffWriter(self.savename + '.tiff',
+                                     software='Tormenta') as storeFile:
+                    nFrames = len(self.lvworker.fRecorded)
+                    while nFrames < self.timeorframes and self.pressed:
+                        time.sleep(0.01)
+                        newFrames = self.lvworker.fRecorded[numStored:]
+                        numStored += len(newFrames)
+                        for frame in newFrames:
+                            storeFile.save(frame)
+                        self.updateSignal.emit()
+            elif saveMode == 'hdf5':
+                with hdf.File(self.savename + '.hdf5', "w") as storeFile:
+                    storeFile.create_dataset(
+                        'Images', (1, self.shape[0], self.shape[1]),
+                        maxshape=(None, self.shape[0], self.shape[1]))
+                    dataset = storeFile['Images']
+                    nFrames = len(self.lvworker.fRecorded)
+                    while nFrames < self.timeorframes and self.pressed:
+                        time.sleep(0.01)
+                        newFrames = self.lvworker.fRecorded[numStored:]
+                        dataset.resize((numStored+len(newFrames)), axis=0)
+                        dataset[numStored:] = newFrames
+                        numStored += len(newFrames)
+                        self.updateSignal.emit()
 
         elif self.recMode == 2:
-            while self.timerecorded < self.timeorframes and self.pressed:
-                self.timerecorded = time.time() - self.starttime
-                time.sleep(0.01)
-                self.updateSignal.emit()
+            if saveMode == 'tiff':
+                with tiff.TiffWriter(self.savename + '.tiff',
+                                     software='Tormenta') as storeFile:
+                    while self.tRecorded < self.timeorframes and self.pressed:
+                        self.tRecorded = time.time() - self.starttime
+                        time.sleep(0.01)
+                        newFrames = self.lvworker.fRecorded[numStored:]
+                        numStored += len(newFrames)
+                        for frame in newFrames:
+                            storeFile.save(frame)
+                        self.updateSignal.emit()
+
+            elif saveMode == 'hdf5':
+                with hdf.File(self.savename + '.hdf5', "w") as storeFile:
+                    storeFile.create_dataset(
+                        'Images', (1, self.shape[0], self.shape[1]),
+                        maxshape=(None, self.shape[0], self.shape[1]))
+                    dataset = storeFile['Images']
+                    while self.tRecorded < self.timeorframes and self.pressed:
+                        self.tRecorded = time.time() - self.starttime
+                        time.sleep(0.01)
+                        newFrames = self.lvworker.fRecorded[numStored:]
+                        dataset.resize((numStored + len(newFrames)), axis=0)
+                        dataset[numStored:] = newFrames
+                        numStored += len(newFrames)
+                        self.updateSignal.emit()
 
         elif self.recMode in [3, 4]:
+            # Change setting for scanning
             self.main.main.trigsourceparam.setValue('External "frame-trigger"')
             laserWidget = self.main.main.laserWidgets
             laserWidget.DigCtrl.DigitalControlButton.setChecked(True)
-#            laserWidget.DigCtrl.GlobalDigitalMod()
-            framesExpected = self.scanWidget.stageScan.frames
+
+#  <<<<<<< HEAD
+#        else:
+#            while self.pressed:
+#                self.tRecorded = time.time() - self.starttime
+#                time.sleep(0.01)
+#                self.updateSignal.emit()
+#
+#        self.lvworker.stopRecording()
+#
+#        # get the recorded data
+#        data = self.lvworker.fRecorded
+#        # Adapted for ImageJ data read shape
+#        if self.recMode in [3, 4]:
+#            try:
+#                if self.scanWidget.scanMode.currentText() == 'VOL scan':
+#                    sizeZ = self.scanWidget.scanParValues['sizeZ']
+#                    stepSizeZ = self.scanWidget.scanParValues['stepSizeZ']
+#                    stepsZ = int(np.ceil(sizeZ / stepSizeZ))
+#                else:
+#                    stepsZ = 1
+#                datashape = (stepsZ, int(len(data)/stepsZ), self.shape[1],
+#                             self.shape[0])
+#                reshapeddata = np.reshape(data, datashape, order='C')
+#
+#                for i, scan in enumerate(reshapeddata):
+#                    self.main.saveData(scan, self.savename + '_' + str(i))
+#            except ValueError:
+#                print('Data could not be saved')
+# =======
+            # Getting Z steps
+            if self.scanWidget.scanMode.currentText() == 'VOL scan':
+                sizeZ = self.scanWidget.scanParValues['sizeZ']
+                stepSizeZ = self.scanWidget.scanParValues['stepSizeZ']
+                stepsZ = int(np.ceil(sizeZ / stepSizeZ))
+            else:
+                stepsZ = 1
+            framesExpected = int(self.scanWidget.stageScan.frames / stepsZ)
+
+            # start scanning
             self.scanWidget.scanButton.click()
-            while len(self.lvworker.framesRecorded) != framesExpected\
-                    and self.pressed:
-                time.sleep(0.1)
-                self.updateSignal.emit()
+            if saveMode == 'tiff':
+                for i in range(stepsZ):
+                    with tiff.TiffWriter(self.savename+'_z'+str(i)+'.tiff',
+                                         software='Tormenta') as storeFile:
+                        while numStored != framesExpected*(i + 1) \
+                                and self.pressed:
+                            time.sleep(0.01)
+                            newFrames = self.lvworker.fRecorded[numStored:]
+                            if numStored+len(newFrames) > framesExpected*(i+1):
+                                maxF = framesExpected*(i + 1) - numStored
+                                newFrames = newFrames[:maxF]
+                            numStored += len(newFrames)
+                            for frame in newFrames:
+                                storeFile.save(frame)
+                            self.updateSignal.emit()
 
+            elif saveMode == 'hdf5':
+                with hdf.File(self.savename + '.hdf5', "w") as storeFile:
+                    for i in range(stepsZ):
+                        zPlane = storeFile.create_group('z' + str(i))
+                        dataset = zPlane.create_dataset(
+                            'Images', (1, self.shape[0], self.shape[1]),
+                            maxshape=(None, self.shape[0], self.shape[1]))
+                        while numStored != framesExpected*(i+1)\
+                                and self.pressed:
+                            time.sleep(0.01)
+                            newFrames = self.lvworker.fRecorded[numStored:]
+                            if numStored+len(newFrames) > framesExpected*(i+1):
+                                maxF = framesExpected*(i+1)-numStored
+                                newFrames = newFrames[:maxF]
+                            size = (numStored-framesExpected*i+len(newFrames))
+                            dataset.resize(size, axis=0)
+                            dataset[numStored:] = newFrames
+                            numStored += len(newFrames)
+                            self.updateSignal.emit()
+# >>>>>>> a2b00f479ff618b99a1c8fb8d63a5506fd2fd4bc
         else:
-            while self.pressed:
-                self.timerecorded = time.time() - self.starttime
-                time.sleep(0.01)
-                self.updateSignal.emit()
+            if saveMode == 'tiff':
+                with tiff.TiffWriter(self.savename + '.tiff',
+                                     software='Tormenta') as storeFile:
+                    while self.pressed:
+                        time.sleep(0.01)
+                        newFrames = self.lvworker.fRecorded[numStored:]
+                        numStored += len(newFrames)
+                        for frame in newFrames:
+                            storeFile.save(frame)
+                        self.updateSignal.emit()
 
+            elif saveMode == 'hdf5':
+                with hdf.File(self.savename + '.hdf5', "w") as storeFile:
+                    storeFile.create_dataset('Images',
+                                             (1, self.shape[0],
+                                              self.shape[1]),
+                                             maxshape=(None, self.shape[0],
+                                                       self.shape[1]))
+                    dataset = storeFile['Images']
+                    while self.pressed:
+                        time.sleep(0.01)
+                        newFrames = self.lvworker.fRecorded[numStored:]
+                        dataset.resize((numStored + len(newFrames)), axis=0)
+                        dataset[numStored:] = newFrames
+                        numStored += len(newFrames)
+                        self.updateSignal.emit()
+
+        print('Number of recorded frame: ' + str(len(self.lvworker.fRecorded)))
         self.lvworker.stopRecording()
-
-        # get the recorded data
-        data = self.lvworker.framesRecorded
-        # Adapted for ImageJ data read shape
-        if self.recMode in [3, 4]:
-            try:
-                if self.scanWidget.scanMode.currentText() == 'VOL scan':
-                    sizeZ = self.scanWidget.scanParValues['sizeZ']
-                    stepSizeZ = self.scanWidget.scanParValues['stepSizeZ']
-                    stepsZ = int(np.ceil(sizeZ / stepSizeZ))
-                else:
-                    stepsZ = 1
-                datashape = (stepsZ, int(len(data)/stepsZ), self.shape[1],
-                             self.shape[0])
-                reshapeddata = np.reshape(data, datashape, order='C')
-
-                for i, scan in enumerate(reshapeddata):
-                    self.main.saveData(scan, self.savename + '_' + str(i))
-            except ValueError:
-                print('Data could not be saved')
-        else:
-            try:
-                datashape = (len(data), self.shape[1], self.shape[0])
-                reshapeddata = np.reshape(data, datashape, order='C')
-                self.main.saveData(reshapeddata, self.savename)
-            except ValueError:
-                print('Data could not be saved')
 
         self.done = True
         self.doneSignal.emit()
@@ -827,7 +913,7 @@ class LVWorker(QtCore.QObject):
         self.orcaflash = orcaflash
         self.running = False
         self.recording = False
-        self.framesRecorded = []
+        self.fRecorded = []
 
         # Memory variable to keep track of if update has been run many times in
         # a row with camera trigger source as internal trigger
@@ -864,7 +950,11 @@ class LVWorker(QtCore.QObject):
                 # stock frames while recording
                 if self.recording:
                     for hcDatum in hcData:
-                        self.framesRecorded.append(hcDatum.getData())
+                        reshapedFrame = np.reshape(hcDatum.getData(),
+                                                   (self.orcaflash.frame_x,
+                                                    self.orcaflash.frame_y),
+                                                   'F')
+                        self.fRecorded.append(reshapedFrame)
 
                 """Following is causing problems with two cameras..."""
     #            trigSource = self.orcaflash.getPropertyValue('trigSource')[0]
@@ -887,7 +977,7 @@ class LVWorker(QtCore.QObject):
 
     def startRecording(self):
         self.recording = True
-        self.framesRecorded.clear()
+        self.fRecorded.clear()
 
     def stopRecording(self):
         self.recording = False
