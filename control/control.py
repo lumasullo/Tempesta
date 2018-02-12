@@ -767,11 +767,9 @@ class RecWorker(QtCore.QObject):
 
             elif saveMode == 'hdf5':
                 with hdf.File(self.savename + '.hdf5', "w") as storeFile:
-                    storeFile.create_dataset('Images',
-                                             (1, self.shape[0],
-                                              self.shape[1]),
-                                             maxshape=(None, self.shape[0],
-                                                       self.shape[1]))
+                    storeFile.create_dataset(
+                        'Images', (1, self.shape[0], self.shape[1]),
+                        maxshape=(None, self.shape[0], self.shape[1]))
                     dataset = storeFile['Images']
                     while self.pressed:
                         time.sleep(0.01)
