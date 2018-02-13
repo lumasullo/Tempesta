@@ -115,7 +115,6 @@ class RecordingWidget(QtGui.QFrame):
         self.untilSTOPbtn = QtGui.QRadioButton('Run until STOP')
         self.untilSTOPbtn.clicked.connect(self.untilStop)
         self.timeToRec = QtGui.QLineEdit('1')
-        self.timeToRec.setFixedWidth(45)
         self.timeToRec.textChanged.connect(self.filesizeupdate)
         self.currentTime = QtGui.QLabel('0 / ')
         self.currentTime.setAlignment((QtCore.Qt.AlignRight |
@@ -123,9 +122,7 @@ class RecordingWidget(QtGui.QFrame):
         self.currentFrame = QtGui.QLabel('0 /')
         self.currentFrame.setAlignment((QtCore.Qt.AlignRight |
                                         QtCore.Qt.AlignVCenter))
-        self.currentFrame.setFixedWidth(45)
         self.numExpositionsEdit = QtGui.QLineEdit('100')
-        self.numExpositionsEdit.setFixedWidth(45)
         self.tRemaining = QtGui.QLabel()
         self.tRemaining.setAlignment((QtCore.Qt.AlignCenter |
                                       QtCore.Qt.AlignVCenter))
@@ -163,10 +160,10 @@ class RecordingWidget(QtGui.QFrame):
             recGrid.addWidget(self.filenameEdit, 3, 1, 1, 2)
             recGrid.addWidget(self.formatBox, 3, 3)
         else:
-            recGrid.addWidget(self.folderEdit, 2, 1)
-            recGrid.addWidget(openFolderButton, 2, 2)
-            recGrid.addWidget(self.filenameEdit, 3, 1)
-            recGrid.addWidget(self.formatBox, 3, 2)
+            recGrid.addWidget(self.folderEdit, 2, 1, 1, 2)
+            recGrid.addWidget(openFolderButton, 2, 3)
+            recGrid.addWidget(self.filenameEdit, 3, 1, 1, 2)
+            recGrid.addWidget(self.formatBox, 3, 3)
 
         recGrid.addWidget(self.specifyfile, 3, 0)
 

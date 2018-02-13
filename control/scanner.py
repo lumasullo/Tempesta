@@ -145,7 +145,7 @@ class Positionner(QtGui.QWidget):
         self.aotask.stop()
 
         # update position text
-        newPos = fullPos[self.activeChannels.index(axis)][-1]
+        newPos = -fullPos[self.activeChannels.index(axis)][-1]
         newText = "<strong>" + axis + " = {0:.2f} µm</strong>".format(newPos)
         getattr(self, axis + "Label").setText(newText)
 
@@ -544,8 +544,9 @@ class ScanWidget(QtGui.QMainWindow):
         if self.scanRadio.isChecked():
             self.stageScan.update(self.scanParValues)
             self.scanButton.setText('Abort')
-            self.main.piezoWidget.resetChannels(
-                self.stageScan.activeChannels[self.stageScan.scanMode])
+            if not(continuous):
+                self.main.piezoWidget.resetChannels(
+                    self.stageScan.activeChannels[self.stageScan.scanMode])
             self.scanner = Scanner(
                self.nidaq, self.stageScan, self.pxCycle, self, continuous)
             self.scanner.finalizeDone.connect(self.finalizeDone)
@@ -576,7 +577,7 @@ class ScanWidget(QtGui.QMainWindow):
             time.sleep(0.1)
 
             self.main.lvworkers[0].stopRecording()
-            data = self.main.lvworkers[0].framesRecorded
+            data = self.main.lvworkers[0].fRecorded
 
             datashape = (len(data), *self.main.shapes[0][::-1])
             reshapeddata = np.reshape(data, datashape, order='C')
@@ -786,8 +787,7 @@ class Scanner(QtCore.QObject):
             sample_mode=nidaqmx.constants.AcquisitionType.FINITE,
             samps_per_chan=self.stageScan.sampleRate)
 
-        self.aotask.write(returnRamps, auto_start=False)
-        self.aotask.start()
+        self.aotask.write(returnRamps, auto_start=True)
         self.waiter.start()
 
     def done(self):
@@ -911,10 +911,8 @@ class MultiScanWorker(QtCore.QObject):
         self.labels = []
 
         # corner detection parameter of Shi-Tomasi
-        self.feature_params = dict(maxCorners=100,
-                                   qualityLevel=0.1,
-                                   minDistance=7,
-                                   blockSize=7)
+        self.feature_params = dict(maxCorners=100, qualityLevel=0.1,
+                                   minDistance=7, blockSize=7)
 
     def set_images(self, images):
         self.primScanDim = self.mainScanWid.scanner.stageScan.primScanDim
@@ -1059,7 +1057,7 @@ class MultiScanWorker(QtCore.QObject):
                                                                :pxe-px]
 
             # process each image
-            for i in range(len(self.illum_images)-1):
+            for i in range(len(self.illum_images) - 1):
                 illumImgPre = self.illum_images_stocked[ind][i]
                 self.illum_images_back.append(illumImgPre)
 
