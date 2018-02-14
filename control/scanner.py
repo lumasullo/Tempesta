@@ -145,21 +145,21 @@ class Positionner(QtGui.QWidget):
         self.aotask.stop()
 
         # update position text
-        newPos = -fullPos[self.activeChannels.index(axis)][-1]
+        newPos = fullPos[self.activeChannels.index(axis)][-1]
         newText = "<strong>" + axis + " = {0:.2f} µm</strong>".format(newPos)
         getattr(self, axis + "Label").setText(newText)
 
     def xMoveUp(self):
-        self.move('x', -float(getattr(self, 'x' + "StepEdit").text()))
-
-    def xMoveDown(self):
         self.move('x', float(getattr(self, 'x' + "StepEdit").text()))
 
+    def xMoveDown(self):
+        self.move('x', -float(getattr(self, 'x' + "StepEdit").text()))
+
     def yMoveUp(self):
-        self.move('y', -float(getattr(self, 'y' + "StepEdit").text()))
+        self.move('y', float(getattr(self, 'y' + "StepEdit").text()))
 
     def yMoveDown(self):
-        self.move('y', float(getattr(self, 'y' + "StepEdit").text()))
+        self.move('y', -float(getattr(self, 'y' + "StepEdit").text()))
 
     def zMoveUp(self):
         self.move('z', float(getattr(self, 'z' + "StepEdit").text()))
