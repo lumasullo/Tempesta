@@ -12,8 +12,6 @@ import os
 import time
 import re
 
-import matplotlib.pyplot as plt
-
 from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
 import pyqtgraph.ptime as ptime
@@ -82,8 +80,6 @@ class RecordingWidget(QtGui.QFrame):
         self.formatBox.addItem('hdf5')
 
         # Snap and recording buttons
-        self.showZgraph = QtGui.QCheckBox('Show Z-graph')
-        self.showZproj = QtGui.QCheckBox('Show Z-projection')
         self.snapTIFFButton = QtGui.QPushButton('Snap')
         self.snapTIFFButton.setStyleSheet("font-size:16px")
         self.snapTIFFButton.setSizePolicy(QtGui.QSizePolicy.Preferred,
@@ -149,8 +145,6 @@ class RecordingWidget(QtGui.QFrame):
 
         recGrid.addWidget(recTitle, 0, 0, 1, 3)
         recGrid.addWidget(QtGui.QLabel('Folder'), 2, 0)
-        recGrid.addWidget(self.showZgraph, 1, 0)
-        recGrid.addWidget(self.showZproj, 1, 1)
 
         if len(self.main.cameras) > 1:
             self.DualCam = QtGui.QCheckBox('Two-cam rec')
@@ -475,17 +469,15 @@ class RecordingWidget(QtGui.QFrame):
                 self.recButton.setEnabled(False)
                 if not self.main.scanWidget.scanning:
                     self.endRecording()
-            for i in range(0, self.nr_cameras):
+            for i in range(0, self.nCameras):
                 ind = np.mod(self.main.currCamIdx + i, 2)
-                print('Terminating recording on camera index ' + str(ind))
                 self.recworkers[ind].pressed = False
 
     def doRecording(self):
         if not self.main.scanWidget.scanning:
             self.makeSavenames()
-            for i in range(0, self.nr_cameras):
+            for i in range(0, self.nCameras):
                 ind = np.mod(self.main.currCamIdx + i, 2)
-                print('Starting recording on camera ' + str(ind + 1))
 
                 # Creates an instance of RecWorker class.
                 self.recworkers[ind] = RecWorker(
@@ -506,32 +498,24 @@ class RecordingWidget(QtGui.QFrame):
                 self.recthreads[ind].started.connect(
                     self.recworkers[ind].start)
 
-            for i in range(0, self.nr_cameras):
-                print('Starting recordings')
+            for i in range(0, self.nCameras):
                 ind = np.mod(self.main.currCamIdx + i, 2)
                 self.recthreads[ind].start()
 
     def endRecording(self):
         """ Function called when recording finishes to reset relevent
         parameters."""
-        if self.nr_cameras == 2 and (
+        if self.nCameras == 2 and (
                 not self.recworkers[0].done or not self.recworkers[1].done):
-            print('In first endRecordig "skip me" if')
+            pass
         else:
-            print('In endRecording')
             ind = self.main.currCamIdx
-            if self.showZgraph.checkState():
-                plt.figure()
-                plt.plot(self.recworkers[ind].z_stack)
-            if self.showZproj.checkState():
-                plt.imshow(self.recworkers[ind].Z_projection, cmap='gray')
 
-            for i in range(0, self.nr_cameras):
+            for i in range(0, self.nCameras):
                 ind = np.mod(self.main.currCamIdx + i, 2)
                 self.recthreads[ind].terminate()
                 # Same as done in Liveviewrun()
 
-            print('After terminating recording thread')
             if self.recMode != 4:
                 self.writable = True
                 self.readyToRecord = True
@@ -559,14 +543,13 @@ class RecordingWidget(QtGui.QFrame):
 
     def makeSavenames(self):
         try:
-            print('Dual camera mode is ' + str(self.DualCam.checkState()))
-            self.nr_cameras = 2
+            self.nCameras = 2
         except AttributeError:
-            self.nr_cameras = 1
+            self.nCameras = 1
         folder = self.folderEdit.text()
         if not os.path.exists(folder):
             os.mkdir(folder)
-        for i in range(0, self.nr_cameras):
+        for i in range(0, self.nCameras):
             ind = np.mod(self.main.currCamIdx + i, 2)
             # Sets name for final output file
             self.savenames[ind] = (os.path.join(folder, self.getFileName(
@@ -608,7 +591,7 @@ class RecWorker(QtCore.QObject):
         time.sleep(0.1)
 
         self.starttime = time.time()
-        numStored = 0  # number of frames stored
+        nStored = 0  # number of frames stored
         saveMode = self.main.formatBox.currentText()
 
         # Main loop for waiting until recording is finished and sending update
@@ -620,8 +603,8 @@ class RecWorker(QtCore.QObject):
                     nFrames = len(self.lvworker.fRecorded)
                     while nFrames < self.timeorframes and self.pressed:
                         time.sleep(0.01)
-                        newFrames = self.lvworker.fRecorded[numStored:]
-                        numStored += len(newFrames)
+                        newFrames = self.lvworker.fRecorded[nStored:]
+                        nStored += len(newFrames)
                         for frame in newFrames:
                             storeFile.save(frame)
                         self.updateSignal.emit()
@@ -634,10 +617,10 @@ class RecWorker(QtCore.QObject):
                     nFrames = len(self.lvworker.fRecorded)
                     while nFrames < self.timeorframes and self.pressed:
                         time.sleep(0.01)
-                        newFrames = self.lvworker.fRecorded[numStored:]
-                        dataset.resize((numStored+len(newFrames)), axis=0)
-                        dataset[numStored:] = newFrames
-                        numStored += len(newFrames)
+                        newFrames = self.lvworker.fRecorded[nStored:]
+                        dataset.resize((nStored+len(newFrames)), axis=0)
+                        dataset[nStored:] = newFrames
+                        nStored += len(newFrames)
                         self.updateSignal.emit()
 
         elif self.recMode == 2:
@@ -647,8 +630,8 @@ class RecWorker(QtCore.QObject):
                     while self.tRecorded < self.timeorframes and self.pressed:
                         self.tRecorded = time.time() - self.starttime
                         time.sleep(0.01)
-                        newFrames = self.lvworker.fRecorded[numStored:]
-                        numStored += len(newFrames)
+                        newFrames = self.lvworker.fRecorded[nStored:]
+                        nStored += len(newFrames)
                         for frame in newFrames:
                             storeFile.save(frame)
                         self.updateSignal.emit()
@@ -662,10 +645,10 @@ class RecWorker(QtCore.QObject):
                     while self.tRecorded < self.timeorframes and self.pressed:
                         self.tRecorded = time.time() - self.starttime
                         time.sleep(0.01)
-                        newFrames = self.lvworker.fRecorded[numStored:]
-                        dataset.resize((numStored + len(newFrames)), axis=0)
-                        dataset[numStored:] = newFrames
-                        numStored += len(newFrames)
+                        newFrames = self.lvworker.fRecorded[nStored:]
+                        dataset.resize((nStored + len(newFrames)), axis=0)
+                        dataset[nStored:] = newFrames
+                        nStored += len(newFrames)
                         self.updateSignal.emit()
 
         elif self.recMode in [3, 4]:
@@ -716,16 +699,17 @@ class RecWorker(QtCore.QObject):
             self.scanWidget.scanButton.click()
             if saveMode == 'tiff':
                 for i in range(stepsZ):
-                    with tiff.TiffWriter(self.savename+'_z'+str(i)+'.tiff',
-                                         software='Tormenta') as storeFile:
-                        while numStored != framesExpected*(i + 1) \
+                    name = self.savename + '_z' + str(i) + '.tiff'
+                    with tiff.TiffWriter(name, software='Tormenta') \
+                            as storeFile:
+                        while nStored != framesExpected*(i + 1) \
                                 and self.pressed:
                             time.sleep(0.01)
-                            newFrames = self.lvworker.fRecorded[numStored:]
-                            if numStored+len(newFrames) > framesExpected*(i+1):
-                                maxF = framesExpected*(i + 1) - numStored
+                            newFrames = self.lvworker.fRecorded[nStored:]
+                            if nStored + len(newFrames) > framesExpected*(i+1):
+                                maxF = framesExpected*(i + 1) - nStored
                                 newFrames = newFrames[:maxF]
-                            numStored += len(newFrames)
+                            nStored += len(newFrames)
                             for frame in newFrames:
                                 storeFile.save(frame)
                             self.updateSignal.emit()
@@ -737,17 +721,17 @@ class RecWorker(QtCore.QObject):
                         dataset = zPlane.create_dataset(
                             'Images', (1, self.shape[0], self.shape[1]),
                             maxshape=(None, self.shape[0], self.shape[1]))
-                        while numStored != framesExpected*(i+1)\
+                        while nStored != framesExpected*(i+1)\
                                 and self.pressed:
                             time.sleep(0.01)
-                            newFrames = self.lvworker.fRecorded[numStored:]
-                            if numStored+len(newFrames) > framesExpected*(i+1):
-                                maxF = framesExpected*(i+1)-numStored
+                            newFrames = self.lvworker.fRecorded[nStored:]
+                            if nStored+len(newFrames) > framesExpected*(i+1):
+                                maxF = framesExpected*(i+1)-nStored
                                 newFrames = newFrames[:maxF]
-                            size = (numStored-framesExpected*i+len(newFrames))
+                            size = (nStored-framesExpected*i+len(newFrames))
                             dataset.resize(size, axis=0)
-                            dataset[numStored:] = newFrames
-                            numStored += len(newFrames)
+                            dataset[nStored:] = newFrames
+                            nStored += len(newFrames)
                             self.updateSignal.emit()
 # >>>>>>> a2b00f479ff618b99a1c8fb8d63a5506fd2fd4bc
         else:
@@ -756,8 +740,8 @@ class RecWorker(QtCore.QObject):
                                      software='Tormenta') as storeFile:
                     while self.pressed:
                         time.sleep(0.01)
-                        newFrames = self.lvworker.fRecorded[numStored:]
-                        numStored += len(newFrames)
+                        newFrames = self.lvworker.fRecorded[nStored:]
+                        nStored += len(newFrames)
                         for frame in newFrames:
                             storeFile.save(frame)
                         self.updateSignal.emit()
@@ -770,13 +754,12 @@ class RecWorker(QtCore.QObject):
                     dataset = storeFile['Images']
                     while self.pressed:
                         time.sleep(0.01)
-                        newFrames = self.lvworker.fRecorded[numStored:]
-                        dataset.resize((numStored + len(newFrames)), axis=0)
-                        dataset[numStored:] = newFrames
-                        numStored += len(newFrames)
+                        newFrames = self.lvworker.fRecorded[nStored:]
+                        dataset.resize((nStored + len(newFrames)), axis=0)
+                        dataset[nStored:] = newFrames
+                        nStored += len(newFrames)
                         self.updateSignal.emit()
 
-        print('Number of recorded frame: ' + str(len(self.lvworker.fRecorded)))
         self.lvworker.stopRecording()
 
         self.done = True
@@ -881,7 +864,6 @@ class CamParamTree(ParameterTree):
     def attrs(self):
         attrs = []
         for ParName in self.p.getValues():
-            print(ParName)
             Par = self.p.param(str(ParName))
             if not(Par.hasChildren()):
                 attrs.append((str(ParName), Par.value()))
@@ -943,6 +925,8 @@ class LVWorker(QtCore.QObject):
                 self.main.latest_images[self.ind] = self.image
 
                 # stock frames while recording
+                # TODO: don't store data in a list. We should create an array
+                #       because we know the nFrames beforehand
                 if self.recording:
                     for hcDatum in hcData:
                         reshapedFrame = np.reshape(hcDatum.getData(),
@@ -953,7 +937,6 @@ class LVWorker(QtCore.QObject):
 
                 """Following is causing problems with two cameras..."""
     #            trigSource = self.orcaflash.getPropertyValue('trigSource')[0]
-    #            print('Trigger source = ', trigSource)
     #            if trigSource == 1:
     #                if self.mem == 3:
     #                    self.main.trigsourceparam.setValue('Internal trigger')
@@ -966,7 +949,6 @@ class LVWorker(QtCore.QObject):
     def stop(self):
         if self.running:
             self.running = False
-            print('Acquisition stopped')
         else:
             print('Cannot stop when not running (from LVThread)')
 
@@ -1423,7 +1405,6 @@ class TormentaGUI(QtGui.QMainWindow):
 
     def cropOrca(self, hpos, vpos, hsize, vsize):
         """Method to crop the frame read out by Orcaflash. """
-        print('cropping camera' + str(self.currCamIdx))
         self.cameras[self.currCamIdx].setPropertyValue('subarray_vpos', 0)
         self.cameras[self.currCamIdx].setPropertyValue('subarray_hpos', 0)
         self.cameras[self.currCamIdx].setPropertyValue(
@@ -1448,7 +1429,6 @@ class TormentaGUI(QtGui.QMainWindow):
         self.frameStart = (hpos, vpos)
         # Only place self.shapes is changed
         self.shapes[self.currCamIdx] = (hsize, vsize)
-        print('orca has been cropped to: ', vpos, hpos, vsize, hsize)
 
     def adjustFrame(self):
         """ Method to change the area of the sensor to be used and adjust the
@@ -1604,12 +1584,6 @@ class TormentaGUI(QtGui.QMainWindow):
         else:
             self.liveviewStop()
 
-    # Threading below is done in this way since making LVThread a QThread
-    # resulted in QTimer not functioning in the thread. Image is now also
-    # saved as latest_image in TormentaGUI class since setting image in GUI
-    # from thread resultet in issues when interacting with the viewbox from
-    # GUI. Maybe due to simultaious manipulation of viewbox from GUI and
-    # thread.
     def liveviewStart(self):
         ''' Threading below  is done in this way since making LVThread a
         QThread resulted in QTimer not functioning in the thread. Image is now
@@ -1732,5 +1706,4 @@ class TormentaGUI(QtGui.QMainWindow):
         self.RotalignWidget.closeEvent(*args, **kwargs)
         self.scanWidget.closeEvent(*args, **kwargs)
         self.FocusLockWidget.closeEvent(*args, **kwargs)
-
         super().closeEvent(*args, **kwargs)
