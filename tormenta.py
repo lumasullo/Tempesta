@@ -17,10 +17,10 @@ def main():
     app = QtGui.QApplication([])
 
     cobolt = 'cobolt.cobolt0601.Cobolt0601_f2'
-    with instruments.Laser(cobolt, 'COM13') as actlaser, \
+    with instruments.Laser(cobolt, 'COM10') as actlaser, \
             instruments.PZT(8) as pzt, instruments.Webcam() as webcam:
 
-        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM4', 'COM10'])
+        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM4', 'COM7'])
         exclaser = instruments.LaserTTL(0)
         orcaflashV3 = instruments.Camera(0)
         print(actlaser.idn)

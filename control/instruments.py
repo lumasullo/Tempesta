@@ -168,7 +168,7 @@ class LaserTTL(object):
         else:
             self.dotask = nidaqmx.Task('dotaskEnableTTL')
             self.dotask.do_channels.add_do_chan(
-                lines='Dev1/port0/line%s' % self.line,
+                lines='Dev2/port0/line%s' % self.line,
                 name_to_assign_to_lines='chan')
 
             self.dotask.timing.cfg_samp_clk_timing(
