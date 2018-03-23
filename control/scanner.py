@@ -21,7 +21,6 @@ import collections
 import nidaqmx
 
 import control.guitools as guitools
-import control.mpl_to_pyqtgraph as mplToPg
 
 from cv2 import rectangle, goodFeaturesToTrack, moments
 
@@ -899,7 +898,7 @@ class MultipleScanWidget(QtGui.QFrame):
         fovDock.addWidget(self.illumWgt)
 
         self.illumWgt3D = pg.ImageView()
-        pos, rgba = zip(*mplToPg.cmapToColormap(plt.get_cmap('inferno')))
+        pos, rgba = zip(*guitools.cmapToColormap(plt.get_cmap('inferno')))
         self.illumWgt3D.setColorMap(pg.ColorMap(pos, rgba))
         for tick in self.illumWgt3D.ui.histogram.gradient.ticks:
             tick.hide()
@@ -1235,7 +1234,7 @@ class IllumImageWidget(pg.GraphicsLayoutWidget):
         self.imgBack.setOpacity(0.5)
         self.histBack = pg.HistogramLUTItem(image=self.imgBack)
         self.histBack.vb.setLimits(yMin=0, yMax=66000)
-        pos, rgba = zip(*mplToPg.cmapToColormap(plt.get_cmap('viridis')))
+        pos, rgba = zip(*guitools.cmapToColormap(plt.get_cmap('viridis')))
         greensColormap = pg.ColorMap(pos, rgba)
         self.histBack.gradient.setColorMap(greensColormap)
         for tick in self.histBack.gradient.ticks:
