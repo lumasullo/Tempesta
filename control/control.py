@@ -1416,9 +1416,14 @@ class TormentaGUI(QtGui.QMainWindow):
             'subarray_hsize', 2048)
 
         # Round to closest "divisable by 4" value.
-        vpos = int(4 * np.ceil(vpos / 4))
-        hpos = int(4 * np.ceil(hpos / 4))
-        # V3 camera seems to only be able to take multiples of 128.
+#        vpos = int(4 * np.ceil(vpos / 4))
+#        hpos = int(4 * np.ceil(hpos / 4))
+        # Followinf is to adapt to the V3 camera on Fra's setup
+        vpos = int(128 * np.ceil(vpos / 128))
+        hpos = int(128 * np.ceil(hpos / 128))
+        vsize = int(128 * np.ceil(vsize / 128))
+        hsize = int(128 * np.ceil(hsize / 128))
+        
         minroi = 64
         vsize = int(min(2048 - vpos, minroi * np.ceil(vsize / minroi)))
         hsize = int(min(2048 - hpos, minroi * np.ceil(hsize / minroi)))

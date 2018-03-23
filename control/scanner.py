@@ -65,7 +65,7 @@ class Positionner(QtGui.QWidget):
         # Following loop creates the voltage channels
         for n in self.AOchans:
             self.aotask.ao_channels.add_ao_voltage_chan(
-                physical_channel='Dev2/ao%s' % n,
+                physical_channel='Dev1/ao%s' % n,
                 name_to_assign_to_channel=self.activeChannels[n],
                 min_val=minVolt[self.activeChannels[n]],
                 max_val=maxVolt[self.activeChannels[n]])

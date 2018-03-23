@@ -9,7 +9,6 @@ import importlib
 import control.mockers as mockers
 import numpy as np
 import nidaqmx
-from instrumental.drivers.cameras.uc480 import UC480_Camera
 
 
 class Laser(object):
@@ -168,7 +167,7 @@ class LaserTTL(object):
         else:
             self.dotask = nidaqmx.Task('dotaskEnableTTL')
             self.dotask.do_channels.add_do_chan(
-                lines='Dev2/port0/line%s' % self.line,
+                lines='Dev1/port0/line%s' % self.line,
                 name_to_assign_to_lines='chan')
 
             self.dotask.timing.cfg_samp_clk_timing(
@@ -183,28 +182,32 @@ class LaserTTL(object):
         pass
 
 
-class Camera(object):
+class Cameras(object):
     """ Buffer class for testing whether the camera is connected. If it's not,
     it returns a dummy class for program testing. """
-# TODO:
-    """This was originally (by Federico) called from tormenta.py using a "with"
-    call, as with the Lasers. But accoring to literature, "with" should be
-    used with classes having __enter__ and __exit functions defined.
-    For some reason this particular class gives "Error: class is missing
-    __exit__ fcn" (or similar)
-    Maybe it could be rewritten using __enter__  __exit__.
+#TODO:
+    """This was originally (by federico) called from tormenta.py using a "with" call, as with the Lasers. But
+    accoring to litterature, "with" should be used with classes having __enter__ and __exit functions defined. 
+    For some reason this particular class gives "Error: class is missing __exit__ fcn" (or similar)
+    Maybe it could be rewritten using __enter__  __exit__. 
     http://effbot.org/zone/python-with-statement.htm
-    Although I believe that design is more suitable for funcions that are
+    Although I believe that design is more suitable for funcions that are 
     called alot or environments that are used alot."""
-    def __new__(cls, id, *args, **kwargs):
-        try:
+
+
+    def __new__(cls, *args, **kwargs):
+        cameras = []
+        try:     
             import lantz.drivers.hamamatsu.hamamatsu_camera as hm
-            orcaflash = hm.HamamatsuCamera(id)
-            return orcaflash
+            for i in np.arange(hm.n_cameras):
+                print('Trying to import camera', i)
+                cameras.append(hm.HamamatsuCameraMR(i))
+                print('Initialized Hamamatsu Camera Object, model: ', cameras[i].camera_model)
+            return cameras
 
         except:
             print('Initializing Mock Hamamatsu')
-            return mockers.MockHamamatsu()
+            return [mockers.MockHamamatsu()]
 
 
 class PZT(object):
@@ -224,6 +227,7 @@ class Webcam(object):
 
     def __new__(cls):
         try:
+            from instrumental.drivers.cameras.uc480 import UC480_Camera
             webcam = UC480_Camera()
         except:
             webcam = mockers.MockWebcam()

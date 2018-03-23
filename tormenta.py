@@ -22,14 +22,13 @@ def main():
 
         offlaser = instruments.LinkedLaserCheck(cobolt, ['COM4', 'COM7'])
         exclaser = instruments.LaserTTL(0)
-        orcaflashV3 = instruments.Camera(0)
+        cameras = instruments.Cameras(0)
         print(actlaser.idn)
         print(exclaser.line)
         print(offlaser.idn)
-        print(orcaflashV3.camera_model)
 
         nidaq = nidaqmx.system.System.local().devices['Dev1']
-        win = control.TormentaGUI(actlaser, offlaser, exclaser, [orcaflashV3],
+        win = control.TormentaGUI(actlaser, offlaser, exclaser, cameras,
                                   nidaq, pzt, webcam)
         win.show()
 
