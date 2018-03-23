@@ -26,7 +26,6 @@ from lantz import Q_
 
 import control.lasercontrol as lasercontrol
 import control.scanner as scanner
-import control.align as align
 import control.guitools as guitools
 import control.focus as focus
 
@@ -1260,13 +1259,13 @@ class TormentaGUI(QtGui.QMainWindow):
 
         # Z align widget
         ZalignDock = Dock("Axial Alignment Tool", size=(1, 1))
-        self.ZalignWidget = align.AlignWidgetAverage(self)
+        self.ZalignWidget = guitools.AlignWidgetAverage(self)
         ZalignDock.addWidget(self.ZalignWidget)
         illumDockArea.addDock(ZalignDock, 'above', alignmentDock)
 
         # Rotational align widget
         RotalignDock = Dock("Rotational Alignment Tool", size=(1, 1))
-        self.RotalignWidget = align.AlignWidgetXYProject(self)
+        self.RotalignWidget = guitools.AlignWidgetXYProject(self)
         RotalignDock.addWidget(self.RotalignWidget)
         illumDockArea.addDock(RotalignDock, 'above', alignmentDock)
 
