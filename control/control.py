@@ -1100,9 +1100,13 @@ class TormentaGUI(QtGui.QMainWindow):
         cameraGrid.addWidget(self.tree, 1, 0)
 
         self.presetsMenu = QtGui.QComboBox()
-        controlFolder = os.path.split(os.path.realpath(__file__))[0]
-        os.chdir(controlFolder)
-        self.presetDir = os.path.join(controlFolder, 'Presets')
+        self.controlFolder = os.path.split(os.path.realpath(__file__))[0]
+        os.chdir(self.controlFolder)
+        self.presetDir = os.path.join(self.controlFolder, 'presets')
+
+        if not os.path.exists(self.presetDir):
+            os.makedirs(self.presetDir)
+
         for preset in os.listdir(self.presetDir):
             self.presetsMenu.addItem(preset)
         self.loadPresetButton = QtGui.QPushButton('Load preset')

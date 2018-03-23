@@ -1,0 +1,22 @@
+[pxParValues]
+start473 = 0.0
+end473 = 0.0
+startCAM = 0.0025
+endCAM = 0.0075
+end488 = 0.0075
+start405 = 0.0
+end405 = 0.0
+start488 = 0.0025
+
+[scanParValues]
+sizeZ = 1.0
+stepSizeXY = 0.1
+seqTime = 0.01
+sizeX = 1.0
+stepSizeZ = 0.1
+sizeY = 1.0
+
+[Modes]
+scanMode = VOL scan
+scan_or_not = True
+

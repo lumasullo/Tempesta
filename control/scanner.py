@@ -6,9 +6,11 @@ Created on Wed Mar 30 10:32:36 2016
     Aurelién Barbotin.
 """
 
+import os
 import numpy as np
 import time
 import re
+import configparser
 
 import pyqtgraph as pg
 from pyqtgraph.dockarea import Dock, DockArea
@@ -235,6 +237,66 @@ class Positionner(QtGui.QWidget):
             self.aotask.close()
 
 
+def saveScan(scanWid):
+
+        config = configparser.ConfigParser()
+        config.optionxform = str
+
+        config['pxParValues'] = scanWid.pxParValues
+        config['scanParValues'] = scanWid.scanParValues
+        config['Modes'] = {'scanMode': scanWid.scanMode.currentText(),
+                           'scan_or_not': scanWid.scanRadio.isChecked()}
+        fileName = QtGui.QFileDialog.getSaveFileName(scanWid, 'Save scan',
+                                                     scanWid.scanDir)
+        if fileName == '':
+            return
+
+        with open(fileName, 'w') as configfile:
+            config.write(configfile)
+
+
+def loadScan(scanWid):
+
+    config = configparser.ConfigParser()
+    config.optionxform = str
+
+    fileName = QtGui.QFileDialog.getOpenFileName(scanWid, 'Load scan',
+                                                 scanWid.scanDir)
+    if fileName == '':
+        return
+
+    config.read(fileName)
+
+    for key in scanWid.pxParValues:
+        scanWid.pxParValues[key] = float(config._sections['pxParValues'][key])
+        scanWid.pxParameters[key].setText(
+            str(1000*float(config._sections['pxParValues'][key])))
+
+    for key in scanWid.scanParValues:
+        value = config._sections['scanParValues'][key]
+        scanWid.scanParValues[key] = float(value)
+        if key == 'seqTime':
+            scanWid.scanPar[key].setText(
+                str(1000*float(config._sections['scanParValues'][key])))
+        else:
+            scanWid.scanPar[key].setText(
+                config._sections['scanParValues'][key])
+
+    scanOrNot = (config._sections['Modes']['scan_or_not'] == 'True')
+    scanWid.setScanOrNot(scanOrNot)
+    if scanOrNot:
+        scanWid.scanRadio.setChecked(True)
+    else:
+        scanWid.contLaserPulsesRadio.setChecked(True)
+
+    scanMode = config._sections['Modes']['scanMode']
+    scanWid.setScanMode(scanMode)
+    scanWid.scanMode.setCurrentIndex(scanWid.scanMode.findText(scanMode))
+
+    scanWid.updateScan(scanWid.allDevices)
+    scanWid.graph.update()
+
+
 class ScanWidget(QtGui.QMainWindow):
     ''' This class is intended as a widget in the bigger GUI, Thus all the
     commented parameters etc. It contain an instance of stageScan and
@@ -270,11 +332,16 @@ class ScanWidget(QtGui.QMainWindow):
 
         self.saveScanBtn = QtGui.QPushButton('Save Scan')
 
-        def saveScanFcn(): return guitools.saveScan(self)
+        self.scanDir = os.path.join(self.main.controlFolder, 'scans')
+
+        if not os.path.exists(self.scanDir):
+            os.makedirs(self.scanDir)
+
+        def saveScanFcn(): return saveScan(self)
         self.saveScanBtn.clicked.connect(saveScanFcn)
         self.loadScanBtn = QtGui.QPushButton('Load Scan')
 
-        def loadScanFcn(): return guitools.loadScan(self)
+        def loadScanFcn(): return loadScan(self)
         self.loadScanBtn.clicked.connect(loadScanFcn)
 
         self.sampleRateEdit = QtGui.QLineEdit()

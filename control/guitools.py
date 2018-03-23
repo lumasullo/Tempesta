@@ -119,68 +119,6 @@ def savePreset(main, filename=None):
     main.presetsMenu.addItem(filename)
 
 
-scanDir = 'E:\Tempesta\Saved_scan_settings'
-
-
-def saveScan(scanWid):
-
-        config = configparser.ConfigParser()
-        config.optionxform = str
-
-        config['pxParValues'] = scanWid.pxParValues
-        config['scanParValues'] = scanWid.scanParValues
-        config['Modes'] = {'scanMode': scanWid.scanMode.currentText(),
-                           'scan_or_not': scanWid.scanRadio.isChecked()}
-        fileName = QtGui.QFileDialog.getSaveFileName(scanWid, 'Save scan',
-                                                     scanDir)
-        if fileName == '':
-            return
-
-        with open(fileName, 'w') as configfile:
-            config.write(configfile)
-
-
-def loadScan(scanWid):
-
-    config = configparser.ConfigParser()
-    config.optionxform = str
-
-    fileName = QtGui.QFileDialog.getOpenFileName(scanWid, 'Load scan', scanDir)
-    if fileName == '':
-        return
-
-    config.read(fileName)
-
-    for key in scanWid.pxParValues:
-        scanWid.pxParValues[key] = float(config._sections['pxParValues'][key])
-        scanWid.pxParameters[key].setText(
-            str(1000*float(config._sections['pxParValues'][key])))
-
-    for key in scanWid.scanParValues:
-        value = config._sections['scanParValues'][key]
-        scanWid.scanParValues[key] = float(value)
-        if key == 'seqTime':
-            scanWid.scanPar[key].setText(
-                str(1000*float(config._sections['scanParValues'][key])))
-        else:
-            scanWid.scanPar[key].setText(
-                config._sections['scanParValues'][key])
-
-    scanOrNot = (config._sections['Modes']['scan_or_not'] == 'True')
-    scanWid.setScanOrNot(scanOrNot)
-    if scanOrNot:
-        scanWid.scanRadio.setChecked(True)
-    else:
-        scanWid.contLaserPulsesRadio.setChecked(True)
-
-    scanMode = config._sections['Modes']['scanMode']
-    scanWid.setScanMode(scanMode)
-    scanWid.scanMode.setCurrentIndex(scanWid.scanMode.findText(scanMode))
-
-    scanWid.updateScan(scanWid.allDevices)
-    scanWid.graph.update()
-
-
 def loadPreset(main, filename=None):
 
     tree = main.tree.p
