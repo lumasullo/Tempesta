@@ -1,2 +1,0 @@
-160211
-Changes in setPropertyValue and setSubArrayMode. Changes described above function as comments.

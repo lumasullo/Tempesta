@@ -5,31 +5,11 @@ Created on Sun Dec 28 13:25:27 2014
 @author: federico
 """
 
-import numpy as np
 import importlib
-
-from lantz.drivers.andor.ccd import CCD
-#   from lantz.drivers.labjack.t7 import T7
-from lantz import Q_
-
-
-import pygame
-import pygame.camera
-
 import control.mockers as mockers
-
-
-class Webcam(object):
-
-    def __new__(cls, *args):
-        try:
-            pygame.camera.init()
-            webcam = pygame.camera.Camera(pygame.camera.list_cameras()[0])
-            webcam.start()
-            return webcam
-
-        except:
-            return mockers.MockWebcam()
+import numpy as np
+import nidaqmx
+from instrumental.drivers.cameras.uc480 import UC480_Camera
 
 
 class Laser(object):
@@ -37,149 +17,214 @@ class Laser(object):
     def __new__(cls, iName, *args):
         try:
             pName, driverName = iName.rsplit('.', 1)
-            package = importlib.import_module('lantz.drivers.' + pName)
+            package = importlib.import_module('lantz.drivers.legacy.' + pName)
             driver = getattr(package, driverName)
             laser = driver(*args)
             laser.initialize()
-        
             return driver(*args)
 
         except:
             return mockers.MockLaser()
 
 
-class DAQ(object):
-    def __new__(cls, *args):
+class LinkedLaserCheck(object):
 
+    def __new__(cls, iName, ports):
         try:
-            from labjack import ljm
-            handle = ljm.openS("ANY", "ANY", "ANY")
-            ljm.close(handle)
-            return STORMDAQ(*args)
+            pName, driverName = iName.rsplit('.', 1)
+            package = importlib.import_module('lantz.drivers.legacy.' + pName)
+            driver = getattr(package, driverName)
+            laser0 = driver(ports[0])
+            laser0.initialize()
+            laser1 = driver(ports[1])
+            laser1.initialize()
+            return LinkedLaser([laser0, laser1])
 
         except:
-            return mockers.MockDAQ()
+            return mockers.MockLaser()
 
 
-#class STORMDAQ(T7):
-#    """ Subclass of the Labjack lantz driver. """
-#    def __init__(self, *args):
-#
-#        super().__init__(*args)
-#        super().initialize(*args)
-#
-#        # Clock configuration for the flipper
-#        self.writeName("DIO_EF_CLOCK0_ENABLE", 0)
-#        self.writeName("DIO_EF_CLOCK0_DIVISOR", 1)
-#        self.writeName("DIO_EF_CLOCK0_ROLL_VALUE", 1600000)
-#        self.writeName("DIO_EF_CLOCK0_ENABLE", 1)
-#        self.writeName("DIO2_EF_ENABLE", 0)
-#        self.writeName("DIO2_EF_INDEX", 0)
-#        self.writeName("DIO2_EF_OPTIONS", 0)
-#        self.flipperState = True
-#        self.flipper = self.flipperState
-#        self.writeName("DIO2_EF_ENABLE", 1)
-#
-#    @property
-#    def flipper(self):
-#        """ Flipper True means the ND filter is in the light path."""
-#        return self.flipperState
-#
-#    @flipper.setter
-#    def flipper(self, value):
-#        if value:
-#            self.writeName("DIO2_EF_CONFIG_A", 150000)
-#        else:
-#            self.writeName("DIO2_EF_CONFIG_A", 72000)
-#
-#        self.flipperState = value
-#
-#    def toggleFlipper(self):
-#        self.flipper = not(self.flipper)
+class LinkedLaser(object):
+
+    def __init__(self, lasers):
+        self.lasers = lasers
+
+    @property
+    def idn(self):
+        return 'Linked Lasers' + self.lasers[0].idn + self.lasers[1].idn
+
+    @property
+    def autostart(self):
+        return self.lasers[0].autostart
+
+    @autostart.setter
+    def autostart(self, value):
+        self.lasers[0].autostart = self.lasers[1].autostart = value
+
+    @property
+    def enabled(self):
+        return self.lasers[0].enabled
+
+    @enabled.setter
+    def enabled(self, value):
+        self.lasers[0].enabled = self.lasers[1].enabled = value
+
+    @property
+    def power(self):
+        return self.lasers[0].power + self.lasers[1].power
+
+    @property
+    def power_sp(self):
+        return self.lasers[0].power_sp + self.lasers[1].power_sp
+
+    @power_sp.setter
+    def power_sp(self, value):
+        self.lasers[0].power_sp = self.lasers[1].power_sp = 0.5*value
+
+    @property
+    def digital_mod(self):
+        return self.lasers[0].digital_mode
+
+    @digital_mod.setter
+    def digital_mod(self, value):
+        self.lasers[0].digital_mod = self.lasers[1].digital_mod = value
+
+    @property
+    def mod_mode(self):
+        return [self.lasers[0].mod_mode, self.lasers[1].mod_mode]
+
+    def enter_mod_mode(self):
+        [self.lasers[i].enter_mod_mode() for i in [0, 1]]
+
+    def changeEdit(self):
+        [self.lasers[i].changeEdit() for i in [0, 1]]
+
+    def query(self, value):
+        [self.lasers[i].query(value) for i in [0, 1]]
+
+    @property
+    def power_mod(self):
+        """Laser modulated power (mW).
+        """
+        return self.lasers[0].power_mod + self.lasers[1].power_mod
+
+    @power_mod.setter
+    def power_mod(self, value):
+        self.lasers[0].power_mod = self.lasers[1].power_mod = 0.5*value
+
+    def finalize(self):
+        self.lasers[0].finalize()
+        self.lasers[1].finalize()
 
 
-class ScanZ(object):
-    def __new__(cls, *args):
+class LaserTTL(object):
+    def __init__(self, line):
+        self.line = line
+        self.power = None
+        # Nidaq task
+        self.digital_mod = False
 
+        self.enabled = False
+
+    @property
+    def enabled(self):
+        return self._enabled
+
+    @enabled.setter
+    def enabled(self, value):
         try:
-            from lantz.drivers.prior.nanoscanz import NanoScanZ
-            scan = NanoScanZ(*args)
-            scan.initialize()
-            return scan
-
+            self.dotask
         except:
-            return mockers.MockScanZ()
+            self.dotask = nidaqmx.Task('dotaskEnableTTL')
+            self.dotask.do_channels.add_do_chan(
+                lines='Dev1/port0/line%s' % self.line,
+                name_to_assign_to_lines='chan')
+
+            self.dotask.timing.cfg_samp_clk_timing(
+               source=r'100kHzTimeBase',
+               rate=100000,
+               sample_mode=nidaqmx.constants.AcquisitionType.FINITE)
+
+        if value:
+            self.dotask.write(np.ones(100, dtype=bool), auto_start=True)
+            self.dotask.wait_until_done()
+            self.dotask.stop()
+        else:
+            self.dotask.write(np.zeros(100, dtype=bool), auto_start=True)
+            self.dotask.wait_until_done()
+            self.dotask.stop()
+
+        self._enabled = value
+
+    @property
+    def digital_mod(self):
+        return self._digital_mod
+
+    @digital_mod.setter
+    def digital_mod(self, value):
+        if value:
+            print('Closing task in LaserTTL')
+            self.dotask.close()
+        else:
+            self.dotask = nidaqmx.Task('dotaskEnableTTL')
+            self.dotask.do_channels.add_do_chan(
+                lines='Dev2/port0/line%s' % self.line,
+                name_to_assign_to_lines='chan')
+
+            self.dotask.timing.cfg_samp_clk_timing(
+               source=r'100kHzTimeBase',
+               rate=100000,
+               sample_mode=nidaqmx.constants.AcquisitionType.FINITE)
+
+    def enter_mod_mode(self):
+        pass
+
+    def query(self, value):
+        pass
 
 
 class Camera(object):
     """ Buffer class for testing whether the camera is connected. If it's not,
     it returns a dummy class for program testing. """
-#TODO:
-    """This was originally (by federico) called from tormenta.py using a "with" call, as with the Lasers. But
-    accoring to litterature, "with" should be used with classes having __enter__ and __exit functions defined. 
-    For some reason this particular class gives "Error: class is missing __exit__ fcn" (or similar)
-    Maybe it could be rewritten using __enter__  __exit__. 
+# TODO:
+    """This was originally (by Federico) called from tormenta.py using a "with"
+    call, as with the Lasers. But accoring to literature, "with" should be
+    used with classes having __enter__ and __exit functions defined.
+    For some reason this particular class gives "Error: class is missing
+    __exit__ fcn" (or similar)
+    Maybe it could be rewritten using __enter__  __exit__.
     http://effbot.org/zone/python-with-statement.htm
-    Although I believe that design is more suitable for funcions that are 
+    Although I believe that design is more suitable for funcions that are
     called alot or environments that are used alot."""
-
-
-    def __new__(cls, *args):
-
-        try:     
+    def __new__(cls, id, *args, **kwargs):
+        try:
             import lantz.drivers.hamamatsu.hamamatsu_camera as hm
-            orcaflash = hm.HamamatsuCameraMR(0)
-            print('Initializing Hamamatsu Camera Object, model: ', orcaflash.camera_model)
+            orcaflash = hm.HamamatsuCamera(id)
             return orcaflash
 
         except:
-            import control.MockHamamatsu as MockHamamatsu
             print('Initializing Mock Hamamatsu')
-            return MockHamamatsu.MockHamamatsu()
+            return mockers.MockHamamatsu()
 
 
-#class OrcaflashCamera(hm.HamamatsuCameraMR):
-#
-#
-#    def __init__(self, camera_id):
-#        hm.HamamatsuCameraMR.__init__(self, camera_id)
-#
-##            pName, driverName = iName.rsplit('.', 1)
-##            package = importlib.import_module('lantz.drivers.' + pName)
-##            driver = getattr(package, driverName)
-##            camera = driver(*args)
-##            camera.lib.Initialize()
+class PZT(object):
+
+    def __new__(cls, port, *args):
+        try:
+            from lantz.drivers.piezosystemjena.nv401 import nv401
+            inst = nv401.via_serial(port)
+            inst.initialize()
+            inst.position
+            return inst
+        except:
+            return mockers.MockPZT()
 
 
-class STORMCamera(CCD):
-    """ Subclass of the Andor's lantz driver. It adapts to our needs the whole
-    functionality of the camera. """
+class Webcam(object):
 
-    def __init__(self, *args, **kwargs):
-
-        super().__init__(*args, **kwargs)
-        super().initialize(*args, **kwargs)
-
-        self.s = Q_(1, 's')
-        self.mock = False
-
-        # Default imaging parameters
-        self.readout_mode = 'Image'
-        self.trigger_mode = 'Internal'
-        self.EM_advanced_enabled = False
-        self.EM_gain_mode = 'RealGain'
-        self.amp_typ = 0
-        self.set_accum_time(0 * self.s)          # Minimum accumulation and
-        self.set_kinetic_cycle_time(0 * self.s)  # kinetic times
-
-        # Lists needed for the ParameterTree
-        self.PreAmps = np.around([self.true_preamp(n)
-                                  for n in np.arange(self.n_preamps)],
-                                 decimals=1)[::-1]
-        self.HRRates = [self.true_horiz_shift_speed(n)
-                        for n in np.arange(self.n_horiz_shift_speeds())][::-1]
-        self.vertSpeeds = [np.round(self.true_vert_shift_speed(n), 1)
-                           for n in np.arange(self.n_vert_shift_speeds)]
-        self.vertAmps = ['+' + str(self.true_vert_amp(n))
-                         for n in np.arange(self.n_vert_clock_amps)]
-        self.vertAmps[0] = 'Normal'
+    def __new__(cls):
+        try:
+            webcam = UC480_Camera()
+        except:
+            webcam = mockers.MockWebcam()
+        return webcam

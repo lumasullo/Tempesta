@@ -2,55 +2,35 @@
 """
 Created on Thu May 21 13:19:31 2015
 
-@author: federico
+@author: Barabas, Bodén, Masullo
 """
 from pyqtgraph.Qt import QtGui
+import nidaqmx
+import sys
+
+from control import control
+import control.instruments as instruments
+
 
 def main():
 
-    from control import control
-    import control.instruments as instruments    
-    
     app = QtGui.QApplication([])
 
-#TO DO: create an instruments.Camera(hamamatsu) or something similar
+    cobolt = 'cobolt.cobolt0601.Cobolt0601_f2'
+    with instruments.Laser(cobolt, 'COM10') as actlaser, \
+            instruments.PZT(8) as pzt, instruments.Webcam() as webcam:
 
-#    with instruments.Camera('hamamatsu.hamamatsu_camera.HamamatsuCameraMR') as orcaflash, \
-    with instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM12') as bluelaser, \
-         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM13') as bluelaser2, \
-         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM5') as greenlaser, \
-         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM7') as violetlaser, \
-         instruments.Laser('cobolt.cobolt0601.Cobolt0601', 'COM10') as uvlaser, \
-         instruments.DAQ() as daq, instruments.ScanZ(12) as scanZ:
-        #instruments.Camera('andor.ccd.CCD') as andor, \
+        offlaser = instruments.LinkedLaserCheck(cobolt, ['COM4', 'COM7'])
+        exclaser = instruments.LaserTTL(0)
+        orcaflashV3 = instruments.Camera(0)
+        print(actlaser.idn)
+        print(exclaser.line)
+        print(offlaser.idn)
+        print(orcaflashV3.camera_model)
 
-         
-#for now, bluelaser is the 488nm laser, greenlaser is the 405nm laser and redlaser is the 355nm laser
-        orcaflash = instruments.Camera()
-        print(bluelaser.idn)
-        print(bluelaser2.idn)
-        print(greenlaser.idn)        
-        print(violetlaser.idn)
-        print(uvlaser.idn)
-        print(daq.idn)
-        print('Prior Z stage')
-
-        win = control.TormentaGUI(bluelaser, bluelaser2, greenlaser, violetlaser, uvlaser,
-                                  scanZ, daq, orcaflash)
+        nidaq = nidaqmx.system.System.local().devices['Dev1']
+        win = control.TormentaGUI(actlaser, offlaser, exclaser, [orcaflashV3],
+                                  nidaq, pzt, webcam)
         win.show()
 
-        app.exec_()
-
-
-def analysisApp():
-
-    from analysis import analysis
-
-    app = QtGui.QApplication([])
-
-    win = analysis.AnalysisWidget()
-    win.show()
-
-    app.exec_()
-
-    
+        sys.exit(app.exec_())

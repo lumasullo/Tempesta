@@ -1,0 +1,22 @@
+[pxParValues]
+start473 = 0.0
+end488 = 0.0075
+startCAM = 0.0025
+end473 = 0.0
+end405 = 0.0
+start405 = 0.0
+start488 = 0.0025
+endCAM = 0.0075
+
+[scanParValues]
+sizeY = 2.0
+stepSizeZ = 1.0
+seqTime = 0.01
+sizeX = 2.0
+sizeZ = 10.0
+stepSizeXY = 0.025
+
+[Modes]
+scan_or_not = True
+scanMode = FOV scan
+

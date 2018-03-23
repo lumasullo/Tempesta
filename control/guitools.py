@@ -6,14 +6,17 @@ Created on Fri Feb  6 13:20:02 2015
 """
 import os
 import time
-import pyqtgraph as pg
 import numpy as np
 import h5py as hdf
 import tifffile as tiff
 import configparser
+import collections
 from ast import literal_eval
 
-from PyQt4 import QtCore, QtGui
+import pyqtgraph as pg
+from pyqtgraph.Qt import QtCore, QtGui
+import pyqtgraph.ptime as ptime
+
 from tkinter import Tk, filedialog, simpledialog
 
 from lantz import Q_
@@ -118,62 +121,7 @@ def savePreset(main, filename=None):
 
     main.presetsMenu.addItem(filename)
 
-def saveScan(scanWid):
-    
-        config = configparser.ConfigParser()
-        config.optionxform = str
-    
-        config['Pixel_par_values'] = scanWid.pixel_par_values
-        config['Scan_par_values'] = scanWid.scan_par_values
-        config['Modes'] = {'scan_mode': scanWid.Scan_Mode.currentText(), 'scan_or_not': scanWid.scanRadio.isChecked()}
-        fileName = QtGui.QFileDialog.getSaveFileName(scanWid, 'Save scan', 'E:\Tempesta\Saved_scan_settings')
-        if fileName == '':
-            return
-            
-        with open(fileName, 'w') as configfile:
-            config.write(configfile)
 
-def loadScan(scanWid):
-    
-    config = configparser.ConfigParser()
-    config.optionxform = str
-    
-    fileName = QtGui.QFileDialog.getOpenFileName(scanWid, 'Load scan', 'E:\Tempesta\Saved_scan_settings')
-    if fileName == '':
-        return
-        
-    config.read(fileName)
-    
-    for key in scanWid.pixel_par_values:
-        scanWid.pixel_par_values[key] = float(config._sections['Pixel_par_values'][key])
-        scanWid.pixel_parameters[key].setText(str(1000*float(config._sections['Pixel_par_values'][key])))
-        
-    for key in scanWid.scan_par_values:
-        scanWid.scan_par_values[key] = float(config._sections['Scan_par_values'][key])
-        if key == 'sequence_time':
-            scanWid.scan_parameters[key].setText(str(1000*float(config._sections['Scan_par_values'][key])))
-        else:
-            scanWid.scan_parameters[key].setText(config._sections['Scan_par_values'][key])
-    
-    scanOrNot = (config._sections['Modes']['scan_or_not'] == 'True')
-    scanWid.setScanOrNot(scanOrNot)
-    if scanOrNot:
-        scanWid.scanRadio.setChecked(True)
-    else:
-        scanWid.contLaserPulsesRadio.setChecked(True)
-    
-    scan_mode = config._sections['Modes']['scan_mode']
-    scanWid.setScanMode(scan_mode)
-    scanWid.Scan_Mode.setCurrentIndex(scanWid.Scan_Mode.findText(scan_mode))
-    
-    scanWid.update_Scan(scanWid.all_devices)
-    scanWid.graph.update()
-
-        
-    
-        
-        
-        
 def loadPreset(main, filename=None):
 
     tree = main.tree.p
@@ -227,6 +175,154 @@ def loadPreset(main, filename=None):
     tree.param('Gain').param(pag).setValue(float(configCam[pag]))
 
     tree.param('Gain').param('EM gain').setValue(int(configCam['EM gain']))
+
+
+def mouseMoved(main, pos):
+    if main.vb.sceneBoundingRect().contains(pos):
+        mousePoint = main.vb.mapSceneToView(pos)
+        x, y = int(mousePoint.x()), int(main.shape[1] - mousePoint.y())
+        main.cursorPos.setText('{}, {}'.format(x, y))
+        countsStr = '{} counts'.format(main.image[x, int(mousePoint.y())])
+        main.cursorPosInt.setText(countsStr)
+
+
+def bestLimits(arr):
+    # Best cmin, cmax algorithm taken from ImageJ routine:
+    # http://cmci.embl.de/documents/120206pyip_cooking/
+    # python_imagej_cookbook#automatic_brightnesscontrast_button
+    pixelCount = arr.size
+    limit = pixelCount/10
+    threshold = pixelCount/5000
+    hist, bin_edges = np.histogram(arr, 256)
+    i = 0
+    found = False
+    count = 0
+    while True:
+        i += 1
+        count = hist[i]
+        if count > limit:
+            count = 0
+        found = count > threshold
+        if found or i >= 255:
+            break
+    hmin = i
+
+    i = 256
+    while True:
+        i -= 1
+        count = hist[i]
+        if count > limit:
+            count = 0
+        found = count > threshold
+        if found or i < 1:
+            break
+    hmax = i
+
+    return bin_edges[hmin], bin_edges[hmax]
+
+
+def cmapToColormap(cmap, nTicks=16):
+    """
+    The function 'cmapToColormap' converts the Matplotlib format to the
+    internal format of PyQtGraph that is used in the GradientEditorItem. The
+    function itself has no dependencies on Matplotlib! Hence the weird if
+    clauses with 'hasattr' instead of 'isinstance'.
+
+    Parameters:
+    *cmap*: Cmap object. Imported from matplotlib.cm.*
+    *nTicks*: Number of ticks to create when dict of functions is used.
+    Otherwise unused.
+
+    taken from
+    https://github.com/honkomonk/pyqtgraph_sandbox
+
+    """
+
+    # Case #1: a dictionary with 'red'/'green'/'blue' values as list of ranges
+    # (e.g. 'jet')
+    # The parameter 'cmap' is a 'matplotlib.colors.LinearSegmentedColormap'
+    # instance ...
+    if hasattr(cmap, '_segmentdata'):
+        colordata = getattr(cmap, '_segmentdata')
+        if ('red' in colordata) and isinstance(
+                colordata['red'], collections.Sequence):
+
+            # collect the color ranges from all channels into one dict to get
+            # unique indices
+            posDict = {}
+            for idx, channel in enumerate(('red', 'green', 'blue')):
+                for colorRange in colordata[channel]:
+                    posDict.setdefault(
+                        colorRange[0], [-1, -1, -1])[idx] = colorRange[2]
+
+            indexList = sorted(posDict.keys())
+            # interpolate missing values (== -1)
+            for channel in range(3):  # R,G,B
+                startIdx = indexList[0]
+                emptyIdx = []
+                for curIdx in indexList:
+                    if posDict[curIdx][channel] == -1:
+                        emptyIdx.append(curIdx)
+                    elif curIdx != indexList[0]:
+                        for eIdx in emptyIdx:
+                            rPos = (eIdx - startIdx) / (curIdx - startIdx)
+                            vStart = posDict[startIdx][channel]
+                            vRange = (
+                                posDict[curIdx][channel] -
+                                posDict[startIdx][channel])
+                            posDict[eIdx][channel] = rPos * vRange + vStart
+                        startIdx = curIdx
+                        del emptyIdx[:]
+            for channel in range(3):  # R,G,B
+                for curIdx in indexList:
+                    posDict[curIdx][channel] *= 255
+
+            rgb_list = [[i, posDict[i]] for i in indexList]
+
+        # Case #2: a dictionary with 'red'/'green'/'blue' values as functions
+        # (e.g. 'gnuplot')
+        elif ('red' in colordata) and isinstance(colordata['red'],
+                                                 collections.Callable):
+            indices = np.linspace(0., 1., nTicks)
+            luts = [
+                np.clip(
+                    np.array(
+                        colordata[rgb](indices),
+                        dtype=np.float),
+                    0,
+                    1) *
+                255 for rgb in (
+                    'red',
+                    'green',
+                    'blue')]
+            rgb_list = zip(indices, list(zip(*luts)))
+
+    # If the parameter 'cmap' is a 'matplotlib.colors.ListedColormap'
+    # instance, with the attributes 'colors' and 'N'
+    elif hasattr(cmap, 'colors') and hasattr(cmap, 'N'):
+        colordata = getattr(cmap, 'colors')
+        # Case #3: a list with RGB values (e.g. 'seismic')
+        if len(colordata[0]) == 3:
+            indices = np.linspace(0., 1., len(colordata))
+            scaledRgbTuples = [
+                (rgbTuple[0] * 255,
+                 rgbTuple[1] * 255,
+                    rgbTuple[2] * 255) for rgbTuple in colordata]
+            rgb_list = zip(indices, scaledRgbTuples)
+
+        # Case #4: a list of tuples with positions and RGB-values
+        # (e.g. 'terrain') -> this section is probably not needed anymore!?
+        elif len(colordata[0]) == 2:
+            rgb_list = [(idx, (vals[0] * 255, vals[1] * 255, vals[2] * 255))
+                        for idx, vals in colordata]
+
+    # Case #X: unknown format or datatype was the wrong object type
+    else:
+        raise ValueError("[cmapToColormap] Unknown cmap format or not a cmap!")
+
+    # Convert the RGB float values to RGBA integer values
+    return list([(pos, (int(r), int(g), int(b), 255))
+                 for pos, (r, g, b) in rgb_list])
 
 
 class TiffConverterThread(QtCore.QThread):
@@ -301,27 +397,24 @@ class TiffConverter(QtCore.QObject):
 
 class Grid():
 
-    def __init__(self, viewBox, shape):
+    def __init__(self, viewBox):
 
         self.showed = False
         self.vb = viewBox
-        self.shape = shape
-        pen = QtGui.QPen(QtCore.Qt.yellow, 0.75, QtCore.Qt.DotLine)
-        pen2 = QtGui.QPen(QtCore.Qt.yellow, 1, QtCore.Qt.SolidLine)
+        self.shape = None
+        pen = QtGui.QPen(QtCore.Qt.yellow, 2, QtCore.Qt.DotLine)
+        pen2 = QtGui.QPen(QtCore.Qt.yellow, 2.5, QtCore.Qt.SolidLine)
 
-        self.yline1 = pg.InfiniteLine(pos=0.25*self.shape[0], pen=pen)
-        self.yline2 = pg.InfiniteLine(pos=0.375*self.shape[0], pen=pen)
-        self.yline3 = pg.InfiniteLine(pos=0.50*self.shape[0], pen=pen2)
-        self.yline4 = pg.InfiniteLine(pos=0.625*self.shape[0], pen=pen)
-        self.yline5 = pg.InfiniteLine(pos=0.75*self.shape[0], pen=pen)
-        self.xline1 = pg.InfiniteLine(pos=0.25*self.shape[1], pen=pen, angle=0)
-        self.xline2 = pg.InfiniteLine(pos=0.375*self.shape[1], pen=pen2,
-                                      angle=0)
-        self.xline3 = pg.InfiniteLine(pos=0.50*self.shape[1], pen=pen2,
-                                      angle=0)
-        self.xline4 = pg.InfiniteLine(pos=0.625*self.shape[1], pen=pen2,
-                                      angle=0)
-        self.xline5 = pg.InfiniteLine(pos=0.75*self.shape[1], pen=pen, angle=0)
+        self.yline1 = pg.InfiniteLine(pen=pen)
+        self.yline2 = pg.InfiniteLine(pen=pen)
+        self.yline3 = pg.InfiniteLine(pen=pen2)
+        self.yline4 = pg.InfiniteLine(pen=pen)
+        self.yline5 = pg.InfiniteLine(pen=pen)
+        self.xline1 = pg.InfiniteLine(pen=pen, angle=0)
+        self.xline2 = pg.InfiniteLine(pen=pen2, angle=0)
+        self.xline3 = pg.InfiniteLine(pen=pen2, angle=0)
+        self.xline4 = pg.InfiniteLine(pen=pen2, angle=0)
+        self.xline5 = pg.InfiniteLine(pen=pen, angle=0)
 
     def update(self, shape):
         self.yline1.setPos(0.25*shape[0])
@@ -483,7 +576,7 @@ class ROI(pg.ROI):
     def hide(self, *args, **kwargs):
         super().hide(*args, **kwargs)
         self.label.hide()
-        
+
     def show(self, *args, **kwargs):
         super().show(*args, **kwargs)
         self.label.show()
@@ -499,3 +592,226 @@ class cropROI(pg.ROI):
                         scaleSnap=True, translateSnap=True, movable=False,
                         pen='y', *args, **kwargs)
         self.addScaleHandle((0, 1), (1, 0))
+
+
+class AlignWidgetAverage(QtGui.QFrame):
+
+    def __init__(self, main, *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+
+        self.main = main
+
+        self.ROI = ROI((50, 50), self.main.vb, (0, 0), handlePos=(1, 0),
+                       handleCenter=(0, 1), color=pg.mkPen(255, 0, 0),
+                       scaleSnap=True, translateSnap=True)
+
+        self.ROI.hide()
+        self.graph = SumpixelsGraph()
+        self.roiButton = QtGui.QPushButton('Show ROI')
+        self.roiButton.setCheckable(True)
+        self.roiButton.clicked.connect(self.ROItoggle)
+        self.resetButton = QtGui.QPushButton('Reset graph')
+        self.resetButton.clicked.connect(self.resetGraph)
+
+        grid = QtGui.QGridLayout()
+        self.setLayout(grid)
+        grid.addWidget(self.graph, 0, 0, 1, 6)
+        grid.addWidget(self.roiButton, 1, 0, 1, 1)
+        grid.addWidget(self.resetButton, 1, 1, 1, 1)
+        grid.setRowMinimumHeight(0, 300)
+
+        self.scansPerS = 10
+        self.alignTime = 1000 / self.scansPerS
+        self.alignTimer = QtCore.QTimer()
+        self.alignTimer.timeout.connect(self.updateValue)
+#        self.alignTimer.start(self.alignTime)
+
+    def resetGraph(self):
+        self.graph.resetData()
+
+    def ROItoggle(self):
+        if self.roiButton.isChecked() is False:
+            self.ROI.hide()
+            self.alignTimer.stop()
+            self.roiButton.setText('Show ROI')
+        else:
+            self.ROI.show()
+            self.roiButton.setText('Hide ROI')
+            self.alignTimer.start(self.alignTime)
+
+    def updateValue(self):
+
+        if self.main.liveviewButton.isChecked():
+            self.selected = self.ROI.getArrayRegion(
+                self.main.latest_images[self.main.currCamIdx], self.main.img)
+            value = np.mean(self.selected)
+            self.graph.updateGraph(value)
+        else:
+            pass
+
+    def closeEvent(self, *args, **kwargs):
+
+        self.alignTimer.stop()
+
+        super().closeEvent(*args, **kwargs)
+
+
+class SumpixelsGraph(pg.GraphicsWindow):
+    """The graph window class"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.setWindowTitle('Average of area')
+        self.setAntialiasing(True)
+
+        self.npoints = 400
+        self.data = np.zeros(self.npoints)
+        self.ptr = 0
+
+        # Graph without a fixed range
+        self.statistics = pg.LabelItem(justify='right')
+        self.addItem(self.statistics)
+        self.statistics.setText('---')
+        self.plot = self.addPlot(row=1, col=0)
+        self.plot.setLabels(bottom=('Time', 's'), left=('Intensity', 'au'))
+        self.plot.showGrid(x=True, y=True)
+        self.sumCurve = self.plot.plot(pen='y')
+
+        self.time = np.zeros(self.npoints)
+        self.startTime = ptime.time()
+
+    def resetData(self):
+        """Set all data points to zero, useful if going from very large values
+        to very small values"""
+        self.data = np.zeros(self.npoints)
+        self.time = np.zeros(self.npoints)
+        self.startTime = ptime.time()
+        self.ptr = 0
+
+    def updateGraph(self, value):
+        """ Update the data displayed in the graphs
+        """
+        if self.ptr < self.npoints:
+            self.data[self.ptr] = value
+            self.time[self.ptr] = ptime.time() - self.startTime
+            self.sumCurve.setData(self.time[1:self.ptr + 1],
+                                  self.data[1:self.ptr + 1])
+
+        else:
+            self.data[:-1] = self.data[1:]
+            self.data[-1] = value
+            self.time[:-1] = self.time[1:]
+            self.time[-1] = ptime.time() - self.startTime
+
+            self.sumCurve.setData(self.time, self.data)
+
+        self.ptr += 1
+
+
+class AlignWidgetXYProject(QtGui.QFrame):
+
+    def __init__(self, main, *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+
+        self.main = main
+
+        self.ROI = ROI((50, 50), self.main.vb, (0, 0), handlePos=(1, 0),
+                       handleCenter=(0, 1), color=pg.mkPen(255, 0, 0),
+                       scaleSnap=True, translateSnap=True)
+
+        self.ROI.hide()
+        self.graph = ProjectionGraph()
+        self.roiButton = QtGui.QPushButton('Show ROI')
+        self.roiButton.setCheckable(True)
+        self.roiButton.clicked.connect(self.ROItoggle)
+
+        self.Xradio = QtGui.QRadioButton('X dimension')
+        self.Yradio = QtGui.QRadioButton('Y dimension')
+
+        grid = QtGui.QGridLayout()
+        self.setLayout(grid)
+        grid.addWidget(self.graph, 0, 0, 1, 6)
+        grid.addWidget(self.roiButton, 1, 0, 1, 1)
+        grid.addWidget(self.Xradio, 1, 1, 1, 1)
+        grid.addWidget(self.Yradio, 1, 2, 1, 1)
+
+        self.scansPerS = 10
+        self.alignTime = 1000 / self.scansPerS
+        self.alignTimer = QtCore.QTimer()
+        self.alignTimer.timeout.connect(self.updateValue)
+        self.alignTimer.start(self.alignTime)
+
+        # 2 zeros because it has to have the attribute "len"
+        self.latest_values = np.zeros(2)
+        self.s_fac = 0.3
+
+    def resetGraph(self):
+        self.graph.resetData()
+
+    def ROItoggle(self):
+        if self.roiButton.isChecked() is False:
+            self.ROI.hide()
+            self.roiButton.setText('Show ROI')
+        else:
+            self.ROI.show()
+            self.roiButton.setText('Hide ROI')
+
+    def updateValue(self):
+
+        if (self.main.liveviewButton.isChecked() and
+                self.roiButton.isChecked()):
+            self.selected = self.ROI.getArrayRegion(self.main.latest_images[0],
+                                                    self.main.img)
+        else:
+            self.selected = self.main.latest_images[self.main.currCamIdx]
+
+        if self.Xradio.isChecked():
+            values = np.mean(self.selected, 0)
+        else:
+            values = np.mean(self.selected, 1)
+
+        if len(self.latest_values) == len(values):
+            smoothed = self.s_fac*values + (1-self.s_fac)*self.latest_values
+            self.latest_values = smoothed
+        else:
+            smoothed = values
+            self.latest_values = values
+
+        self.graph.updateGraph(smoothed)
+
+    def closeEvent(self, *args, **kwargs):
+        self.alignTimer.stop()
+        super().closeEvent(*args, **kwargs)
+
+
+class ProjectionGraph(pg.GraphicsWindow):
+    """The graph window class"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.setWindowTitle('Average of area')
+        self.setAntialiasing(True)
+
+        self.npoints = 400
+        self.data = np.zeros(self.npoints)
+        self.ptr = 0
+
+        # Graph without a fixed range
+        self.statistics = pg.LabelItem(justify='right')
+        self.addItem(self.statistics)
+        self.statistics.setText('---')
+        self.plot = self.addPlot(row=1, col=0)
+        self.plot.setLabels(bottom=('Time', 's'),
+                            left=('Intensity', 'au'))
+        self.plot.showGrid(x=True, y=True)
+        self.sumCurve = self.plot.plot(pen='y')
+
+        self.startTime = ptime.time()
+
+    def updateGraph(self, values):
+        """ Update the data displayed in the graphs
+        """
+        self.data = values
+        self.sumCurve.setData(np.arange(len(self.data)), self.data)
